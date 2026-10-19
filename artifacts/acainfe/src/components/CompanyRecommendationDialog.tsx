@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog';
 import { ApiError, api } from '../lib/api';
-import { optionalCompanyLabels, optionalCompanyPatch, type OptionalCompanyField, type ReadinessItem } from '../lib/company-details';
+import { optionalCompanyLabels, optionalCompanyPatch, simplesRateInput, municipalRegistrationHelp, type OptionalCompanyField, type ReadinessItem } from '../lib/company-details';
 
 export function CompanyRecommendationDialog<T>({
   base, item, onSaved, onClose, onUnauthorized,
@@ -13,7 +13,7 @@ export function CompanyRecommendationDialog<T>({
   onClose: () => void;
   onUnauthorized: (error: ApiError) => void;
 }) {
-  const [value, setValue] = useState('');
+  const [value, setValue] = useState(item.field === 'simplesNacionalTaxRateBps' ? simplesRateInput(null, [item]) : '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function save(event: FormEvent) {
@@ -35,7 +35,7 @@ export function CompanyRecommendationDialog<T>({
   return <Dialog open onOpenChange={open => { if (!open && !busy) onClose(); }}>
     <DialogContent className="company-recommendation-dialog">
       <DialogTitle>{optionalCompanyLabels[item.field]}</DialogTitle>
-      <DialogDescription>{item.message}</DialogDescription>
+      <DialogDescription>{item.field === 'municipalRegistration' ? municipalRegistrationHelp : item.message}</DialogDescription>
       <form onSubmit={save}>
         <label className="app-field" htmlFor="recommended-company-value">
           <span>{optionalCompanyLabels[item.field]}</span>

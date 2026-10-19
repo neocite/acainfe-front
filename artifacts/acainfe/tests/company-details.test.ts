@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { optionalCompanyPatch, isOptionalCompanyField, type ReadinessItem } from '../src/lib/company-details';
+import { optionalCompanyPatch, onboardingCompanyPatch, simplesRateInput, isOptionalCompanyField, type ReadinessItem } from '../src/lib/company-details';
 import { onboardingEntry } from '../src/lib/onboarding-entry';
 import { ApiError } from '../src/lib/api';
 
@@ -10,7 +10,7 @@ const recommended: ReadinessItem[] = [
 ];
 const blank = { municipalRegistration: '', simplesNacionalTaxRateBps: '' };
 
-describe('CCM e alíquota opcionais', () => {
+describe('Dados fiscais e obrigatoriedade do CCM no cadastro', () => {
   it('envia somente a resposta da numeração quando os opcionais estão vazios', () => {
     const patch = { ...optionalCompanyPatch(recommended, blank), issuesElsewhere: false };
     assert.deepEqual(patch, { issuesElsewhere: false });
@@ -42,8 +42,8 @@ describe('CCM e alíquota opcionais', () => {
     assert.deepEqual(optionalCompanyPatch([recommended[0]], { municipalRegistration: '123', simplesNacionalTaxRateBps: '6,25' }), { municipalRegistration: '123' });
     assert.deepEqual(optionalCompanyPatch([recommended[1]], { municipalRegistration: '123', simplesNacionalTaxRateBps: '6,25' }), { simplesNacionalTaxRateBps: 625 });
   });
-  it('recommended não impede o avanço ao AbacatePay ou ao painel', () => {
-    const company = { readiness: { canIssue: true, missing: [], recommended }, availability: { status: 'READY' }, tenant: { integrations: { abacatepay: false } } };
+  it('alíquota recomendada não impede o avanço ao AbacatePay ou ao painel', () => {
+    const company = { readiness: { canIssue: true, missing: [], recommended: [recommended[1]] }, availability: { status: 'READY' }, tenant: { integrations: { abacatepay: false } } };
     assert.deepEqual(onboardingEntry(company), { step: 4, view: 'wizard' });
     company.tenant.integrations.abacatepay = true;
     assert.deepEqual(onboardingEntry(company), { step: 5, view: 'panel' });
@@ -59,5 +59,28 @@ describe('CCM e alíquota opcionais', () => {
     assert.equal(isOptionalCompanyField('simplesNacionalTaxRateBps'), true);
     assert.equal(isOptionalCompanyField('numbering'), false);
     assert.equal(isOptionalCompanyField('toString'), false);
+  });
+  it('exige CCM no cadastro e mostra erro no campo', () => {
+    for (const value of ['', '   ']) {
+      assert.throws(() => onboardingCompanyPatch(recommended, { municipalRegistration: value, simplesNacionalTaxRateBps: '6,00' }),
+        (error: unknown) => error instanceof ApiError && error.status === 422 && !!(error.details as Record<string, string>).municipalRegistration);
+    }
+  });
+  it('inicia em 6%, envia 600 Bps e permite alterar para 625 Bps', () => {
+    const rate = simplesRateInput(null, recommended);
+    assert.equal(rate, '6,00');
+    assert.deepEqual(onboardingCompanyPatch(recommended, { municipalRegistration: '123', simplesNacionalTaxRateBps: rate }), { municipalRegistration: '123', simplesNacionalTaxRateBps: 600 });
+    assert.deepEqual(onboardingCompanyPatch(recommended, { municipalRegistration: '123', simplesNacionalTaxRateBps: '6,25' }), { municipalRegistration: '123', simplesNacionalTaxRateBps: 625 });
+  });
+  it('não sobrescreve uma alíquota já informada, inclusive zero', () => {
+    assert.equal(simplesRateInput(625, recommended), '6,25');
+    assert.equal(simplesRateInput(0, recommended), '0,00');
+    assert.equal(simplesRateInput(null, []), '');
+  });
+  it('retoma a coleta do CCM em vez de pular ao AbacatePay ou painel', () => {
+    for (const connected of [false, true]) {
+      const company = { readiness: { canIssue: true, recommended }, availability: { status: 'READY' }, tenant: { integrations: { abacatepay: connected } } };
+      assert.deepEqual(onboardingEntry(company), { step: 3, view: 'wizard' });
+    }
   });
 });

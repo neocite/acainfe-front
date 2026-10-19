@@ -1,14 +1,32 @@
 import { ApiError } from './api';
-import { percentToBps } from './numbers';
+import { percentToBps, bpsToPercent } from './numbers';
 
 export type ReadinessItem = { field: string; message: string };
 export type OptionalCompanyField = 'municipalRegistration' | 'simplesNacionalTaxRateBps';
+export const municipalRegistrationHelp = 'Obrigatório para concluir o cadastro. Encontre o número no alvará ou no cadastro da sua empresa na prefeitura.';
 export const optionalCompanyLabels: Record<OptionalCompanyField, string> = {
   municipalRegistration: 'Inscrição municipal (CCM)',
   simplesNacionalTaxRateBps: 'Alíquota efetiva do Simples (%)',
 };
 export function isOptionalCompanyField(field: string): field is OptionalCompanyField {
   return Object.hasOwn(optionalCompanyLabels, field);
+}
+
+export function simplesRateInput(bps: number | null | undefined, recommended: ReadinessItem[]): string {
+  if (typeof bps === 'number') return bpsToPercent(bps);
+  return recommended.some(item => item.field === 'simplesNacionalTaxRateBps') ? '6,00' : '';
+}
+
+/** O cadastro exige CCM, mesmo que ele seja opcional para a emissão na API. */
+export function onboardingCompanyPatch(
+  recommended: ReadinessItem[],
+  values: { municipalRegistration: string; simplesNacionalTaxRateBps: string },
+) {
+  if (recommended.some(item => item.field === 'municipalRegistration') && !values.municipalRegistration.trim()) {
+    const message = 'Informe a inscrição municipal (CCM) para continuar.';
+    throw new ApiError(422, message, { municipalRegistration: message });
+  }
+  return optionalCompanyPatch(recommended, values);
 }
 
 /** Campos recomendados vazios ficam ausentes: a estimativa é responsabilidade da API. */

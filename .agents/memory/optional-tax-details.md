@@ -3,8 +3,10 @@ name: Dados fiscais opcionais
 description: Por que CCM e alíquota do Simples não devem bloquear o cadastro nem a emissão.
 ---
 
-CCM e alíquota do Simples são recomendações, não pré-requisitos de emissão. A prefeitura normalmente já tem o CCM no cadastro nacional; o número só deve ser exigido se ela recusar a nota. Enquanto a alíquota não for informada, a API usa 6% como estimativa dos tributos aproximados da Lei 12.741, sem alterar o imposto pago no DAS.
+O usuário reviu a experiência de cadastro: pedir CCM obrigatório, pois a pessoa precisa saber que tem que informar isso, e carregar 6% como padrão da alíquota, permitindo alterar. Os campos devem ficar visíveis, não em uma seção recolhida de dados opcionais. Preservar uma alíquota que já tenha sido informada.
 
-**Why:** O usuário explicou que quem cadastra de madrugada não sabe esses dados e não pode ficar travado esperando o contador acordar.
+**Why:** O usuário não aprovou a seção opcional e pediu explicitamente CCM obrigatório e 6% pré-preenchido.
 
-**How to apply:** Não tornar recomendações obrigatórias, não gravar a estimativa como se fosse uma alíquota informada pelo usuário e distinguir claramente recomendações das pendências que impedem emissão.
+A API continua considerando CCM e alíquota recomendações que não impedem a emissão. A estimativa de 6% se refere aos tributos aproximados da Lei 12.741; não altera o imposto pago no DAS.
+
+**How to apply:** Separar a exigência de CCM na interface do cadastro da capacidade de emissão indicada pela API. Não deixar a retomada do cadastro pular o CCM pendente.
