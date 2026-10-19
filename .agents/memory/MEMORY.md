@@ -1,0 +1,1 @@
+- [Bootstrap de artefatos](artifact-bootstrap.md) — em projetos vazios, o scaffold de um artefato pode não trazer os pré-requisitos do workspace.

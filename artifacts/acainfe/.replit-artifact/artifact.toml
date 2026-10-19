@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "açaínfe"
+description = "Nota fiscal automática, sem mensalidade, para quem vende no AbacatePay."
+version = "1.0.0"
+id = "artifacts/acainfe"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21280
+
+[services.development]
+run = "pnpm --filter @workspace/acainfe run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/acainfe", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/acainfe/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21280"
+BASE_PATH = "/"

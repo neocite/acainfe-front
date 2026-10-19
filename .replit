@@ -1,0 +1,20 @@
+modules = ["nodejs-22", "postgresql-16"]
+
+[workflows]
+runButton = "Project"
+
+[userenv]
+
+[userenv.shared]
+ACAINFE_API_URL = "https://flowing-rabbit-still.ngrok-free.app"
+
+[nix]
+channel = "stable-25_05"
+
+[[ports]]
+localPort = 21280
+externalPort = 3000
+
+[[ports]]
+localPort = 24678
+externalPort = 80
