@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import { ArrowRight, ArrowLeft, Check, ShieldCheck, FileKey, Sparkles, Copy, CheckCheck, LogOut, Loader2, Wallet, Building2, AlertTriangle, Leaf, Mail } from 'lucide-react';
@@ -5,6 +6,9 @@ import { api, ApiError, phoneMask } from '../lib/api';
 import { isOptionalCompanyField, onboardingCompanyPatch, simplesRateInput, municipalRegistrationHelp, type ReadinessItem, type OptionalCompanyField } from '../lib/company-details';
 import { CompanyRecommendationDialog } from '../components/CompanyRecommendationDialog';
 import { AbacatePayStep } from '../components/AbacatePayStep';
+import { FiscalCompanyFields } from '../components/FiscalCompanyFields';
+import { fiscalCompanyPatch } from '../lib/fiscal-profiles';
+import { bpsToPercent } from '../lib/numbers';
 import { isAuthUser, type AuthUser } from '../lib/auth';
 import { onboardingEntry } from '../lib/onboarding-entry';
 import { brl } from '../config/pricing';
@@ -14,10 +18,11 @@ import '../company-details.css';
 import '../abacatepay-step.css';
 import '../past-sales.css';
 import '../products.css';
+import '../fiscal-company.css';
 
 type User = AuthUser;
 type CompanyStatus = {
-  tenant: { id: string; cnpj?: string; taxRegime?: string; municipalRegistration?: string | null; simplesNacionalTaxRateBps?: number | null; status?: string; integrations?: { abacatepay?: boolean }; certificateExpiresAt?: string; accountant?: unknown };
+  tenant: { id: string; cnpj?: string; taxRegime?: string; municipalRegistration?: string | null; simplesNacionalTaxRateBps?: number | null; status?: string; integrations?: { abacatepay?: boolean }; certificateExpiresAt?: string; accountant?: unknown; businessType?: string | null; issRateBps?: number | null };
   company?: { legalName?: string; tradeName?: string; cityName?: string; uf?: string };
   availability: { status: string; reason?: string };
   readiness: { canIssue: boolean; missing: ReadinessItem[]; recommended?: ReadinessItem[] };
@@ -72,6 +77,8 @@ export default function Onboarding() {
   const [municipal, setMunicipal] = useState('');
   const [rate, setRate] = useState('');
   const [regime, setRegime] = useState('');
+  const [businessType, setBusinessType] = useState('');
+  const [issRate, setIssRate] = useState('');
   const [numbering, setNumbering] = useState('');
   const [advanced, setAdvanced] = useState(false);
   const [series, setSeries] = useState('');
@@ -91,6 +98,8 @@ export default function Onboarding() {
     setRegime(s.tenant.taxRegime || 'SIMPLES_NACIONAL');
     setMunicipal(s.tenant.municipalRegistration || '');
     setRate(simplesRateInput(s.tenant.simplesNacionalTaxRateBps, s.readiness.recommended || []));
+    setBusinessType(s.tenant.businessType || '');
+    setIssRate(typeof s.tenant.issRateBps === 'number' ? bpsToPercent(s.tenant.issRateBps) : '');
   }
   function handleError(e: unknown) {
     setError(e instanceof Error ? e.message : 'Não foi possível concluir.');
@@ -174,6 +183,7 @@ export default function Onboarding() {
         if (s.availability.status !== 'WAITLIST') setStep(3);
       } else if (step === 3) {
         const data: Record<string, unknown> = onboardingCompanyPatch(recommended, { municipalRegistration: municipal, simplesNacionalTaxRateBps: rate });
+        Object.assign(data, fiscalCompanyPatch(status?.readiness.missing || [], { businessType, issRate }));
         if (regime && regime !== (status?.tenant.taxRegime || 'SIMPLES_NACIONAL')) data.taxRegime = regime;
         if (needsNumbering && advanced) { data.dpsSeries = series; data.nextDpsNumber = Number(nextNumber); }
         else if (needsNumbering) {
@@ -231,9 +241,10 @@ export default function Onboarding() {
         {step === 3 && <><div className="step-icon"><Building2 /></div><h2>Só mais alguns detalhes.</h2><p>A Receita já contou quase tudo. Agora faltam as informações abaixo.</p>{status && <><CompanyCard status={status} /><div className="app-success"><Check size={17} /> Sua cidade já está liberada!</div></>}
           {recommended.map(item => item.field === 'municipalRegistration' ? <Field key={item.field} label="Inscrição municipal (CCM)" help={municipalRegistrationHelp}><input value={municipal} onChange={e => setMunicipal(e.target.value)} required aria-required="true" /></Field> : item.field === 'simplesNacionalTaxRateBps' ? <Field key={item.field} label="Alíquota efetiva do Simples (%)" help="Valor padrão: 6%. Altere se souber sua alíquota. Esse valor aparece nos tributos aproximados da nota e não muda o imposto do DAS."><input value={rate} onChange={e => setRate(e.target.value)} inputMode="decimal" /></Field> : null)}
           <Field label="Regime da empresa" help="Se veio errado, você pode corrigir aqui."><select value={regime} onChange={e => setRegime(e.target.value)}><option value="MEI">MEI</option><option value="SIMPLES_NACIONAL">Simples Nacional</option><option value="LUCRO_PRESUMIDO">Lucro Presumido</option><option value="LUCRO_REAL">Lucro Real</option></select></Field>
+          <FiscalCompanyFields missing={status?.readiness.missing || []} businessType={businessType} issRate={issRate} onBusinessType={setBusinessType} onIssRate={setIssRate} errors={fieldErrors} disabled={busy} onUnauthorized={handleError} />
           {needsNumbering && <><fieldset className="numbering-options"><legend>Você já emite nota fiscal de serviço por outro sistema?</legend>{[['no', 'Não, vou começar agora'], ['yes', 'Sim, já emito']].map(([value, label]) => <label key={value}><input type="radio" name="numbering" value={value} checked={numbering === value} required={!advanced} disabled={advanced} onChange={() => setNumbering(value)} />{label}</label>)}{numbering === 'yes' && !advanced && <small>Usaremos a série exclusiva 900 para evitar números repetidos.</small>}{fieldErrors.numbering && <small className="danger-text">{fieldErrors.numbering}</small>}</fieldset>
           <button type="button" className="text-button" onClick={() => setAdvanced(!advanced)}>{advanced ? 'Usar configuração automática' : 'Prefiro informar a numeração'}</button>{advanced && <><p className="app-muted">Peça ao seu contador ou veja no seu emissor atual a série e o número da próxima nota.</p><div className="app-two-cols"><Field label="Série"><input value={series} onChange={e => setSeries(e.target.value)} required pattern="[0-9]+" inputMode="numeric" /></Field><Field label="Próximo número livre"><input type="number" min="1" step="1" value={nextNumber} onChange={e => setNextNumber(e.target.value)} required /></Field></div></>}</>}
-          {status?.readiness.missing.filter(m => m.field !== 'numbering').map(m => <p className="app-notice" key={m.field}>{m.message}</p>)}
+          {status?.readiness.missing.filter(m => !['numbering', 'businessType', 'issRateBps'].includes(m.field)).map(m => <p className="app-notice" key={m.field}>{m.message}</p>)}
         </>}
         {step === 3.1 && <><div className="step-icon"><Mail /></div><span className="app-eyebrow">UM EXTRA QUE FACILITA A VIDA</span><h2>Quem é seu contador?</h2><p>Todo mês o seu contador precisa das notas emitidas. A gente manda <strong>automaticamente, todo dia 1</strong>, por e-mail e WhatsApp: os PDFs, os XMLs e a planilha no formato necessário para ele. Você não precisa lembrar de nada.</p><Field label="Nome do contador ou escritório (opcional)"><input value={accountant.name} onChange={e => setAccountant({ ...accountant, name: e.target.value })} /></Field><Field label="E-mail do contador"><input type="email" value={accountant.email} onChange={e => setAccountant({ ...accountant, email: e.target.value })} /></Field><Field label="WhatsApp do contador" help="Precisamos de pelo menos um dos dois contatos."><input inputMode="tel" value={accountant.whatsapp} placeholder="(11) 99999-9999" onChange={e => setAccountant({ ...accountant, whatsapp: phoneMask(e.target.value) })} /></Field><button type="button" className="text-button" disabled={busy} onClick={() => { setAccountantSkipped(true); setStep(status?.tenant.integrations?.abacatepay ? 5 : 4); }}>Não tenho contador agora</button></>}
         {step === 5 && <><div className="step-icon"><Sparkles /></div><h2>Seu assistente<br />assume daqui.</h2><p>Emita, consulte, reenvie e cancele notas conversando. Conecte o açaínfe ao Claude ou a outro cliente MCP.</p>{products.length > 0 && <div className="app-notice">{products.length} produtos aguardam a definição do código de serviço. O assistente te ajuda no próximo passo.</div>}
