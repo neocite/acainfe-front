@@ -2,7 +2,7 @@ import { it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { companyDisplayName, mergeCompanyProfile, type CompanyProfile } from '../src/lib/company-profile';
+import { companyDisplayName, mergeCompanyProfile, companyStatusLabel, certificateExpiryLabel, type CompanyProfile } from '../src/lib/company-profile';
 import { CompanyCard } from '../src/components/CompanyCard';
 
 const certificate: CompanyProfile = {
@@ -44,4 +44,29 @@ it('não mistura dados de empresas diferentes', () => {
 });
 it('informa explicitamente quando a API não retornou nenhum nome', () => {
   assert.equal(companyDisplayName({ tenant: { id: 'test-company' } }), 'Nome da empresa não informado pela API');
+});
+it('traduz status e não mostra códigos desconhecidos em inglês', () => {
+  assert.equal(companyStatusLabel('ACTIVE'), 'Ativa');
+  assert.equal(companyStatusLabel('INACTIVE'), 'Inativa');
+  assert.equal(companyStatusLabel('SUSPENDED'), 'Suspensa');
+  assert.equal(companyStatusLabel('FUTURE_STATUS'), 'Status não reconhecido');
+  assert.equal(companyStatusLabel(), 'Não informado');
+});
+it('lê datas suportadas e mantém o dia sem deslocamento de fuso', () => {
+  for (const data of [
+    { certificate: { expiresAt: '2027-05-20T00:00:00Z' } },
+    { certificate: { validUntil: '2027-05-20' } },
+    { tenant: { id: 'test-company', certificateExpiresAt: '2027-05-20' } },
+  ]) assert.equal(certificateExpiryLabel({ tenant: { id: 'test-company' }, ...data }), '20/05/2027');
+  assert.equal(certificateExpiryLabel({ tenant: { id: 'test-company' }, certificate: { expiresAt: 'invalid' } }), 'Validade inválida');
+  assert.equal(certificateExpiryLabel({ tenant: { id: 'test-company' } }), 'Validade não informada');
+});
+it('preserva validade de respostas resumidas sem misturar empresas nem ignorar remoção explícita', () => {
+  const full = { ...certificate, certificate: { expiresAt: '2027-05-20' } };
+  assert.equal(certificateExpiryLabel(mergeCompanyProfile<CompanyProfile>(full, { tenant: { id: 'test-company' } })), '20/05/2027');
+  assert.equal(certificateExpiryLabel(mergeCompanyProfile<CompanyProfile>(full, { tenant: { id: 'test-company' }, certificate: null })), 'Validade não informada');
+  assert.equal(certificateExpiryLabel(mergeCompanyProfile<CompanyProfile>(full, { tenant: { id: 'other' } })), 'Validade não informada');
+  const inTenant = { tenant: { id: 'test-company', certificateExpiresAt: '2027-05-20' } };
+  assert.equal(certificateExpiryLabel(mergeCompanyProfile<CompanyProfile>(inTenant, { tenant: { id: 'test-company' } })), '20/05/2027');
+  assert.equal(certificateExpiryLabel(mergeCompanyProfile<CompanyProfile>(inTenant, { tenant: { id: 'test-company', certificateExpiresAt: null } })), 'Validade não informada');
 });

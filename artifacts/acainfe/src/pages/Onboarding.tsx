@@ -7,6 +7,8 @@ import { isOptionalCompanyField, onboardingCompanyPatch, simplesRateInput, munic
 import { CompanyRecommendationDialog } from '../components/CompanyRecommendationDialog';
 import { AbacatePayStep } from '../components/AbacatePayStep';
 import { FiscalCompanyFields } from '../components/FiscalCompanyFields';
+import { CompanyCard } from '../components/CompanyCard';
+import { mergeCompanyProfile, companyStatusLabel, certificateExpiryLabel, type CompanyProfile } from '../lib/company-profile';
 import { fiscalCompanyPatch } from '../lib/fiscal-profiles';
 import { bpsToPercent } from '../lib/numbers';
 import { isAuthUser, type AuthUser } from '../lib/auth';
@@ -21,7 +23,7 @@ import '../products.css';
 import '../fiscal-company.css';
 
 type User = AuthUser;
-type CompanyStatus = {
+type CompanyStatus = CompanyProfile & {
   tenant: { id: string; cnpj?: string; taxRegime?: string; municipalRegistration?: string | null; simplesNacionalTaxRateBps?: number | null; status?: string; integrations?: { abacatepay?: boolean }; certificateExpiresAt?: string; accountant?: unknown; businessType?: string | null; issRateBps?: number | null };
   company?: { legalName?: string; tradeName?: string; cityName?: string; uf?: string };
   availability: { status: string; reason?: string };
@@ -54,10 +56,6 @@ function Field({ label, help, children }: { label: string; help?: string; childr
   const errors = useContext(ValidationContext);
   const error = errors[fieldNames[label] || label];
   return <label className="app-field"><span>{label}</span>{children}{help && <small>{help}</small>}{error && <small className="danger-text" role="alert">{error}</small>}</label>;
-}
-function CompanyCard({ status }: { status: CompanyStatus }) {
-  const cnpj = status.tenant.cnpj?.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
-  return <div className="company-summary"><Building2 size={24} /><div><strong>{status.company?.legalName || status.company?.tradeName || 'Sua empresa'}</strong><p>{cnpj} {status.company?.cityName && `· ${status.company.cityName}/${status.company.uf}`}</p><small>{status.tenant.taxRegime?.replaceAll('_', ' ')}</small></div></div>;
 }
 export default function Onboarding() {
   const [user, setUser] = useState<User | null>(null);
@@ -94,7 +92,7 @@ export default function Onboarding() {
   const base = `/app/companies/${encodeURIComponent(id || '')}`;
 
   function applyStatus(s: CompanyStatus) {
-    setStatus(s);
+    setStatus(previous => mergeCompanyProfile(previous, s));
     setRegime(s.tenant.taxRegime || 'SIMPLES_NACIONAL');
     setMunicipal(s.tenant.municipalRegistration || '');
     setRate(simplesRateInput(s.tenant.simplesNacionalTaxRateBps, s.readiness.recommended || []));
@@ -137,6 +135,12 @@ export default function Onboarding() {
     setView(entry.view);
     if (existing) {
       applyStatus(existing);
+      const details = await api<CompanyStatus>(`/app/companies/${encodeURIComponent(existing.tenant.id)}`);
+      const hydrated = mergeCompanyProfile(existing, details);
+      applyStatus(hydrated);
+      const detailedEntry = onboardingEntry(hydrated);
+      setStep(detailedEntry.step);
+      setView(detailedEntry.view);
     }
   }
   useEffect(() => {
@@ -225,7 +229,7 @@ export default function Onboarding() {
       : view === 'billing' ? <section className="app-card"><span className="app-eyebrow">SEM MENSALIDADE. SEM SURPRESA.</span><h1>Seu saldo.</h1>{errorBox}{billing ? <><div className="balance-value">{brl(billing.amountDueCents)}</div><p>Você tem <strong>{brl(billing.openCents)}</strong> em aberto ({billing.openCharges} notas).{billing.blocksAt && <> Pague até <strong>{new Date(billing.blocksAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</strong> para manter a emissão ativa.</>}</p>{billing.overdue && <p className="danger-text">O pagamento está atrasado.</p>}{billing.creditCents > 0 && <div className="app-success">Você tem {brl(billing.creditCents)} de crédito para as próximas notas.</div>}<p className="app-muted">Cada nota custa {brl(billing.pricePerInvoiceCents)}. O saldo é avisado todo dia por e-mail e WhatsApp. Pix mínimo de R$ 1,00; a sobra vira crédito.</p>
       <button className="app-primary" disabled={busy || billing.amountDueCents <= 0} onClick={() => run(async () => setPix(await api(`${base}/billing/payments`, 'POST')))}>{busy ? <Loader2 className="spin" size={17} /> : <Wallet size={17} />} {billing.amountDueCents > 0 ? 'Pagar com Pix' : 'Tudo em dia'}</button>
       {pix && <div className="pix-section"><h2>Pix de {brl(pix.amountCents)}</h2>{/^data:image\/(png|jpeg|webp);base64,/.test(pix.pixQrCodeImage) && <img src={pix.pixQrCodeImage} alt="QR Code para pagamento Pix" />}<p>Expira em {new Date(pix.expiresAt).toLocaleString('pt-BR')}</p><div className="copy-field"><code>{pix.pixCopyPaste}</code><CopyButton text={pix.pixCopyPaste} /></div><button className="app-secondary" disabled={busy} onClick={() => run(async () => { const b = await api<Billing>(`${base}/billing`); setBilling(b); if (b.amountDueCents <= 0) setPix(null); })}>Verificar pagamento</button></div>}</> : <p>Não foi possível carregar o saldo. Use a aba Saldo para tentar novamente.</p>}</section>
-      : view === 'panel' ? <section className="app-card"><span className="app-eyebrow">TUDO NO SEU LUGAR</span><h1>Seu negócio, por aqui.</h1>{errorBox}{status && <><CompanyCard status={status} /><div className="panel-grid"><div><small>Status da empresa</small><strong>{status.tenant.status || 'Não informado'}</strong></div><div><small>Emissão de notas</small><strong>{status.readiness.canIssue ? 'Empresa pronta' : 'Há pendências'}</strong></div><div><small>Produtos aguardando tributação</small><strong>{Array.isArray(status.pendingTaxReview) ? status.pendingTaxReview.length : status.pendingTaxReview}</strong></div><div><small>Validade do certificado</small><strong>{(() => { const date = status.certificate?.expiresAt || status.certificate?.validUntil || status.tenant.certificateExpiresAt; return date ? new Date(date).toLocaleDateString('pt-BR') : 'Não informada pela API'; })()}</strong></div></div>
+      : view === 'panel' ? <section className="app-card"><span className="app-eyebrow">TUDO NO SEU LUGAR</span><h1>Seu negócio, por aqui.</h1>{errorBox}{status && <><CompanyCard status={status} /><div className="panel-grid"><div><small>Status da empresa</small><strong>{companyStatusLabel(status.tenant.status)}</strong></div><div><small>Emissão de notas</small><strong>{status.readiness.canIssue ? 'Empresa pronta' : 'Há pendências'}</strong></div><div><small>Produtos aguardando tributação</small><strong>{Array.isArray(status.pendingTaxReview) ? status.pendingTaxReview.length : status.pendingTaxReview}</strong></div><div><small>Validade do certificado</small><strong>{certificateExpiryLabel(status)}</strong></div></div>
       {status.readiness.missing.length > 0 && <div className="app-notice"><h3>O que falta para emitir</h3><ul>{status.readiness.missing.map(m => <li key={m.field}>{m.message}</li>)}</ul><button className="app-secondary" onClick={() => { setStep(3); setView('wizard'); }}>Completar dados</button></div>}
        {recommended.length > 0 && <section className="company-recommendations" aria-labelledby="recommendations-title"><h3 id="recommendations-title">{recommended.some(item => item.field === 'municipalRegistration') ? 'Complete seu cadastro' : 'Complete quando puder'}</h3><p>{recommended.some(item => item.field === 'municipalRegistration') ? 'Informe o CCM para concluir seu cadastro. A alíquota pode ser ajustada quando precisar.' : 'Esses dados são opcionais e não impedem a emissão.'}</p><ul>{recommended.map(item => <li key={item.field}><span>{item.field === 'municipalRegistration' ? municipalRegistrationHelp : item.message}</span>{isOptionalCompanyField(item.field) && <button className="app-secondary" type="button" disabled={busy} onClick={() => setEditingRecommendation({ ...item, field: item.field as OptionalCompanyField })}>Informar<span className="sr-only"> {item.field === 'municipalRegistration' ? 'CCM' : 'alíquota do Simples'}</span></button>}</li>)}</ul></section>}
       {(accountantSkipped || !status.tenant.accountant) && <div className="app-notice"><h3>Seu contador já está por aqui?</h3><p>Cadastre um contato para receber os PDFs, XMLs e a planilha automaticamente todo dia 1.</p><button className="app-secondary" onClick={() => { setStep(3.1); setView('wizard'); }}>Adicionar contador</button></div>}<button className="app-secondary" onClick={refreshPanel} disabled={busy}>Atualizar status</button></>}</section>

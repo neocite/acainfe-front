@@ -11,6 +11,6 @@ O usuário do açaínfe não é contador. Perguntar “O que você vende?” em 
 
 Ao corrigir uma etapa do cadastro, verificar também a continuidade das etapas vizinhas na página completa, não apenas os componentes isolados.
 
-**Why:** Testes dos componentes fiscais passaram mesmo quando a página de cadastro deixou de exibir a escolha de atividade e de enviar a resposta; isso bloqueou a configuração da empresa.
+**Why:** Testes dos componentes fiscais passaram mesmo quando a página de cadastro deixou de exibir a escolha de atividade e de enviar a resposta; isso bloqueou a configuração da empresa. O mesmo problema ocorreu com o cartão da empresa: o componente isolado estava correto, mas a página usava outra implementação.
 
-**How to apply:** Cobrir a escolha de cada atividade, o envio junto com a numeração e a chegada à conexão com o AbacatePay. A existência do componente e seus testes isolados não comprovam que ele está ligado ao fluxo real.
+**How to apply:** Cobrir a escolha de cada atividade, o envio junto com a numeração e a chegada à conexão com o AbacatePay. Incluir a entrada e a atualização do painel na página real. A existência do componente e seus testes isolados não comprovam que ele está ligado ao fluxo real.

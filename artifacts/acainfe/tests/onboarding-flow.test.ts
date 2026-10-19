@@ -10,7 +10,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   let Onboarding: typeof import('../src/pages/Onboarding').default;
   let createRoot: typeof import('react-dom/client').createRoot;
   let modules: ViteDevServer;
-  let company: any, patches: any[], profilesRequested: number;
+  let company: any, details: any, patches: any[], profilesRequested: number, detailRequests: number;
   const descriptors = new Map<string, PropertyDescriptor | undefined>();
   const originalFetch = globalThis.fetch;
   before(async () => {
@@ -46,7 +46,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     }
   });
   beforeEach(() => {
-    patches = []; profilesRequested = 0;
+    patches = []; profilesRequested = 0; details = undefined; detailRequests = 0;
     company = {
       tenant: { id: 'test-company', taxRegime: 'SIMPLES_NACIONAL', municipalRegistration: '123', integrations: {} },
       company: { legalName: 'EMPRESA DE TESTE' }, availability: { status: 'AVAILABLE' },
@@ -68,6 +68,11 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
           { businessType: 'MICROSAAS', label: 'MicroSaaS', examples: 'Assinaturas e licenças de software', validated: false },
         ];
       } else if (path.endsWith('/billing')) data = { amountDueCents: 0 };
+      else if (path.endsWith('/products?pendingTaxReview=true')) data = [];
+      else if (path === '/api/app/companies/test-company' && method === 'GET') {
+        detailRequests++;
+        data = details || company;
+      }
       else if (path === '/api/app/companies/test-company' && method === 'PATCH') {
         const body = JSON.parse(String(init?.body)); patches.push(body);
         company = { ...company, tenant: { ...company.tenant, ...body }, readiness: { ...company.readiness,
@@ -141,5 +146,43 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   it('não mostra ISS em empresa que não precisa informá-lo', async () => {
     await mount();
     assert.equal(container.textContent?.includes('Alíquota de ISS do seu município'), false);
+  });
+  function readyPanel() {
+    company.tenant.integrations.abacatepay = true;
+    company.tenant.status = 'ACTIVE';
+    company.readiness = { canIssue: true, missing: [], recommended: [] };
+    delete company.company;
+  }
+  it('painel consulta detalhes, exibe nome, data e status em português e preserva ao atualizar', async () => {
+    readyPanel();
+    details = { ...company, tenant: { ...company.tenant, legalName: 'RAZÃO SOCIAL COMPLETA' },
+      certificate: { expiresAt: '2027-05-20T00:00:00.000Z' } };
+    await mount();
+    assert.equal(detailRequests, 1);
+    assert.ok(container.textContent?.includes('RAZÃO SOCIAL COMPLETA'));
+    assert.ok(container.textContent?.includes('20/05/2027'));
+    assert.ok(container.textContent?.includes('Ativa'));
+    assert.equal(container.textContent?.includes('ACTIVE'), false);
+    details = { ...company, tenant: { ...company.tenant, status: 'SUSPENDED' } };
+    await click(button('Atualizar status'));
+    assert.equal(detailRequests, 2);
+    assert.ok(container.textContent?.includes('RAZÃO SOCIAL COMPLETA'));
+    assert.ok(container.textContent?.includes('20/05/2027'));
+    assert.ok(container.textContent?.includes('Suspensa'));
+  });
+  it('painel aceita validade em tenant e usa nome do certificado quando detalhes são resumidos', async () => {
+    readyPanel();
+    company.company = { legalName: 'NOME DO CERTIFICADO' };
+    details = { ...company, company: undefined,
+      tenant: { ...company.tenant, certificateExpiresAt: '2027-12-31' } };
+    await mount();
+    assert.ok(container.textContent?.includes('NOME DO CERTIFICADO'));
+    assert.ok(container.textContent?.includes('31/12/2027'));
+  });
+  it('painel não inventa nome ou vencimento quando a API não fornece', async () => {
+    readyPanel(); await mount();
+    assert.ok(container.textContent?.includes('Nome da empresa não informado pela API'));
+    assert.ok(container.textContent?.includes('Validade não informada'));
+    assert.equal(container.textContent?.includes('Invalid Date'), false);
   });
 });

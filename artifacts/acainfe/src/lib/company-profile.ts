@@ -1,6 +1,7 @@
 export type CompanyProfile = {
-  tenant: { id: string; cnpj?: string; taxRegime?: string; legalName?: string; tradeName?: string; name?: string; effectiveIssRateBps?: number | null; environment?: string };
+  tenant: { id: string; cnpj?: string; taxRegime?: string; legalName?: string; tradeName?: string; name?: string; effectiveIssRateBps?: number | null; environment?: string; certificateExpiresAt?: string | null };
   company?: { legalName?: string; tradeName?: string; cityName?: string; uf?: string };
+  certificate?: { expiresAt?: string | null; validUntil?: string | null } | null;
 };
 
 function nonEmpty(value: string | null | undefined) {
@@ -29,12 +30,35 @@ export function mergeCompanyProfile<T extends CompanyProfile>(previous: T | null
     ...next,
     tenant: {
       ...next.tenant,
+      ...(!Object.hasOwn(next.tenant, 'certificateExpiresAt') && previous.tenant.certificateExpiresAt !== undefined
+        ? { certificateExpiresAt: previous.tenant.certificateExpiresAt } : {}),
       ...Object.fromEntries(['legalName', 'tradeName', 'name'].flatMap(field => {
         const key = field as 'legalName' | 'tradeName' | 'name';
         const value = nonEmpty(next.tenant[key]) || nonEmpty(previous.tenant[key]);
         return value ? [[key, value]] : [];
       })),
     },
+    ...(next.certificate === undefined
+      ? (previous.certificate !== undefined ? { certificate: previous.certificate } : {})
+      : { certificate: next.certificate === null ? null : { ...previous.certificate, ...next.certificate } }),
     ...(Object.keys(company).length ? { company } : {}),
   };
+}
+
+export function companyStatusLabel(status?: string): string {
+  const labels: Record<string, string> = {
+    ACTIVE: 'Ativa', INACTIVE: 'Inativa', PENDING: 'Pendente',
+    SUSPENDED: 'Suspensa', BLOCKED: 'Bloqueada', DISABLED: 'Desativada',
+    WAITLIST: 'Na lista de espera', REJECTED: 'Rejeitada',
+  };
+  return status ? labels[status.toUpperCase()] || 'Status não reconhecido' : 'Não informado';
+}
+
+export function certificateExpiryLabel(profile: CompanyProfile): string {
+  const value = profile.certificate?.expiresAt || profile.certificate?.validUntil || profile.tenant.certificateExpiresAt;
+  if (!value) return 'Validade não informada';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return 'Validade inválida';
+  // A data fiscal não deve recuar um dia por causa do fuso do navegador.
+  return new Intl.DateTimeFormat('pt-BR', { timeZone: 'UTC' }).format(date);
 }
