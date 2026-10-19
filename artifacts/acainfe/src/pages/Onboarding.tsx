@@ -11,6 +11,7 @@ import { CompanyCard } from '../components/CompanyCard';
 import { mergeCompanyProfile, companyStatusLabel, certificateExpiryLabel, type CompanyProfile } from '../lib/company-profile';
 import { fiscalCompanyPatch } from '../lib/fiscal-profiles';
 import { bpsToPercent } from '../lib/numbers';
+import { hermesMcpCommand } from '../lib/hermes-mcp';
 import { isAuthUser, type AuthUser } from '../lib/auth';
 import { onboardingEntry } from '../lib/onboarding-entry';
 import { brl } from '../config/pricing';
@@ -47,8 +48,14 @@ function Brand() { return <Link href="/" className="app-brand">açaínfe<span cl
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState(false);
+  const resetTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (resetTimer.current !== null) clearTimeout(resetTimer.current); }, []);
   return <button className="copy-button" type="button" onClick={async () => {
-    try { await navigator.clipboard.writeText(text); setCopied(true); setError(false); setTimeout(() => setCopied(false), 2000); }
+    try {
+      await navigator.clipboard.writeText(text); setCopied(true); setError(false);
+      if (resetTimer.current !== null) clearTimeout(resetTimer.current);
+      resetTimer.current = setTimeout(() => setCopied(false), 2000);
+    }
     catch { setError(true); }
   }}>{copied ? <CheckCheck size={16} /> : <Copy size={16} />}{error ? 'Selecione e copie' : copied ? 'Copiado!' : 'Copiar'}</button>;
 }
@@ -253,8 +260,18 @@ export default function Onboarding() {
         {step === 3.1 && <><div className="step-icon"><Mail /></div><span className="app-eyebrow">UM EXTRA QUE FACILITA A VIDA</span><h2>Quem é seu contador?</h2><p>Todo mês o seu contador precisa das notas emitidas. A gente manda <strong>automaticamente, todo dia 1</strong>, por e-mail e WhatsApp: os PDFs, os XMLs e a planilha no formato necessário para ele. Você não precisa lembrar de nada.</p><Field label="Nome do contador ou escritório (opcional)"><input value={accountant.name} onChange={e => setAccountant({ ...accountant, name: e.target.value })} /></Field><Field label="E-mail do contador"><input type="email" value={accountant.email} onChange={e => setAccountant({ ...accountant, email: e.target.value })} /></Field><Field label="WhatsApp do contador" help="Precisamos de pelo menos um dos dois contatos."><input inputMode="tel" value={accountant.whatsapp} placeholder="(11) 99999-9999" onChange={e => setAccountant({ ...accountant, whatsapp: phoneMask(e.target.value) })} /></Field><button type="button" className="text-button" disabled={busy} onClick={() => { setAccountantSkipped(true); setStep(status?.tenant.integrations?.abacatepay ? 5 : 4); }}>Não tenho contador agora</button></>}
         {step === 5 && <><div className="step-icon"><Sparkles /></div><h2>Seu assistente<br />assume daqui.</h2><p>Emita, consulte, reenvie e cancele notas conversando. Conecte o açaínfe ao Claude ou a outro cliente MCP.</p>{products.length > 0 && <div className="app-notice">{products.length} produtos aguardam a definição do código de serviço. O assistente te ajuda no próximo passo.</div>}
           {!mcp ? <button type="button" className="app-primary" disabled={busy} onClick={() => run(async () => setMcp(await api(`${base}/mcp-key`, 'POST')))}>{busy ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}Gerar minha chave</button> : <><div className="app-notice"><strong>Guarde esta chave: ela é exibida uma única vez.</strong><p>Não compartilhe sua chave nem capturas desta tela. Ela não será salva no navegador.</p></div><Field label="Sua chave MCP"><div className="copy-field"><code>{mcp.apiKey}</code><CopyButton text={mcp.apiKey} /></div></Field><Field label="URL do servidor MCP"><div className="copy-field"><code>{mcp.mcpUrl}</code><CopyButton text={mcp.mcpUrl} /></div></Field>
-            <div className="mcp-tabs"><button type="button" className={client === 'code' ? 'active' : ''} onClick={() => setClient('code')}>Claude Code</button><button type="button" className={client === 'desktop' ? 'active' : ''} onClick={() => setClient('desktop')}>Claude Desktop / outros</button></div>
-            {client === 'code' ? <><p>Cole este comando no terminal:</p><div className="copy-field command"><code>{mcp.claudeCodeCommand}</code><CopyButton text={mcp.claudeCodeCommand} /></div></> : <><p>Adicione um servidor MCP remoto com transporte <strong>Streamable HTTP</strong>, a URL acima e este header:</p><div className="copy-field"><code>Authorization: Bearer {mcp.apiKey}</code><CopyButton text={`Authorization: Bearer ${mcp.apiKey}`} /></div></>}
+            <div className="mcp-tabs" style={{ flexWrap: 'wrap' }}><button type="button" aria-pressed={client === 'code'} className={client === 'code' ? 'active' : ''} onClick={() => setClient('code')}>Claude Code</button><button type="button" aria-pressed={client === 'hermes'} className={client === 'hermes' ? 'active' : ''} onClick={() => setClient('hermes')}>Hermes (CLI)</button><button type="button" aria-pressed={client === 'desktop'} className={client === 'desktop' ? 'active' : ''} onClick={() => setClient('desktop')}>Claude Desktop / outros</button></div>
+            {client === 'code' ? <><p>Cole este comando no terminal:</p><div className="copy-field command"><code>{mcp.claudeCodeCommand}</code><CopyButton text={mcp.claudeCodeCommand} /></div></> : client === 'hermes' ? <section aria-label="Conectar ao Hermes via CLI">
+              <h3>Adicione o açaínfe ao Hermes</h3>
+              <p>Com o Hermes Agent instalado, abra o terminal do seu computador (Bash ou Zsh, no macOS/Linux).</p>
+              <ol>
+                <li><p>Adicione o servidor com autenticação por chave:</p><div className="copy-field command"><code>{hermesMcpCommand(mcp.mcpUrl)}</code><CopyButton text={hermesMcpCommand(mcp.mcpUrl)} /></div></li>
+                <li><p>Quando aparecer <code>API key / Bearer token</code>, cole somente sua chave MCP, sem escrever <code>Bearer</code>, e pressione Enter. A entrada fica oculta no terminal. Use o botão “Copiar” do campo “Sua chave MCP” acima.</p><p>Se já houver uma chave salva para esse servidor, o Hermes poderá reutilizá-la. Confirme a seleção das ferramentas que deseja habilitar.</p></li>
+                <li><p>Teste a conexão:</p><div className="copy-field command"><code>hermes mcp test acainfe</code><CopyButton text="hermes mcp test acainfe" /></div><p>Depois, abra uma nova sessão do Hermes para usar as ferramentas do açaínfe.</p></li>
+              </ol>
+              <p>O comando não inclui sua chave, para não deixá-la no histórico do terminal. O Hermes salva a credencial no perfil local dele; proteja esse arquivo e não o compartilhe.</p>
+              <a href="https://hermes-agent.nousresearch.com/docs/reference/cli-commands" target="_blank" rel="noopener noreferrer">Documentação oficial do Hermes</a>
+            </section> : <><p>Adicione um servidor MCP remoto com transporte <strong>Streamable HTTP</strong>, a URL acima e este header:</p><div className="copy-field"><code>Authorization: Bearer {mcp.apiKey}</code><CopyButton text={`Authorization: Bearer ${mcp.apiKey}`} /></div></>}
             <div className="first-prompt"><Sparkles size={19} /><div><strong>Sua primeira conversa</strong><p>Use o prompt <code>configurar_empresa</code> ou diga: “quero definir a tributação dos meus produtos”.</p><CopyButton text="quero definir a tributação dos meus produtos" /></div></div><button type="button" disabled={busy} className="text-button" onClick={() => { if (confirm('Gerar uma nova chave? As anteriores continuam válidas. Copie sua chave atual antes de continuar.')) void run(async () => setMcp(await api(`${base}/mcp-key`, 'POST'))); }}>Gerar outra chave (as anteriores continuam válidas)</button><button type="button" className="app-primary" onClick={() => { setView('panel'); void refreshPanel(); }}>Ir para meu painel <ArrowRight size={18} /></button></>}
         </>}
         {step !== 5 && <div className="form-actions">{step === 2 && <button type="button" className="app-secondary" onClick={() => setStep(1)} disabled={busy}><ArrowLeft size={16} /> Voltar</button>}<button className="app-primary" type="submit" disabled={busy || (!!error && error.includes('ACAINFE_APP_KEY'))}>{busy ? <><Loader2 className="spin" size={17} /> Salvando…</> : <>{step === 2 ? 'Enviar certificado' : step === 3 ? 'Continuar' : 'Salvar e continuar'}<ArrowRight size={17} /></>}</button></div>}

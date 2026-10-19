@@ -10,7 +10,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   let Onboarding: typeof import('../src/pages/Onboarding').default;
   let createRoot: typeof import('react-dom/client').createRoot;
   let modules: ViteDevServer;
-  let company: any, details: any, patches: any[], profilesRequested: number, detailRequests: number;
+  let company: any, details: any, patches: any[], profilesRequested: number, detailRequests: number, mcpRequests: number;
   const descriptors = new Map<string, PropertyDescriptor | undefined>();
   const originalFetch = globalThis.fetch;
   before(async () => {
@@ -46,7 +46,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     }
   });
   beforeEach(() => {
-    patches = []; profilesRequested = 0; details = undefined; detailRequests = 0;
+    patches = []; profilesRequested = 0; details = undefined; detailRequests = 0; mcpRequests = 0;
     company = {
       tenant: { id: 'test-company', taxRegime: 'SIMPLES_NACIONAL', municipalRegistration: '123', integrations: {} },
       company: { legalName: 'EMPRESA DE TESTE' }, availability: { status: 'AVAILABLE' },
@@ -69,6 +69,11 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
         ];
       } else if (path.endsWith('/billing')) data = { amountDueCents: 0 };
       else if (path.endsWith('/products?pendingTaxReview=true')) data = [];
+      else if (path === '/api/app/companies/test-company/mcp-key' && method === 'POST') {
+        mcpRequests++;
+        data = { apiKey: 'test-only-mcp-key', mcpUrl: 'https://example.test/mcp',
+          claudeCodeCommand: 'claude mcp add acainfe --transport http https://example.test/mcp' };
+      }
       else if (path === '/api/app/companies/test-company' && method === 'GET') {
         detailRequests++;
         data = details || company;
@@ -184,5 +189,46 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     assert.ok(container.textContent?.includes('Nome da empresa não informado pela API'));
     assert.ok(container.textContent?.includes('Validade não informada'));
     assert.equal(container.textContent?.includes('Invalid Date'), false);
+  });
+  it('abre Hermes na etapa MCP, copia comandos e mantém as outras instruções sem gerar nova chave', async () => {
+    readyPanel();
+    const copied: string[] = [];
+    const descriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: {
+      writeText: async (text: string) => { copied.push(text); },
+    } });
+    try {
+      await mount();
+      await click(button('Configuração'));
+      assert.equal(container.textContent?.includes('Hermes (CLI)'), false);
+      await click(button('Gerar minha chave'));
+      assert.equal(mcpRequests, 1);
+      const hermes = button('Hermes (CLI)');
+      await click(hermes);
+      assert.equal(hermes.getAttribute('aria-pressed'), 'true');
+      const section = container.querySelector('section[aria-label="Conectar ao Hermes via CLI"]');
+      assert.ok(section);
+      assert.ok(section.textContent?.includes('API key / Bearer token'));
+      assert.ok(section.textContent?.includes('histórico do terminal'));
+      assert.ok(section.querySelector('a[target="_blank"][rel="noopener noreferrer"]'));
+      assert.equal(section.textContent?.includes('test-only-mcp-key'), false);
+      const commands = [...section.querySelectorAll('.copy-field')];
+      assert.equal(commands[0].querySelector('code')?.textContent,
+        "hermes mcp add acainfe --url 'https://example.test/mcp' --auth header");
+      for (const command of commands) await click(command.querySelector('button')!);
+      assert.deepEqual(copied, [
+        "hermes mcp add acainfe --url 'https://example.test/mcp' --auth header",
+        'hermes mcp test acainfe',
+      ]);
+      await click(button('Claude Code'));
+      assert.ok(container.textContent?.includes('claude mcp add acainfe'));
+      assert.equal(container.querySelector('section[aria-label="Conectar ao Hermes via CLI"]'), null);
+      await click(button('Claude Desktop / outros'));
+      assert.ok(container.textContent?.includes('Authorization: Bearer test-only-mcp-key'));
+      assert.equal(mcpRequests, 1);
+    } finally {
+      if (descriptor) Object.defineProperty(navigator, 'clipboard', descriptor);
+      else delete (navigator as any).clipboard;
+    }
   });
 });
