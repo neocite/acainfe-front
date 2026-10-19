@@ -2,19 +2,22 @@ import { createContext, useContext, useEffect, useState, type FormEvent, type Re
 import { Link } from 'wouter';
 import { ArrowRight, ArrowLeft, Check, ShieldCheck, FileKey, Sparkles, Copy, CheckCheck, LogOut, Loader2, Wallet, Building2, AlertTriangle, ExternalLink, Leaf, Mail } from 'lucide-react';
 import { api, ApiError, phoneMask } from '../lib/api';
-import { percentToBps, bpsToPercent } from '../lib/numbers';
+import { bpsToPercent } from '../lib/numbers';
+import { isOptionalCompanyField, optionalCompanyPatch, type ReadinessItem, type OptionalCompanyField } from '../lib/company-details';
+import { CompanyRecommendationDialog } from '../components/CompanyRecommendationDialog';
 import { isAuthUser, type AuthUser } from '../lib/auth';
 import { onboardingEntry } from '../lib/onboarding-entry';
 import { brl } from '../config/pricing';
 import '../onboarding.css';
 import '../mobile-fixes.css';
+import '../company-details.css';
 
 type User = AuthUser;
 type CompanyStatus = {
-  tenant: { id: string; cnpj?: string; taxRegime?: string; simplesNacionalTaxRateBps?: number | null; status?: string; integrations?: { abacatepay?: boolean }; certificateExpiresAt?: string; accountant?: unknown };
+  tenant: { id: string; cnpj?: string; taxRegime?: string; municipalRegistration?: string | null; simplesNacionalTaxRateBps?: number | null; status?: string; integrations?: { abacatepay?: boolean }; certificateExpiresAt?: string; accountant?: unknown };
   company?: { legalName?: string; tradeName?: string; cityName?: string; uf?: string };
   availability: { status: string; reason?: string };
-  readiness: { canIssue: boolean; missing: { field: string; message: string }[] };
+  readiness: { canIssue: boolean; missing: ReadinessItem[]; recommended?: ReadinessItem[] };
   pendingTaxReview: number | unknown[];
   certificate?: { expiresAt?: string; validUntil?: string };
 };
@@ -55,7 +58,7 @@ export default function Onboarding() {
   const [error, setError] = useState('');
   const [unauthorized, setUnauthorized] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [newCompany, setNewCompany] = useState(false);
+  const [editingRecommendation, setEditingRecommendation] = useState<(ReadinessItem & { field: OptionalCompanyField }) | null>(null);
   const [status, setStatus] = useState<CompanyStatus | null>(null);
   const [step, setStep] = useState(1);
   const [view, setView] = useState<'wizard' | 'panel' | 'billing'>('wizard');
@@ -85,6 +88,7 @@ export default function Onboarding() {
   function applyStatus(s: CompanyStatus) {
     setStatus(s);
     setRegime(s.tenant.taxRegime || 'SIMPLES_NACIONAL');
+    setMunicipal(s.tenant.municipalRegistration || '');
     setRate(typeof s.tenant.simplesNacionalTaxRateBps === 'number' ? bpsToPercent(s.tenant.simplesNacionalTaxRateBps) : '');
   }
   function handleError(e: unknown) {
@@ -103,11 +107,8 @@ export default function Onboarding() {
         Object.entries(details).forEach(([key, value]) => { if (typeof value === 'string') errors[key] = value; });
       }
       if (!Object.keys(errors).length) {
-        const relevant = step === 1 ? ['name','whatsapp'] : step === 2 ? ['file','password'] : step === 4 ? ['apiKey'] : missing;
+        const relevant = step === 1 ? ['name','whatsapp'] : step === 2 ? ['file','password'] : step === 4 ? ['apiKey'] : [...missing, ...recommended.filter(item => isOptionalCompanyField(item.field) && (item.field === 'municipalRegistration' ? municipal.trim() : rate.trim())).map(item => item.field)];
         relevant.forEach(field => { errors[field] = e.message; });
-      }
-      if (step === 3 && missing.includes('simplesNacionalTaxRateBps') && !errors.simplesNacionalTaxRateBps) {
-        errors.simplesNacionalTaxRateBps = e.message;
       }
       setFieldErrors(errors);
     }
@@ -168,20 +169,11 @@ export default function Onboarding() {
         if (!file) throw new Error('Escolha seu certificado digital.');
         const form = new FormData(); form.append('file', file); form.append('password', password);
         const s = await api<CompanyStatus>('/app/onboarding/certificate', 'POST', form);
-        applyStatus(s); setPassword(''); setFile(null); setNewCompany(true);
+        applyStatus(s); setPassword(''); setFile(null);
         if (s.availability.status !== 'WAITLIST') setStep(3);
       } else if (step === 3) {
-        const missing = status?.readiness.missing.map(m => m.field) || [];
-        const data: Record<string, unknown> = { taxRegime: regime };
-        if (missing.includes('municipalRegistration')) data.municipalRegistration = municipal;
-        if (missing.includes('simplesNacionalTaxRateBps')) {
-          const bps = percentToBps(rate);
-          if (bps === null || bps > 3300) {
-            const message = 'Informe um percentual válido, ex.: 6 ou 6,25';
-            throw new ApiError(422, message, { simplesNacionalTaxRateBps: message });
-          }
-          data.simplesNacionalTaxRateBps = bps;
-        }
+        const data: Record<string, unknown> = optionalCompanyPatch(recommended, { municipalRegistration: municipal, simplesNacionalTaxRateBps: rate });
+        if (regime && regime !== (status?.tenant.taxRegime || 'SIMPLES_NACIONAL')) data.taxRegime = regime;
         if (needsNumbering && advanced) { data.dpsSeries = series; data.nextDpsNumber = Number(nextNumber); }
         else if (needsNumbering) {
           if (!numbering) throw new Error('Informe se você já emite notas em outro sistema.');
@@ -189,7 +181,7 @@ export default function Onboarding() {
         }
         const s = await api<CompanyStatus>(base, 'PATCH', data); applyStatus(s);
         if (!s.readiness.canIssue) throw new Error(s.readiness.missing.map(m => m.message).join('. ') || 'Confira as pendências da empresa.');
-        setNewCompany(false); setStep(3.1);
+        setStep(3.1);
       } else if (step === 3.1) {
         if (!accountant.email && accountant.whatsapp.replace(/\D/g, '').length < 10) throw new Error('Informe pelo menos um contato válido do contador.');
         if (accountant.whatsapp && accountant.whatsapp.replace(/\D/g, '').length < 10) throw new Error('Informe o WhatsApp do contador com DDD.');
@@ -204,7 +196,8 @@ export default function Onboarding() {
     });
   }
   const missing = status?.readiness.missing.map(m => m.field) || [];
-  const needsNumbering = newCompany || missing.includes('numbering');
+  const recommended = status?.readiness.recommended || [];
+  const needsNumbering = missing.includes('numbering');
   const isWaitlist = status?.availability.status === 'WAITLIST';
   const errorBox = error && <div className="app-alert" role="alert"><AlertTriangle size={18} /><div>{error}{unauthorized && <a href="/api/login">Entrar novamente <ArrowRight size={14} /></a>}{!unauthorized && <button type="button" onClick={() => run(loadMe)}>Tentar novamente</button>}</div></div>;
   if (loading) return <div className="app-loading"><Loader2 className="spin" size={28} /><p>Preparando seu espaço…</p></div>;
@@ -227,6 +220,7 @@ export default function Onboarding() {
       {pix && <div className="pix-section"><h2>Pix de {brl(pix.amountCents)}</h2>{/^data:image\/(png|jpeg|webp);base64,/.test(pix.pixQrCodeImage) && <img src={pix.pixQrCodeImage} alt="QR Code para pagamento Pix" />}<p>Expira em {new Date(pix.expiresAt).toLocaleString('pt-BR')}</p><div className="copy-field"><code>{pix.pixCopyPaste}</code><CopyButton text={pix.pixCopyPaste} /></div><button className="app-secondary" disabled={busy} onClick={() => run(async () => { const b = await api<Billing>(`${base}/billing`); setBilling(b); if (b.amountDueCents <= 0) setPix(null); })}>Verificar pagamento</button></div>}</> : <p>Não foi possível carregar o saldo. Use a aba Saldo para tentar novamente.</p>}</section>
       : view === 'panel' ? <section className="app-card"><span className="app-eyebrow">TUDO NO SEU LUGAR</span><h1>Seu negócio, por aqui.</h1>{errorBox}{status && <><CompanyCard status={status} /><div className="panel-grid"><div><small>Status da empresa</small><strong>{status.tenant.status || 'Não informado'}</strong></div><div><small>Emissão de notas</small><strong>{status.readiness.canIssue ? 'Empresa pronta' : 'Há pendências'}</strong></div><div><small>Produtos aguardando tributação</small><strong>{Array.isArray(status.pendingTaxReview) ? status.pendingTaxReview.length : status.pendingTaxReview}</strong></div><div><small>Validade do certificado</small><strong>{(() => { const date = status.certificate?.expiresAt || status.certificate?.validUntil || status.tenant.certificateExpiresAt; return date ? new Date(date).toLocaleDateString('pt-BR') : 'Não informada pela API'; })()}</strong></div></div>
       {status.readiness.missing.length > 0 && <div className="app-notice"><h3>O que falta para emitir</h3><ul>{status.readiness.missing.map(m => <li key={m.field}>{m.message}</li>)}</ul><button className="app-secondary" onClick={() => { setStep(3); setView('wizard'); }}>Completar dados</button></div>}
+       {recommended.length > 0 && <section className="company-recommendations" aria-labelledby="recommendations-title"><h3 id="recommendations-title">Complete quando puder</h3><p>Esses dados são opcionais e não impedem a emissão.</p><ul>{recommended.map(item => <li key={item.field}><span>{item.message}</span>{isOptionalCompanyField(item.field) && <button className="app-secondary" type="button" disabled={busy} onClick={() => setEditingRecommendation({ ...item, field: item.field as OptionalCompanyField })}>Informar<span className="sr-only"> {item.field === 'municipalRegistration' ? 'CCM' : 'alíquota do Simples'}</span></button>}</li>)}</ul></section>}
       {(accountantSkipped || !status.tenant.accountant) && <div className="app-notice"><h3>Seu contador já está por aqui?</h3><p>Cadastre um contato para receber os PDFs, XMLs e a planilha automaticamente todo dia 1.</p><button className="app-secondary" onClick={() => { setStep(3.1); setView('wizard'); }}>Adicionar contador</button></div>}<button className="app-secondary" onClick={refreshPanel} disabled={busy}>Atualizar status</button></>}</section>
       : <div className="wizard-layout"><aside className="wizard-aside"><span className="app-eyebrow">SÓ PRECISA CONFIGURAR UMA VEZ</span><h1>Vamos deixar<br />tudo <em>prontinho.</em></h1><p>Alguns passos agora.<br />Menos trabalho em cada venda.</p><ol>{steps.map((label, i) => <li key={label} className={Math.floor(step) === i + 1 ? 'current' : step > i + 1 ? 'complete' : ''}><span>{step > i + 1 ? <Check size={16} /> : String(i + 1).padStart(2, '0')}</span>{label}</li>)}</ol><div className="aside-secure"><ShieldCheck size={20} /><span>Seus dados protegidos.<br />Sua empresa no controle.</span></div></aside>
       <section className="app-card wizard-card"><div className="progress-label"><span>ETAPA {Math.floor(step)} DE 5</span><span>{Math.round(Math.floor(step) / 5 * 100)}%</span></div><div className="app-progress"><span style={{ width: `${Math.floor(step) * 20}%` }} /></div>
@@ -235,12 +229,13 @@ export default function Onboarding() {
         {step === 1 && <><div className="step-icon"><Leaf /></div><h2>Primeiro, você.</h2><p>Como podemos te chamar? Vamos usar seu WhatsApp para avisos importantes sobre suas notas.</p><Field label="E-mail da sua conta"><input type="email" value={user.email} readOnly className="readonly" /></Field><Field label="Seu nome"><input value={name} onChange={e => setName(e.target.value)} autoComplete="name" required placeholder="Como você gosta de ser chamado?" /></Field><Field label="WhatsApp com DDD"><input value={phone} onChange={e => setPhone(phoneMask(e.target.value))} inputMode="tel" autoComplete="tel" required placeholder="(11) 99999-9999" /></Field></>}
         {step === 2 && <><div className="step-icon"><FileKey /></div><h2>Seu certificado A1.</h2><p>É o mesmo certificado que você usa para emitir notas ou acessar o e-CAC. Ele fica guardado criptografado e serve para assinar suas notas.</p><Field label="Arquivo do certificado" help="Formatos .pfx ou .p12, até 10 MB."><div className="upload-box"><FileKey size={28} /><strong>{file ? file.name : 'Selecione seu certificado'}</strong><input type="file" accept=".pfx,.p12" required onChange={e => { const f = e.target.files?.[0]; if (f && f.size > 10 * 1024 * 1024) { setError('O certificado deve ter até 10 MB.'); e.target.value = ''; setFile(null); } else setFile(f || null); }} /></div></Field><Field label="Senha do certificado"><input type="password" autoComplete="off" value={password} onChange={e => setPassword(e.target.value)} required placeholder="A senha do seu arquivo A1" /></Field><div className="secure-note"><ShieldCheck size={17} /> Enviado com segurança. Nunca fica salvo no navegador.</div></>}
         {step === 3 && <><div className="step-icon"><Building2 /></div><h2>Só mais alguns detalhes.</h2><p>A Receita já contou quase tudo. Agora faltam as informações abaixo.</p>{status && <><CompanyCard status={status} /><div className="app-success"><Check size={17} /> Sua cidade já está liberada!</div></>}
-          {missing.includes('municipalRegistration') && <Field label="Inscrição municipal (CCM)" help="Está no seu cadastro na prefeitura ou no alvará."><input value={municipal} onChange={e => setMunicipal(e.target.value)} required /></Field>}
-          {missing.includes('simplesNacionalTaxRateBps') && <Field label="Alíquota efetiva do Simples (%)" help="Está no seu último DAS. Se não souber, peça ao seu contador."><input value={rate} onChange={e => setRate(e.target.value)} inputMode="decimal" required /></Field>}
+          {recommended.some(item => isOptionalCompanyField(item.field)) && <details className="optional-company-details" open={!!(fieldErrors.municipalRegistration || fieldErrors.simplesNacionalTaxRateBps) || undefined}><summary>Tenho esses dados agora (opcional)</summary>
+            {recommended.map(item => item.field === 'municipalRegistration' ? <Field key={item.field} label="Inscrição municipal (CCM)" help={item.message}><input value={municipal} onChange={e => setMunicipal(e.target.value)} /></Field> : item.field === 'simplesNacionalTaxRateBps' ? <Field key={item.field} label="Alíquota efetiva do Simples (%)" help={item.message}><input value={rate} onChange={e => setRate(e.target.value)} inputMode="decimal" /></Field> : null)}
+          </details>}
           <Field label="Regime da empresa" help="Se veio errado, você pode corrigir aqui."><select value={regime} onChange={e => setRegime(e.target.value)}><option value="MEI">MEI</option><option value="SIMPLES_NACIONAL">Simples Nacional</option><option value="LUCRO_PRESUMIDO">Lucro Presumido</option><option value="LUCRO_REAL">Lucro Real</option></select></Field>
           {needsNumbering && <><fieldset className="numbering-options"><legend>Você já emite nota fiscal de serviço por outro sistema?</legend>{[['no', 'Não, vou começar agora'], ['yes', 'Sim, já emito']].map(([value, label]) => <label key={value}><input type="radio" name="numbering" value={value} checked={numbering === value} required={!advanced} disabled={advanced} onChange={() => setNumbering(value)} />{label}</label>)}{numbering === 'yes' && !advanced && <small>Usaremos a série exclusiva 900 para evitar números repetidos.</small>}{fieldErrors.numbering && <small className="danger-text">{fieldErrors.numbering}</small>}</fieldset>
           <button type="button" className="text-button" onClick={() => setAdvanced(!advanced)}>{advanced ? 'Usar configuração automática' : 'Prefiro informar a numeração'}</button>{advanced && <><p className="app-muted">Peça ao seu contador ou veja no seu emissor atual a série e o número da próxima nota.</p><div className="app-two-cols"><Field label="Série"><input value={series} onChange={e => setSeries(e.target.value)} required pattern="[0-9]+" inputMode="numeric" /></Field><Field label="Próximo número livre"><input type="number" min="1" step="1" value={nextNumber} onChange={e => setNextNumber(e.target.value)} required /></Field></div></>}</>}
-          {status?.readiness.missing.filter(m => !['municipalRegistration','simplesNacionalTaxRateBps','numbering'].includes(m.field)).map(m => <p className="app-notice" key={m.field}>{m.message}</p>)}
+          {status?.readiness.missing.filter(m => m.field !== 'numbering').map(m => <p className="app-notice" key={m.field}>{m.message}</p>)}
         </>}
         {step === 3.1 && <><div className="step-icon"><Mail /></div><span className="app-eyebrow">UM EXTRA QUE FACILITA A VIDA</span><h2>Quem é seu contador?</h2><p>Todo mês o seu contador precisa das notas emitidas. A gente manda <strong>automaticamente, todo dia 1</strong>, por e-mail e WhatsApp: os PDFs, os XMLs e a planilha no mesmo formato do eNotas. Você não precisa lembrar de nada.</p><Field label="Nome do contador ou escritório (opcional)"><input value={accountant.name} onChange={e => setAccountant({ ...accountant, name: e.target.value })} /></Field><Field label="E-mail do contador"><input type="email" value={accountant.email} onChange={e => setAccountant({ ...accountant, email: e.target.value })} /></Field><Field label="WhatsApp do contador" help="Precisamos de pelo menos um dos dois contatos."><input inputMode="tel" value={accountant.whatsapp} placeholder="(11) 99999-9999" onChange={e => setAccountant({ ...accountant, whatsapp: phoneMask(e.target.value) })} /></Field><button type="button" className="text-button" disabled={busy} onClick={() => { setAccountantSkipped(true); setStep(status?.tenant.integrations?.abacatepay ? 5 : 4); }}>Não tenho contador agora</button></>}
         {step === 4 && <><div className="step-icon"><Leaf /></div><h2>Venda aprovada.<br />Conexão feita.</h2>{imported === null ? <><p>No painel do AbacatePay, crie uma API key com as permissões <strong>PRODUCT:READ</strong> e <strong>WEBHOOK:CREATE</strong>.</p><a className="external-link" href="https://app.abacatepay.com" target="_blank" rel="noreferrer">Abrir painel do AbacatePay <ExternalLink size={15} /></a><Field label="Sua API key do AbacatePay" help="Usada pelo servidor para criar o webhook e importar seus produtos."><input type="password" value={apiKey} autoComplete="off" required onChange={e => setApiKey(e.target.value)} placeholder="Cole sua chave aqui" /></Field></> : <><div className="app-success"><Check size={18} /> Importamos {imported} produtos</div>{products.map(p => <div className="product-row" key={p.id}><strong>{p.name}</strong><small>Aguardando definição do código de serviço</small></div>)}<p>Na próxima etapa, o assistente de IA vai te ajudar a definir, produto por produto, como cada serviço é tributado, com base nas atividades (CNAEs) da sua empresa. Vendas que chegarem antes disso ficam guardadas e viram nota assim que você confirmar.</p><button type="button" className="app-primary" onClick={() => setStep(5)}>Conectar meu assistente <ArrowRight size={17} /></button></>}</>}
@@ -250,8 +245,9 @@ export default function Onboarding() {
             {client === 'code' ? <><p>Cole este comando no terminal:</p><div className="copy-field command"><code>{mcp.claudeCodeCommand}</code><CopyButton text={mcp.claudeCodeCommand} /></div></> : <><p>Adicione um servidor MCP remoto com transporte <strong>Streamable HTTP</strong>, a URL acima e este header:</p><div className="copy-field"><code>Authorization: Bearer {mcp.apiKey}</code><CopyButton text={`Authorization: Bearer ${mcp.apiKey}`} /></div></>}
             <div className="first-prompt"><Sparkles size={19} /><div><strong>Sua primeira conversa</strong><p>Use o prompt <code>configurar_empresa</code> ou diga: “quero definir a tributação dos meus produtos”.</p><CopyButton text="quero definir a tributação dos meus produtos" /></div></div><button type="button" disabled={busy} className="text-button" onClick={() => { if (confirm('Gerar uma nova chave? As anteriores continuam válidas. Copie sua chave atual antes de continuar.')) void run(async () => setMcp(await api(`${base}/mcp-key`, 'POST'))); }}>Gerar outra chave (as anteriores continuam válidas)</button><button type="button" className="app-primary" onClick={() => { setView('panel'); void refreshPanel(); }}>Ir para meu painel <ArrowRight size={18} /></button></>}
         </>}
-        {step !== 5 && !(step === 4 && imported !== null) && <div className="form-actions">{step === 2 && <button type="button" className="app-secondary" onClick={() => setStep(1)} disabled={busy}><ArrowLeft size={16} /> Voltar</button>}<button className="app-primary" type="submit" disabled={busy || (!!error && error.includes('ACAINFE_APP_KEY'))}>{busy ? <><Loader2 className="spin" size={17} /> Salvando…</> : <>{step === 2 ? 'Enviar certificado' : step === 4 ? 'Conectar AbacatePay' : 'Salvar e continuar'}<ArrowRight size={17} /></>}</button></div>}
+        {step !== 5 && !(step === 4 && imported !== null) && <div className="form-actions">{step === 2 && <button type="button" className="app-secondary" onClick={() => setStep(1)} disabled={busy}><ArrowLeft size={16} /> Voltar</button>}<button className="app-primary" type="submit" disabled={busy || (!!error && error.includes('ACAINFE_APP_KEY'))}>{busy ? <><Loader2 className="spin" size={17} /> Salvando…</> : <>{step === 2 ? 'Enviar certificado' : step === 4 ? 'Conectar AbacatePay' : step === 3 ? 'Continuar' : 'Salvar e continuar'}<ArrowRight size={17} /></>}</button></div>}
       </form></ValidationContext.Provider></section></div>}
       <p className="app-bottom-note"><ShieldCheck size={14} /> Sem mensalidade. Não vendeu, não pagou.</p>
+      {editingRecommendation && <CompanyRecommendationDialog base={base} item={editingRecommendation} onSaved={applyStatus} onClose={() => setEditingRecommendation(null)} onUnauthorized={handleError} />}
     </div></div>;
 }

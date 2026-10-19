@@ -1,0 +1,13 @@
+.optional-company-details{margin:24px 0;border:1px solid #4a194226;border-radius:12px;padding:16px}
+.optional-company-details summary{cursor:pointer;font-size:14px;font-weight:600;color:#4a1942}
+.optional-company-details[open] summary{margin-bottom:20px}
+.company-recommendations{margin:24px 0;padding:20px;border:1px solid #ccdae6;border-radius:14px;background:#f1f6fa;color:#344c60}
+.company-recommendations h3{margin:0 0 8px;font-size:17px}
+.company-recommendations>p{font-size:13px;line-height:1.6}
+.company-recommendations ul{list-style:none;padding:0;margin:16px 0 0}
+.company-recommendations li{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:14px 0;border-top:1px solid #ccdae6;font-size:13px;line-height:1.7}
+.company-recommendations button{flex-shrink:0}
+.company-recommendation-dialog{max-width:min(512px,calc(100vw - 32px));border-radius:16px;background:#fff8ee;color:#2b2230;font-family:Inter,sans-serif}
+.company-recommendation-dialog .app-field{margin-top:12px}
+.company-recommendation-dialog .form-actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:24px}
+@media(max-width:600px){.company-recommendations li{align-items:flex-start;flex-direction:column;gap:12px}.company-recommendation-dialog .form-actions button{flex:1;justify-content:center}}

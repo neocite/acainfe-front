@@ -1,1 +1,3 @@
 - [Bootstrap de artefatos](artifact-bootstrap.md) — em projetos vazios, o scaffold de um artefato pode não trazer os pré-requisitos do workspace.
+- [Dados fiscais opcionais](optional-tax-details.md) — CCM e alíquota não bloqueiam emissão; estimativa de 6% não altera o DAS.
+- [Genéricos JSX na prévia](dev-jsx-generics.md) — tags com parâmetro genérico explícito podem quebrar o injetor de metadados, mesmo com build válido.
