@@ -75,7 +75,7 @@ app.get('/api/callback', async (req, res) => {
       pkceCodeVerifier: login.verifier, expectedState: login.state, expectedNonce: login.nonce,
     });
     const claims = tokens.claims();
-    if (!claims?.sub || typeof claims.email !== 'string') throw new Error('Missing identity');
+    if (!claims?.sub || typeof claims.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(claims.email)) throw new Error('Missing identity');
     const auth = {
       sub: claims.sub, email: claims.email,
       name: String(claims.name || [claims.first_name, claims.last_name].filter(Boolean).join(' ') || ''),
@@ -92,7 +92,9 @@ app.get('/api/callback', async (req, res) => {
 app.post('/api/logout', (req, res) => req.session.destroy(() => { res.clearCookie('connect.sid'); res.json({ ok: true }); }));
 async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const auth = req.session.auth;
-  if (!auth) { res.status(401).json({ error: 'UNAUTHORIZED', message: 'Entre na sua conta para continuar.' }); return; }
+  if (!auth || !auth.sub?.trim() || typeof auth.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(auth.email) || !Number.isFinite(auth.expiresAt)) {
+    res.status(401).json({ error: 'UNAUTHORIZED', message: 'Entre com uma conta com e-mail válido para continuar.' }); return;
+  }
   if (Date.now() / 1000 >= auth.expiresAt) {
     try {
       if (!auth.refreshToken) throw new Error('Expired');
@@ -158,6 +160,9 @@ app.use('/api/app', (req, res, next) => {
 });
 app.post('/api/app/onboarding/certificate', upload.single('file'), proxyApi);
 app.use('/api/app', proxyApi);
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'NOT_FOUND', message: 'Rota não encontrada.' });
+});
 async function proxyApi(req: express.Request, res: express.Response) {
   try {
     const auth = req.session.auth!;

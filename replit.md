@@ -17,6 +17,8 @@ Landing page em `/` e cadastro inicial em `/app`. A operação de notas acontece
 - `SESSION_SECRET`: Secret de sessão.
 - `DATABASE_URL` e `REPL_ID`: fornecidos pelo ambiente.
 - Replit Auth via OIDC, com PKCE, state e nonce. O usuário escolhe Google no fluxo de login do Replit.
+- Todas as entradas pela landing precisam passar pela autenticação antes de exibir as etapas. Nunca considerar `{}` ou e-mail em branco uma sessão válida; sem sessão, encaminhar ao login. Após autenticar, retomar a etapa indicada pelos dados da API.
+- O serviço do artefato deve publicar o processo Express (`start`), sem modo estático ou rewrite de `/api/*` para HTML. O comando de publicação da raiz não substitui a configuração de produção do serviço do artefato.
 - O banco local guarda somente sessões em `app_sessions`; empresas, certificados, contatos e saldos ficam na API externa.
 - Certificados e senhas passam pelo servidor em memória, sem gravar arquivos em disco. Chaves MCP retornadas ficam apenas na memória da página, sem localStorage.
 - Não criar modos de demonstração que simulem certificado válido, emissão ou confirmação de Pix.

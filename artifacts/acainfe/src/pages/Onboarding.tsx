@@ -3,11 +3,13 @@ import { Link } from 'wouter';
 import { ArrowRight, ArrowLeft, Check, ShieldCheck, FileKey, Sparkles, Copy, CheckCheck, LogOut, Loader2, Wallet, Building2, AlertTriangle, ExternalLink, Leaf, Mail } from 'lucide-react';
 import { api, ApiError, phoneMask } from '../lib/api';
 import { percentToBps, bpsToPercent } from '../lib/numbers';
+import { isAuthUser, type AuthUser } from '../lib/auth';
+import { onboardingEntry } from '../lib/onboarding-entry';
 import { brl } from '../config/pricing';
 import '../onboarding.css';
 import '../mobile-fixes.css';
 
-type User = { id: string; email: string; name: string };
+type User = AuthUser;
 type CompanyStatus = {
   tenant: { id: string; cnpj?: string; taxRegime?: string; simplesNacionalTaxRateBps?: number | null; status?: string; integrations?: { abacatepay?: boolean }; certificateExpiresAt?: string; accountant?: unknown };
   company?: { legalName?: string; tradeName?: string; cityName?: string; uf?: string };
@@ -88,6 +90,10 @@ export default function Onboarding() {
   function handleError(e: unknown) {
     setError(e instanceof Error ? e.message : 'Não foi possível concluir.');
     setUnauthorized(e instanceof ApiError && e.status === 401);
+    if (e instanceof ApiError && e.status === 401) {
+      setUser(null);
+      if (!new URLSearchParams(location.search).has('error')) window.location.replace('/api/login');
+    }
     if (e instanceof ApiError && e.status === 422) {
       const errors: Record<string, string> = {};
       const details = e.details as any;
@@ -115,20 +121,28 @@ export default function Onboarding() {
     setName(me.user?.name || me.name || user?.name || '');
     setPhone(me.user?.whatsapp || me.whatsapp || '');
     const existing = me.companies?.[0] as CompanyStatus | undefined;
+    const entry = onboardingEntry(existing);
+    setStep(entry.step);
+    setView(entry.view);
     if (existing) {
       applyStatus(existing);
-      if (existing.availability.status === 'WAITLIST') return;
-      if (!existing.readiness.canIssue) setStep(3);
-      else if (existing.tenant.integrations?.abacatepay === false) setStep(4);
-      else setStep(5);
     }
   }
   useEffect(() => {
     let mounted = true;
-    api<User>('/auth/user').then(async u => {
-      if (!mounted) return; setUser(u); setName(u.name);
+    api<unknown>('/auth/user').then(async u => {
+      if (!mounted) return;
+      if (!isAuthUser(u)) throw new ApiError(401, 'Entre com uma conta com e-mail válido para continuar.');
+      setUser(u); setName(u.name);
       try { await loadMe(); } catch (e) { if (mounted) handleError(e); }
-    }).catch(e => { if (e instanceof ApiError && e.status !== 401) handleError(e); })
+    }).catch(e => {
+      if (!mounted) return;
+      if (e instanceof ApiError && e.status === 401 && !new URLSearchParams(location.search).has('error')) {
+        window.location.replace('/api/login');
+        return;
+      }
+      handleError(e);
+    })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
   }, []);
@@ -194,7 +208,7 @@ export default function Onboarding() {
   const isWaitlist = status?.availability.status === 'WAITLIST';
   const errorBox = error && <div className="app-alert" role="alert"><AlertTriangle size={18} /><div>{error}{unauthorized && <a href="/api/login">Entrar novamente <ArrowRight size={14} /></a>}{!unauthorized && <button type="button" onClick={() => run(loadMe)}>Tentar novamente</button>}</div></div>;
   if (loading) return <div className="app-loading"><Loader2 className="spin" size={28} /><p>Preparando seu espaço…</p></div>;
-  if (!user) return <div className="login-page">
+  if (!isAuthUser(user)) return <div className="login-page">
     <div className="login-nav"><Brand /><Link href="/">Voltar para o site <ArrowLeft size={16} /></Link></div>
     <main className="login-layout"><section className="login-story"><span className="app-eyebrow"><Leaf size={16} /> MENOS BUROCRACIA. MAIS VENDAS.</span><h1>Seu próximo passo.<br /><em>Não sua próxima<br />dor de cabeça.</em></h1><p>Deixe a nota fiscal com a gente.<br />Seu negócio tem coisa melhor pra fazer.</p><div className="login-note"><ShieldCheck size={22} /><span>Sem mensalidade.<br /><strong>Não vendeu, não pagou.</strong></span></div></section>
       <section className="login-card"><div className="login-icon"><Sparkles size={28} /></div><span className="app-eyebrow">BORA COMEÇAR?</span><h2>Seu negócio,<br />no automático.</h2><p>Entre na sua conta para configurar a empresa. É rápido e sem complicação.</p>

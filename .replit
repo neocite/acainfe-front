@@ -12,6 +12,10 @@ ACAINFE_API_URL = "https://flowing-rabbit-still.ngrok-free.app"
 channel = "stable-25_05"
 
 [[ports]]
+localPort = 3001
+externalPort = 3001
+
+[[ports]]
 localPort = 21280
 externalPort = 3000
 
@@ -20,4 +24,6 @@ localPort = 24678
 externalPort = 80
 
 [deployment]
-deploymentTarget = "cloudrun"
+deploymentTarget = "autoscale"
+run = ["pnpm", "--filter", "@workspace/acainfe", "run", "start"]
+build = ["pnpm", "--filter", "@workspace/acainfe", "run", "build"]
