@@ -2,13 +2,14 @@ import { createContext, useContext, useEffect, useState, type FormEvent, type Re
 import { Link } from 'wouter';
 import { ArrowRight, ArrowLeft, Check, ShieldCheck, FileKey, Sparkles, Copy, CheckCheck, LogOut, Loader2, Wallet, Building2, AlertTriangle, ExternalLink, Leaf, Mail } from 'lucide-react';
 import { api, ApiError, phoneMask } from '../lib/api';
+import { percentToBps, bpsToPercent } from '../lib/numbers';
 import { brl } from '../config/pricing';
 import '../onboarding.css';
 import '../mobile-fixes.css';
 
 type User = { id: string; email: string; name: string };
 type CompanyStatus = {
-  tenant: { id: string; cnpj?: string; taxRegime?: string; status?: string; integrations?: { abacatepay?: boolean }; certificateExpiresAt?: string; accountant?: unknown };
+  tenant: { id: string; cnpj?: string; taxRegime?: string; simplesNacionalTaxRateBps?: number | null; status?: string; integrations?: { abacatepay?: boolean }; certificateExpiresAt?: string; accountant?: unknown };
   company?: { legalName?: string; tradeName?: string; cityName?: string; uf?: string };
   availability: { status: string; reason?: string };
   readiness: { canIssue: boolean; missing: { field: string; message: string }[] };
@@ -24,7 +25,7 @@ const fieldNames: Record<string, string> = {
   'Seu nome': 'name', 'WhatsApp com DDD': 'whatsapp',
   'Arquivo do certificado': 'file', 'Senha do certificado': 'password',
   'Inscrição municipal (CCM)': 'municipalRegistration',
-  'Alíquota efetiva do Simples (%)': 'simplesNacionalTaxRate',
+  'Alíquota efetiva do Simples (%)': 'simplesNacionalTaxRateBps',
   'Regime da empresa': 'taxRegime', 'Sua API key do AbacatePay': 'apiKey',
 };
 function Brand() { return <Link href="/" className="app-brand">açaínfe<span className="brand-dot" /></Link>; }
@@ -79,7 +80,11 @@ export default function Onboarding() {
   const id = status?.tenant.id;
   const base = `/app/companies/${encodeURIComponent(id || '')}`;
 
-  function applyStatus(s: CompanyStatus) { setStatus(s); setRegime(s.tenant.taxRegime || 'SIMPLES_NACIONAL'); }
+  function applyStatus(s: CompanyStatus) {
+    setStatus(s);
+    setRegime(s.tenant.taxRegime || 'SIMPLES_NACIONAL');
+    setRate(typeof s.tenant.simplesNacionalTaxRateBps === 'number' ? bpsToPercent(s.tenant.simplesNacionalTaxRateBps) : '');
+  }
   function handleError(e: unknown) {
     setError(e instanceof Error ? e.message : 'Não foi possível concluir.');
     setUnauthorized(e instanceof ApiError && e.status === 401);
@@ -94,6 +99,9 @@ export default function Onboarding() {
       if (!Object.keys(errors).length) {
         const relevant = step === 1 ? ['name','whatsapp'] : step === 2 ? ['file','password'] : step === 4 ? ['apiKey'] : missing;
         relevant.forEach(field => { errors[field] = e.message; });
+      }
+      if (step === 3 && missing.includes('simplesNacionalTaxRateBps') && !errors.simplesNacionalTaxRateBps) {
+        errors.simplesNacionalTaxRateBps = e.message;
       }
       setFieldErrors(errors);
     }
@@ -152,10 +160,13 @@ export default function Onboarding() {
         const missing = status?.readiness.missing.map(m => m.field) || [];
         const data: Record<string, unknown> = { taxRegime: regime };
         if (missing.includes('municipalRegistration')) data.municipalRegistration = municipal;
-        if (missing.includes('simplesNacionalTaxRate')) {
-          const n = Number(rate.replace(',', '.'));
-          if (!Number.isFinite(n) || n < 0 || n > 100) throw new Error('Informe uma alíquota entre 0 e 100%.');
-          data.simplesNacionalTaxRate = n;
+        if (missing.includes('simplesNacionalTaxRateBps')) {
+          const bps = percentToBps(rate);
+          if (bps === null || bps > 3300) {
+            const message = 'Informe um percentual válido, ex.: 6 ou 6,25';
+            throw new ApiError(422, message, { simplesNacionalTaxRateBps: message });
+          }
+          data.simplesNacionalTaxRateBps = bps;
         }
         if (needsNumbering && advanced) { data.dpsSeries = series; data.nextDpsNumber = Number(nextNumber); }
         else if (needsNumbering) {
@@ -211,11 +222,11 @@ export default function Onboarding() {
         {step === 2 && <><div className="step-icon"><FileKey /></div><h2>Seu certificado A1.</h2><p>É o mesmo certificado que você usa para emitir notas ou acessar o e-CAC. Ele fica guardado criptografado e serve para assinar suas notas.</p><Field label="Arquivo do certificado" help="Formatos .pfx ou .p12, até 10 MB."><div className="upload-box"><FileKey size={28} /><strong>{file ? file.name : 'Selecione seu certificado'}</strong><input type="file" accept=".pfx,.p12" required onChange={e => { const f = e.target.files?.[0]; if (f && f.size > 10 * 1024 * 1024) { setError('O certificado deve ter até 10 MB.'); e.target.value = ''; setFile(null); } else setFile(f || null); }} /></div></Field><Field label="Senha do certificado"><input type="password" autoComplete="off" value={password} onChange={e => setPassword(e.target.value)} required placeholder="A senha do seu arquivo A1" /></Field><div className="secure-note"><ShieldCheck size={17} /> Enviado com segurança. Nunca fica salvo no navegador.</div></>}
         {step === 3 && <><div className="step-icon"><Building2 /></div><h2>Só mais alguns detalhes.</h2><p>A Receita já contou quase tudo. Agora faltam as informações abaixo.</p>{status && <><CompanyCard status={status} /><div className="app-success"><Check size={17} /> Sua cidade já está liberada!</div></>}
           {missing.includes('municipalRegistration') && <Field label="Inscrição municipal (CCM)" help="Está no seu cadastro na prefeitura ou no alvará."><input value={municipal} onChange={e => setMunicipal(e.target.value)} required /></Field>}
-          {missing.includes('simplesNacionalTaxRate') && <Field label="Alíquota efetiva do Simples (%)" help="Está no seu último DAS. Se não souber, peça ao seu contador."><input value={rate} onChange={e => setRate(e.target.value)} inputMode="decimal" required /></Field>}
+          {missing.includes('simplesNacionalTaxRateBps') && <Field label="Alíquota efetiva do Simples (%)" help="Está no seu último DAS. Se não souber, peça ao seu contador."><input value={rate} onChange={e => setRate(e.target.value)} inputMode="decimal" required /></Field>}
           <Field label="Regime da empresa" help="Se veio errado, você pode corrigir aqui."><select value={regime} onChange={e => setRegime(e.target.value)}><option value="MEI">MEI</option><option value="SIMPLES_NACIONAL">Simples Nacional</option><option value="LUCRO_PRESUMIDO">Lucro Presumido</option><option value="LUCRO_REAL">Lucro Real</option></select></Field>
           {needsNumbering && <><fieldset className="numbering-options"><legend>Você já emite nota fiscal de serviço por outro sistema?</legend>{[['no', 'Não, vou começar agora'], ['yes', 'Sim, já emito']].map(([value, label]) => <label key={value}><input type="radio" name="numbering" value={value} checked={numbering === value} required={!advanced} disabled={advanced} onChange={() => setNumbering(value)} />{label}</label>)}{numbering === 'yes' && !advanced && <small>Usaremos a série exclusiva 900 para evitar números repetidos.</small>}{fieldErrors.numbering && <small className="danger-text">{fieldErrors.numbering}</small>}</fieldset>
           <button type="button" className="text-button" onClick={() => setAdvanced(!advanced)}>{advanced ? 'Usar configuração automática' : 'Prefiro informar a numeração'}</button>{advanced && <><p className="app-muted">Peça ao seu contador ou veja no seu emissor atual a série e o número da próxima nota.</p><div className="app-two-cols"><Field label="Série"><input value={series} onChange={e => setSeries(e.target.value)} required pattern="[0-9]+" inputMode="numeric" /></Field><Field label="Próximo número livre"><input type="number" min="1" step="1" value={nextNumber} onChange={e => setNextNumber(e.target.value)} required /></Field></div></>}</>}
-          {status?.readiness.missing.filter(m => !['municipalRegistration','simplesNacionalTaxRate','numbering'].includes(m.field)).map(m => <p className="app-notice" key={m.field}>{m.message}</p>)}
+          {status?.readiness.missing.filter(m => !['municipalRegistration','simplesNacionalTaxRateBps','numbering'].includes(m.field)).map(m => <p className="app-notice" key={m.field}>{m.message}</p>)}
         </>}
         {step === 3.1 && <><div className="step-icon"><Mail /></div><span className="app-eyebrow">UM EXTRA QUE FACILITA A VIDA</span><h2>Quem é seu contador?</h2><p>Todo mês o seu contador precisa das notas emitidas. A gente manda <strong>automaticamente, todo dia 1</strong>, por e-mail e WhatsApp: os PDFs, os XMLs e a planilha no mesmo formato do eNotas. Você não precisa lembrar de nada.</p><Field label="Nome do contador ou escritório (opcional)"><input value={accountant.name} onChange={e => setAccountant({ ...accountant, name: e.target.value })} /></Field><Field label="E-mail do contador"><input type="email" value={accountant.email} onChange={e => setAccountant({ ...accountant, email: e.target.value })} /></Field><Field label="WhatsApp do contador" help="Precisamos de pelo menos um dos dois contatos."><input inputMode="tel" value={accountant.whatsapp} placeholder="(11) 99999-9999" onChange={e => setAccountant({ ...accountant, whatsapp: phoneMask(e.target.value) })} /></Field><button type="button" className="text-button" disabled={busy} onClick={() => { setAccountantSkipped(true); setStep(status?.tenant.integrations?.abacatepay ? 5 : 4); }}>Não tenho contador agora</button></>}
         {step === 4 && <><div className="step-icon"><Leaf /></div><h2>Venda aprovada.<br />Conexão feita.</h2>{imported === null ? <><p>No painel do AbacatePay, crie uma API key com as permissões <strong>PRODUCT:READ</strong> e <strong>WEBHOOK:CREATE</strong>.</p><a className="external-link" href="https://app.abacatepay.com" target="_blank" rel="noreferrer">Abrir painel do AbacatePay <ExternalLink size={15} /></a><Field label="Sua API key do AbacatePay" help="Usada pelo servidor para criar o webhook e importar seus produtos."><input type="password" value={apiKey} autoComplete="off" required onChange={e => setApiKey(e.target.value)} placeholder="Cole sua chave aqui" /></Field></> : <><div className="app-success"><Check size={18} /> Importamos {imported} produtos</div>{products.map(p => <div className="product-row" key={p.id}><strong>{p.name}</strong><small>Aguardando definição do código de serviço</small></div>)}<p>Na próxima etapa, o assistente de IA vai te ajudar a definir, produto por produto, como cada serviço é tributado, com base nas atividades (CNAEs) da sua empresa. Vendas que chegarem antes disso ficam guardadas e viram nota assim que você confirmar.</p><button type="button" className="app-primary" onClick={() => setStep(5)}>Conectar meu assistente <ArrowRight size={17} /></button></>}</>}

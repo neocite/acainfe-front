@@ -25,6 +25,10 @@ Landing page em `/` e cadastro inicial em `/app`. A operação de notas acontece
 
 `src/config/pricing.ts` é a fonte única de preços padrão e planos concorrentes. O servidor consulta `/v1/public/pricing` na API externa e mantém cache de cinco minutos, usando o padrão apenas em indisponibilidade. O HTML público e a imagem social usam esse mesmo preço.
 
+## Unidades numéricas da API
+
+Dinheiro continua em centavos (`Cents`). Percentuais usam inteiros em pontos-base (`Bps`): 6,25% corresponde a 625. Converter percentuais digitados por texto, nunca multiplicando um decimal por 100, para evitar erros de ponto flutuante. A alíquota efetiva do Simples aceita de 0 a 3300 Bps. No formulário, manter a exibição usual em percentual.
+
 ## Antes de abrir ao público
 
 - Validar a jornada autenticada com certificado e empresa de teste autorizados. A presença da chave não substitui a validação ponta a ponta.
