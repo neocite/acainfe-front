@@ -7,7 +7,7 @@ export function AbacatePayKeyGuide() {
     <ol>
       <li><strong>Versão da API</strong><span>Selecione <b>API v2</b>, marcada como “Recomendada”.</span></li>
       <li><strong>Escopo</strong><span>Escolha <b>Personalizado</b>.</span></li>
-      <li><strong>Permissões</strong><span>Marque <b>Ver produtos</b> e <b>Criar webhooks</b>. Não é necessário liberar outras permissões.</span></li>
+      <li><strong>Permissões</strong><span>Marque <b>PRODUCT:READ</b> (Ver produtos), <b>WEBHOOK:CREATE</b> (Criar webhooks), <b>CHECKOUT:READ</b>, <b>TRANSPARENT:READ</b>, <b>SUBSCRIPTION:READ</b> e <b>CUSTOMER:READ</b>. As quatro últimas permitem ler as vendas passadas e os dados dos clientes.</span></li>
       <li><strong>Descrição</strong><span>Digite <b>acainfe</b> para identificar esta conexão.</span></li>
       <li><strong>Continue no AbacatePay</strong><span>Clique em <b>Continuar</b> e conclua a criação da chave. Depois, copie a chave gerada e cole no campo abaixo.</span></li>
     </ol>

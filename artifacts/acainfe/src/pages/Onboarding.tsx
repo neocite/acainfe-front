@@ -6,6 +6,9 @@ import { isOptionalCompanyField, onboardingCompanyPatch, simplesRateInput, munic
 import { CompanyRecommendationDialog } from '../components/CompanyRecommendationDialog';
 import { AbacatePayKeyGuide } from '../components/AbacatePayKeyGuide';
 import { CompanyCard } from '../components/CompanyCard';
+import { PastSales, PastSalesPanelCard } from '../components/PastSales';
+import { AbacatePayConnectionDialog } from '../components/AbacatePayConnectionDialog';
+import type { AbacatePayConnection, PastSalesPreview } from '../lib/past-sales';
 import { mergeCompanyProfile, type CompanyProfile } from '../lib/company-profile';
 import '../components/abacatepay-key-guide.css';
 import { isAuthUser, type AuthUser } from '../lib/auth';
@@ -14,6 +17,7 @@ import { brl } from '../config/pricing';
 import '../onboarding.css';
 import '../mobile-fixes.css';
 import '../company-details.css';
+import '../past-sales.css';
 
 type User = AuthUser;
 type CompanyStatus = CompanyProfile & {
@@ -60,7 +64,9 @@ export default function Onboarding() {
   const [editingRecommendation, setEditingRecommendation] = useState<(ReadinessItem & { field: OptionalCompanyField }) | null>(null);
   const [status, setStatus] = useState<CompanyStatus | null>(null);
   const [step, setStep] = useState(1);
-  const [view, setView] = useState<'wizard' | 'panel' | 'billing'>('wizard');
+  const [view, setView] = useState<'wizard' | 'panel' | 'billing' | 'past-sales'>('wizard');
+  const [pastSales, setPastSales] = useState<PastSalesPreview | null>(null);
+  const [updatingAbacateKey, setUpdatingAbacateKey] = useState(false);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -196,8 +202,9 @@ export default function Onboarding() {
         if (status) setStatus({ ...status, tenant: { ...status.tenant, accountant } });
         setStep(status?.tenant.integrations?.abacatepay ? 5 : 4);
       } else if (step === 4) {
-        const data = await api(`${base}/abacatepay`, 'POST', { apiKey });
+        const data = await api<AbacatePayConnection>(`${base}/abacatepay`, 'POST', { apiKey: apiKey.trim() });
         setImported(data.imported); setProducts(data.pendingTaxReview || []); setApiKey('');
+        setPastSales(data.pastSales || null); setStep(4.1);
         if (status) setStatus({ ...status, tenant: { ...status.tenant, integrations: { abacatepay: true } } });
       }
     });
@@ -222,17 +229,19 @@ export default function Onboarding() {
     <div className="app-body">
       {id && !isWaitlist && <nav className="app-tabs" aria-label="Área da empresa"><button className={view === 'wizard' ? 'active' : ''} onClick={() => setView('wizard')}><Sparkles size={16} /> Configuração</button><button className={view === 'panel' ? 'active' : ''} onClick={() => { setView('panel'); void refreshPanel(); }}><Building2 size={16} /> Painel</button><button className={view === 'billing' ? 'active' : ''} onClick={() => { setView('billing'); void run(async () => setBilling(await api(`${base}/billing`))); }}><Wallet size={16} /> Saldo</button></nav>}
       {isWaitlist ? <section className="app-card waitlist"><div className="login-icon"><Mail size={30} /></div><span className="app-eyebrow">VOCÊ JÁ ESTÁ NA LISTA</span><h1>Sua cidade é o<br />nosso próximo passo.</h1><CompanyCard status={status!} /><p>{status?.availability.reason || 'Sua cidade ainda não está liberada. Vamos te avisar por e-mail e WhatsApp assim que estiver tudo pronto.'}</p><p>Por enquanto, atendemos São Bernardo do Campo/SP, para Simples Nacional e MEI.</p>{errorBox}<button className="app-secondary" onClick={refreshPanel} disabled={busy}>Verificar disponibilidade</button></section>
+      : view === 'past-sales' ? <section className="app-card">{errorBox}<PastSales key={id} base={base} initial={pastSales} onUpdateKey={() => setUpdatingAbacateKey(true)} onSkip={() => { setView('panel'); void refreshPanel(); }} onUnauthorized={handleError} /></section>
       : view === 'billing' ? <section className="app-card"><span className="app-eyebrow">SEM MENSALIDADE. SEM SURPRESA.</span><h1>Seu saldo.</h1>{errorBox}{billing ? <><div className="balance-value">{brl(billing.amountDueCents)}</div><p>Você tem <strong>{brl(billing.openCents)}</strong> em aberto ({billing.openCharges} notas).{billing.blocksAt && <> Pague até <strong>{new Date(billing.blocksAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</strong> para manter a emissão ativa.</>}</p>{billing.overdue && <p className="danger-text">O pagamento está atrasado.</p>}{billing.creditCents > 0 && <div className="app-success">Você tem {brl(billing.creditCents)} de crédito para as próximas notas.</div>}<p className="app-muted">Cada nota custa {brl(billing.pricePerInvoiceCents)}. O saldo é avisado todo dia por e-mail e WhatsApp. Pix mínimo de R$ 1,00; a sobra vira crédito.</p>
       <button className="app-primary" disabled={busy || billing.amountDueCents <= 0} onClick={() => run(async () => setPix(await api(`${base}/billing/payments`, 'POST')))}>{busy ? <Loader2 className="spin" size={17} /> : <Wallet size={17} />} {billing.amountDueCents > 0 ? 'Pagar com Pix' : 'Tudo em dia'}</button>
       {pix && <div className="pix-section"><h2>Pix de {brl(pix.amountCents)}</h2>{/^data:image\/(png|jpeg|webp);base64,/.test(pix.pixQrCodeImage) && <img src={pix.pixQrCodeImage} alt="QR Code para pagamento Pix" />}<p>Expira em {new Date(pix.expiresAt).toLocaleString('pt-BR')}</p><div className="copy-field"><code>{pix.pixCopyPaste}</code><CopyButton text={pix.pixCopyPaste} /></div><button className="app-secondary" disabled={busy} onClick={() => run(async () => { const b = await api<Billing>(`${base}/billing`); setBilling(b); if (b.amountDueCents <= 0) setPix(null); })}>Verificar pagamento</button></div>}</> : <p>Não foi possível carregar o saldo. Use a aba Saldo para tentar novamente.</p>}</section>
       : view === 'panel' ? <section className="app-card"><span className="app-eyebrow">TUDO NO SEU LUGAR</span><h1>Seu negócio, por aqui.</h1>{errorBox}{status && <><CompanyCard status={status} /><div className="panel-grid"><div><small>Status da empresa</small><strong>{status.tenant.status || 'Não informado'}</strong></div><div><small>Emissão de notas</small><strong>{status.readiness.canIssue ? 'Empresa pronta' : 'Há pendências'}</strong></div><div><small>Produtos aguardando tributação</small><strong>{Array.isArray(status.pendingTaxReview) ? status.pendingTaxReview.length : status.pendingTaxReview}</strong></div><div><small>Validade do certificado</small><strong>{(() => { const date = status.certificate?.expiresAt || status.certificate?.validUntil || status.tenant.certificateExpiresAt; return date ? new Date(date).toLocaleDateString('pt-BR') : 'Não informada pela API'; })()}</strong></div></div>
       {status.readiness.missing.length > 0 && <div className="app-notice"><h3>O que falta para emitir</h3><ul>{status.readiness.missing.map(m => <li key={m.field}>{m.message}</li>)}</ul><button className="app-secondary" onClick={() => { setStep(3); setView('wizard'); }}>Completar dados</button></div>}
+      {status.tenant.integrations?.abacatepay && <PastSalesPanelCard base={base} onOpen={() => setView('past-sales')} onUpdateKey={() => setUpdatingAbacateKey(true)} onUnauthorized={handleError} />}
        {recommended.length > 0 && <section className="company-recommendations" aria-labelledby="recommendations-title"><h3 id="recommendations-title">{recommended.some(item => item.field === 'municipalRegistration') ? 'Complete seu cadastro' : 'Complete quando puder'}</h3><p>{recommended.some(item => item.field === 'municipalRegistration') ? 'Informe o CCM para concluir seu cadastro. A alíquota pode ser ajustada quando precisar.' : 'Esses dados são opcionais e não impedem a emissão.'}</p><ul>{recommended.map(item => <li key={item.field}><span>{item.field === 'municipalRegistration' ? municipalRegistrationHelp : item.message}</span>{isOptionalCompanyField(item.field) && <button className="app-secondary" type="button" disabled={busy} onClick={() => setEditingRecommendation({ ...item, field: item.field as OptionalCompanyField })}>Informar<span className="sr-only"> {item.field === 'municipalRegistration' ? 'CCM' : 'alíquota do Simples'}</span></button>}</li>)}</ul></section>}
       {(accountantSkipped || !status.tenant.accountant) && <div className="app-notice"><h3>Seu contador já está por aqui?</h3><p>Cadastre um contato para receber os PDFs, XMLs e a planilha automaticamente todo dia 1.</p><button className="app-secondary" onClick={() => { setStep(3.1); setView('wizard'); }}>Adicionar contador</button></div>}<button className="app-secondary" onClick={refreshPanel} disabled={busy}>Atualizar status</button></>}</section>
       : <div className="wizard-layout"><aside className="wizard-aside"><span className="app-eyebrow">SÓ PRECISA CONFIGURAR UMA VEZ</span><h1>Vamos deixar<br />tudo <em>prontinho.</em></h1><p>Alguns passos agora.<br />Menos trabalho em cada venda.</p><ol>{steps.map((label, i) => <li key={label} className={Math.floor(step) === i + 1 ? 'current' : step > i + 1 ? 'complete' : ''}><span>{step > i + 1 ? <Check size={16} /> : String(i + 1).padStart(2, '0')}</span>{label}</li>)}</ol><div className="aside-secure"><ShieldCheck size={20} /><span>Seus dados protegidos.<br />Sua empresa no controle.</span></div></aside>
       <section className="app-card wizard-card"><div className="progress-label"><span>ETAPA {Math.floor(step)} DE 5</span><span>{Math.round(Math.floor(step) / 5 * 100)}%</span></div><div className="app-progress"><span style={{ width: `${Math.floor(step) * 20}%` }} /></div>
       {errorBox}
-      <ValidationContext.Provider value={fieldErrors}><form onSubmit={submit}>
+      {step === 4.1 ? <>{imported !== null && <div className="app-success">Importamos {imported} produtos. A conexão com o AbacatePay está pronta.</div>}<PastSales key={id} base={base} initial={pastSales} onUpdateKey={() => setUpdatingAbacateKey(true)} onSkip={() => setStep(5)} onUnauthorized={handleError} /></> : <ValidationContext.Provider value={fieldErrors}><form onSubmit={submit}>
         {step === 1 && <><div className="step-icon"><Leaf /></div><h2>Primeiro, você.</h2><p>Como podemos te chamar? Vamos usar seu WhatsApp para avisos importantes sobre suas notas.</p><Field label="E-mail da sua conta"><input type="email" value={user.email} readOnly className="readonly" /></Field><Field label="Seu nome"><input value={name} onChange={e => setName(e.target.value)} autoComplete="name" required placeholder="Como você gosta de ser chamado?" /></Field><Field label="WhatsApp com DDD"><input value={phone} onChange={e => setPhone(phoneMask(e.target.value))} inputMode="tel" autoComplete="tel" required placeholder="(11) 99999-9999" /></Field></>}
         {step === 2 && <><div className="step-icon"><FileKey /></div><h2>Seu certificado A1.</h2><p>É o mesmo certificado que você usa para emitir notas ou acessar o e-CAC. Ele fica guardado criptografado e serve para assinar suas notas.</p><Field label="Arquivo do certificado" help="Formatos .pfx ou .p12, até 10 MB."><div className="upload-box"><FileKey size={28} /><strong>{file ? file.name : 'Selecione seu certificado'}</strong><input type="file" accept=".pfx,.p12" required onChange={e => { const f = e.target.files?.[0]; if (f && f.size > 10 * 1024 * 1024) { setError('O certificado deve ter até 10 MB.'); e.target.value = ''; setFile(null); } else setFile(f || null); }} /></div></Field><Field label="Senha do certificado"><input type="password" autoComplete="off" value={password} onChange={e => setPassword(e.target.value)} required placeholder="A senha do seu arquivo A1" /></Field><div className="secure-note"><ShieldCheck size={17} /> Enviado com segurança. Nunca fica salvo no navegador.</div></>}
         {step === 3 && <><div className="step-icon"><Building2 /></div><h2>Só mais alguns detalhes.</h2><p>A Receita já contou quase tudo. Agora faltam as informações abaixo.</p>{status && <><CompanyCard status={status} /><div className="app-success"><Check size={17} /> Sua cidade já está liberada!</div></>}
@@ -251,8 +260,15 @@ export default function Onboarding() {
             <div className="first-prompt"><Sparkles size={19} /><div><strong>Sua primeira conversa</strong><p>Use o prompt <code>configurar_empresa</code> ou diga: “quero definir a tributação dos meus produtos”.</p><CopyButton text="quero definir a tributação dos meus produtos" /></div></div><button type="button" disabled={busy} className="text-button" onClick={() => { if (confirm('Gerar uma nova chave? As anteriores continuam válidas. Copie sua chave atual antes de continuar.')) void run(async () => setMcp(await api(`${base}/mcp-key`, 'POST'))); }}>Gerar outra chave (as anteriores continuam válidas)</button><button type="button" className="app-primary" onClick={() => { setView('panel'); void refreshPanel(); }}>Ir para meu painel <ArrowRight size={18} /></button></>}
         </>}
         {step !== 5 && !(step === 4 && imported !== null) && <div className="form-actions">{step === 2 && <button type="button" className="app-secondary" onClick={() => setStep(1)} disabled={busy}><ArrowLeft size={16} /> Voltar</button>}<button className="app-primary" type="submit" disabled={busy || (!!error && error.includes('ACAINFE_APP_KEY'))}>{busy ? <><Loader2 className="spin" size={17} /> Salvando…</> : <>{step === 2 ? 'Enviar certificado' : step === 4 ? 'Conectar AbacatePay' : step === 3 ? 'Continuar' : 'Salvar e continuar'}<ArrowRight size={17} /></>}</button></div>}
-      </form></ValidationContext.Provider></section></div>}
+      </form></ValidationContext.Provider>}</section></div>}
       <p className="app-bottom-note"><ShieldCheck size={14} /> Sem mensalidade. Não vendeu, não pagou.</p>
       {editingRecommendation && <CompanyRecommendationDialog base={base} item={editingRecommendation} onSaved={applyStatus} onClose={() => setEditingRecommendation(null)} onUnauthorized={handleError} />}
+      {updatingAbacateKey && <AbacatePayConnectionDialog base={base} onClose={() => setUpdatingAbacateKey(false)} onUnauthorized={handleError} onConnected={connection => {
+        setPastSales(connection.pastSales || null);
+        setProducts(connection.pendingTaxReview || []);
+        setStatus(previous => previous ? { ...previous, tenant: { ...previous.tenant, integrations: { ...previous.tenant.integrations, abacatepay: true } } } : previous);
+        if (view === 'wizard') { setImported(connection.imported); setStep(4.1); }
+        else setView('past-sales');
+      }} />}
     </div></div>;
 }

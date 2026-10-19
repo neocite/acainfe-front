@@ -10,6 +10,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import { PRICE_PER_INVOICE_CENTS, brl } from '../src/config/pricing';
+import { isAllowedAppRoute } from './app-routes';
 
 declare module 'express-session' {
   interface SessionData {
@@ -140,17 +141,9 @@ app.get(['/api/og.svg', '/api/og.png'], async (req, res) => {
   else res.type('svg').send(svg);
 });
 app.use('/api/app', requireAuth);
-const allowed = [
-  ['GET', /^\/me$/], ['PUT', /^\/me$/],
-  ['POST', /^\/onboarding\/certificate$/],
-  ['GET', /^\/companies\/[a-zA-Z0-9_-]+$/], ['PATCH', /^\/companies\/[a-zA-Z0-9_-]+$/],
-  ['PUT', /^\/companies\/[a-zA-Z0-9_-]+\/accountant$/],
-  ['POST', /^\/companies\/[a-zA-Z0-9_-]+\/(?:abacatepay|mcp-key|billing\/payments)$/],
-  ['GET', /^\/companies\/[a-zA-Z0-9_-]+\/(?:products|billing)$/],
-] as const;
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 1 } });
 app.use('/api/app', (req, res, next) => {
-  if (!allowed.some(([method, pattern]) => method === req.method && pattern.test(req.path))) {
+  if (!isAllowedAppRoute(req.method, req.path)) {
     res.status(404).json({ error: 'NOT_FOUND', message: 'Rota não encontrada.' }); return;
   }
   if (!apiBase() || !process.env.ACAINFE_APP_KEY) {

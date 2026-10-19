@@ -1,3 +1,4 @@
 - [Bootstrap de artefatos](artifact-bootstrap.md) — em projetos vazios, o scaffold de um artefato pode não trazer os pré-requisitos do workspace.
 - [Dados fiscais no cadastro](optional-tax-details.md) — CCM obrigatório na interface; alíquota inicia em 6% editáveis, embora a API aceite ambos como opcionais.
 - [Genéricos JSX na prévia](dev-jsx-generics.md) — tags com parâmetro genérico explícito podem quebrar o injetor de metadados, mesmo com build válido.
+- [Vendas passadas](past-sales-rules.md) — competência original, consentimento para meses anteriores e marcação manual de notas emitidas fora do app.

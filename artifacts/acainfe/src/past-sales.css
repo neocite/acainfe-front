@@ -1,0 +1,27 @@
+.past-sales{min-width:0}
+.past-sales h2{margin:14px 0;font:700 30px/1.15 'Bricolage Grotesque',sans-serif;letter-spacing:-.7px}
+.past-sales>p,.past-sales-review>p{font-size:14px;line-height:1.7;color:#6b5f70}
+.past-sales-period{margin:22px 0;padding:22px;border:1px solid #4a194226;border-radius:14px;background:#fffdf9}
+.past-sales-period-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.past-sales-period-heading h3{margin:0;font:700 22px/1.2 'Bricolage Grotesque',sans-serif}
+.past-sales-period-heading>span{padding:5px 9px;border-radius:99px;background:#4a19420d;color:#6b5f70;font-size:11px}
+.past-sales-period>p{font-size:14px;line-height:1.7}
+.past-sales-period>small{display:block;color:#6b5f70;line-height:1.7}
+.past-sales-period .past-sales-cost{font-weight:600;color:#4a1942}
+.past-sales-period .past-sales-period-note{font-size:12px;color:#735022}
+.past-sales-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:20px}
+.past-sales-actions button{margin-top:0!important}
+.past-sales-result{border:1px solid #cbdcce;border-radius:10px;padding:12px 16px;margin-top:20px;background:#f2f8f3;font-size:13px;line-height:1.7}
+.past-sales-review{border:1px solid #ccdae6;border-radius:14px;padding:20px;margin:24px 0;background:#f5f8fb}
+.past-sales-review h3{margin:0;font-size:17px}
+.past-sales-table-wrap{overflow-x:auto;margin-top:20px}
+.past-sales-table{width:100%;border-collapse:collapse;text-align:left;font-size:12px}
+.past-sales-table th,.past-sales-table td{padding:12px 9px;border-bottom:1px solid #ccdae6;vertical-align:middle}
+.past-sales-table th{font-weight:600}
+.past-sales-table td:nth-child(3){white-space:nowrap}
+.past-sales-table input[type=checkbox],.past-sales-confirm-checkbox input{width:18px;height:18px;accent-color:#4a1942;flex-shrink:0}
+.past-sales-confirm-checkbox{display:flex;gap:10px;align-items:center;font-size:14px;line-height:1.6;margin-top:12px}
+.past-sales-confirmation [id],.abacatepay-connection-dialog [id]{line-height:1.7}
+.past-sales-panel-card h3{margin-top:0}
+.abacatepay-connection-dialog .abacatepay-key-guide{margin:0}
+@media(max-width:600px){.past-sales-period{padding:16px}.past-sales h2{font-size:27px}.past-sales-actions{gap:10px}.past-sales-actions .app-primary,.past-sales-actions .app-secondary{width:100%;justify-content:center}.past-sales-review{padding:15px}.past-sales-table{min-width:490px}}
