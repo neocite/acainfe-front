@@ -16,6 +16,8 @@ export type PastSalesResult = {
 export type SaleProduct = { id: string; name: string };
 export type AbacatePayConnection = {
   imported: number; pendingTaxReview?: SaleProduct[]; pastSales?: PastSalesPreview;
+  confirmedByProfile?: SaleProduct[]; skippedTestProducts?: string[];
+  mergedDuplicates?: { name: string; externalId: string; productId: string }[];
 };
 
 export function periodLabel(period: string): string {

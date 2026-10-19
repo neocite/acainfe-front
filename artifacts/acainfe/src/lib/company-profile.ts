@@ -1,5 +1,5 @@
 export type CompanyProfile = {
-  tenant: { id: string; cnpj?: string; taxRegime?: string; legalName?: string; tradeName?: string; name?: string };
+  tenant: { id: string; cnpj?: string; taxRegime?: string; legalName?: string; tradeName?: string; name?: string; effectiveIssRateBps?: number | null; environment?: string };
   company?: { legalName?: string; tradeName?: string; cityName?: string; uf?: string };
 };
 

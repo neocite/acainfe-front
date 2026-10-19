@@ -1,6 +1,10 @@
 import { api } from './api';
 
 export type Product = { id: string; name: string };
+export type TaxProduct = Product & {
+  serviceDescription?: string; defaultPriceCents?: number;
+  taxStatus?: string; suggestedTaxProfile?: unknown; warnings?: string[];
+};
 
 export function parseProducts<T extends Product = Product>(data: unknown): T[] {
   const envelope = data && typeof data === 'object' ? data as Record<string, unknown> : {};
