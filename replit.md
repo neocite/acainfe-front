@@ -27,6 +27,6 @@ Landing page em `/` e cadastro inicial em `/app`. A operação de notas acontece
 
 ## Antes de abrir ao público
 
-- Adicionar `ACAINFE_APP_KEY` via Secrets e validar a jornada com certificado e empresa de teste autorizados.
+- Validar a jornada autenticada com certificado e empresa de teste autorizados. A presença da chave não substitui a validação ponta a ponta.
 - Preencher CNPJ da empresa operadora, termos de uso, política de privacidade e canal de contato. Os links legais atualmente indicam explicitamente que aguardam o responsável.
 - Validar o login com Google e o fluxo autenticado ponta a ponta. Verificações locais atuais cobrem build, tipos, cálculo dos planos, bloqueio de acesso sem sessão, CSRF, metadados, imagem social e as telas públicas.
