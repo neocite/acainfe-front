@@ -5,6 +5,8 @@ import { api, ApiError, phoneMask } from '../lib/api';
 import { isOptionalCompanyField, onboardingCompanyPatch, simplesRateInput, municipalRegistrationHelp, type ReadinessItem, type OptionalCompanyField } from '../lib/company-details';
 import { CompanyRecommendationDialog } from '../components/CompanyRecommendationDialog';
 import { AbacatePayKeyGuide } from '../components/AbacatePayKeyGuide';
+import { CompanyCard } from '../components/CompanyCard';
+import { mergeCompanyProfile, type CompanyProfile } from '../lib/company-profile';
 import '../components/abacatepay-key-guide.css';
 import { isAuthUser, type AuthUser } from '../lib/auth';
 import { onboardingEntry } from '../lib/onboarding-entry';
@@ -14,7 +16,7 @@ import '../mobile-fixes.css';
 import '../company-details.css';
 
 type User = AuthUser;
-type CompanyStatus = {
+type CompanyStatus = CompanyProfile & {
   tenant: { id: string; cnpj?: string; taxRegime?: string; municipalRegistration?: string | null; simplesNacionalTaxRateBps?: number | null; status?: string; integrations?: { abacatepay?: boolean }; certificateExpiresAt?: string; accountant?: unknown };
   company?: { legalName?: string; tradeName?: string; cityName?: string; uf?: string };
   availability: { status: string; reason?: string };
@@ -47,10 +49,6 @@ function Field({ label, help, children }: { label: string; help?: string; childr
   const errors = useContext(ValidationContext);
   const error = errors[fieldNames[label] || label];
   return <label className="app-field"><span>{label}</span>{children}{help && <small>{help}</small>}{error && <small className="danger-text" role="alert">{error}</small>}</label>;
-}
-function CompanyCard({ status }: { status: CompanyStatus }) {
-  const cnpj = status.tenant.cnpj?.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
-  return <div className="company-summary"><Building2 size={24} /><div><strong>{status.company?.legalName || status.company?.tradeName || 'Sua empresa'}</strong><p>{cnpj} {status.company?.cityName && `· ${status.company.cityName}/${status.company.uf}`}</p><small>{status.tenant.taxRegime?.replaceAll('_', ' ')}</small></div></div>;
 }
 export default function Onboarding() {
   const [user, setUser] = useState<User | null>(null);
@@ -87,7 +85,7 @@ export default function Onboarding() {
   const base = `/app/companies/${encodeURIComponent(id || '')}`;
 
   function applyStatus(s: CompanyStatus) {
-    setStatus(s);
+    setStatus(previous => mergeCompanyProfile(previous, s));
     setRegime(s.tenant.taxRegime || 'SIMPLES_NACIONAL');
     setMunicipal(s.tenant.municipalRegistration || '');
     setRate(simplesRateInput(s.tenant.simplesNacionalTaxRateBps, s.readiness.recommended || []));
@@ -122,7 +120,15 @@ export default function Onboarding() {
     const me = await api('/app/me');
     setName(me.user?.name || me.name || user?.name || '');
     setPhone(me.user?.whatsapp || me.whatsapp || '');
-    const existing = me.companies?.[0] as CompanyStatus | undefined;
+    let existing = me.companies?.[0] as CompanyStatus | undefined;
+    if (existing) {
+      try {
+        const fullStatus = await api<CompanyStatus>(`/app/companies/${encodeURIComponent(existing.tenant.id)}`);
+        existing = mergeCompanyProfile(existing, fullStatus);
+      } catch (e) {
+        handleError(e);
+      }
+    }
     const entry = onboardingEntry(existing);
     setStep(entry.step);
     setView(entry.view);
