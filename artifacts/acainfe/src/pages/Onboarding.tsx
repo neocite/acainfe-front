@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type FormEvent, type Re
 import { Link } from 'wouter';
 import { ArrowRight, ArrowLeft, Check, ShieldCheck, FileKey, Sparkles, Copy, CheckCheck, LogOut, Loader2, Wallet, Building2, AlertTriangle, ExternalLink, Leaf, Mail } from 'lucide-react';
 import { api, ApiError, phoneMask } from '../lib/api';
+import { getProducts } from '../lib/products';
 import { isOptionalCompanyField, onboardingCompanyPatch, simplesRateInput, municipalRegistrationHelp, type ReadinessItem, type OptionalCompanyField } from '../lib/company-details';
 import { CompanyRecommendationDialog } from '../components/CompanyRecommendationDialog';
 import { AbacatePayKeyGuide } from '../components/AbacatePayKeyGuide';
@@ -166,7 +167,7 @@ export default function Onboarding() {
   }, [id, view]);
   useEffect(() => {
     if (!id || step !== 5) return;
-    api(`${base}/products?pendingTaxReview=true`).then(data => setProducts(Array.isArray(data) ? data : data.products ?? [])).catch(handleError);
+    getProducts(`${base}/products?pendingTaxReview=true`).then(setProducts).catch(handleError);
   }, [id, step]);
 
   async function refreshPanel() {

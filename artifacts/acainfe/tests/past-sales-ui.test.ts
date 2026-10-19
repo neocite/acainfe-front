@@ -14,6 +14,7 @@ describe('Vendas sem nota: interações reais dos componentes', () => {
   let periods: PastSalesPeriod[];
   let items: PastSale[];
   let warning: string | undefined;
+  let productResponse: unknown;
   let calls: { url: string; method: string; body: any }[];
   let updatedKey: number;
   let skipped: number;
@@ -53,7 +54,7 @@ describe('Vendas sem nota: interações reais dos componentes', () => {
       { id: 'sale-1', paidAt: '2026-10-10T15:00:00Z', amountCents: 10000, status: 'AVAILABLE', customer: { name: 'Cliente de teste' } },
       { id: 'sale-2', paidAt: '2026-10-11T15:00:00Z', amountCents: 20000, status: 'AVAILABLE', customer: null },
     ];
-    warning = undefined; calls = []; updatedKey = 0; skipped = 0;
+    warning = undefined; productResponse = { products: [{ id: 'product-1', name: 'Serviço de teste' }] }; calls = []; updatedKey = 0; skipped = 0;
     container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
     dom.window.confirm = () => true;
     globalThis.fetch = async (url, init) => {
@@ -64,7 +65,7 @@ describe('Vendas sem nota: interações reais dos componentes', () => {
       let data: unknown;
       if (path.pathname.endsWith('/public/pricing')) data = { pricePerInvoiceCents: 80 };
       else if (path.pathname.endsWith('/abacatepay')) data = { imported: 3, pendingTaxReview: [], pastSales: { periods } };
-      else if (path.pathname.endsWith('/products')) data = { products: [{ id: 'product-1', name: 'Serviço de teste' }] };
+      else if (path.pathname.endsWith('/products')) data = productResponse;
       else if (path.pathname.endsWith('/past-sales/items')) data = { items };
       else if (path.pathname.endsWith('/past-sales/mark')) {
         for (const item of items) if (body.period || body.ids.includes(item.id)) item.status = body.alreadyIssued ? 'ALREADY_ISSUED' : 'AVAILABLE';
@@ -162,6 +163,27 @@ describe('Vendas sem nota: interações reais dos componentes', () => {
     await act(async () => { select.value = 'product-1'; select.dispatchEvent(new dom.window.Event('change', { bubbles: true })); });
     await click(button('Emitir 2 notas', current));
     assert.deepEqual(calls.find(call => call.url.endsWith('/issue'))?.body, { period: '2026-10', fallbackProductId: 'product-1' });
+  });
+  it('carrega produtos no envelope items para escolher o produto do Pix', async () => {
+    productResponse = { items: [{ id: 'product-1', name: 'Serviço importado' }], total: 1 };
+    periods.find(period => period.period === '2026-10')!.available.withoutItems = 1;
+    await mount(); await flush();
+    assert.ok(card('outubro/2026').querySelector('select')!.textContent?.includes('Serviço importado'));
+    assert.equal(container.querySelectorAll('[role="alert"]').length, 0);
+  });
+  it('mantém um único erro ao repetir consulta de produtos e o limpa após recuperação', async () => {
+    productResponse = { unexpected: [] };
+    periods.find(period => period.period === '2026-10')!.available.withoutItems = 1;
+    await mount(); await flush();
+    assert.equal(container.querySelectorAll('[role="alert"]').length, 1);
+    assert.ok(container.textContent?.includes('A importação foi concluída'));
+    await click(button('Carregar produtos novamente'));
+    assert.equal(container.querySelectorAll('[role="alert"]').length, 1);
+    assert.equal(container.textContent?.includes('Tentar novamente'), false);
+    productResponse = { items: [{ id: 'product-1', name: 'Serviço recuperado' }] };
+    await click(button('Carregar produtos novamente'));
+    assert.equal(container.querySelectorAll('[role="alert"]').length, 0);
+    assert.ok(card('outubro/2026').querySelector('select')!.textContent?.includes('Serviço recuperado'));
   });
   it('trata falta de permissão como aviso e permite atualizar key ou pular', async () => {
     warning = 'A API key precisa da permissão CHECKOUT:READ';

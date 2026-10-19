@@ -4,6 +4,7 @@ import { api, ApiError } from '../lib/api';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog';
 import { PastSalesPeriodCard } from './PastSalesPeriodCard';
 import { PastSalesReview } from './PastSalesReview';
+import { getProducts } from '../lib/products';
 import { getPastSales, issuePastSales, pastPeriodWarning, sortedPeriods, type PastSalesPreview, type PastSalesPeriod, type PastSalesResult, type SaleProduct } from '../lib/past-sales';
 
 type Props = { base: string; initial?: PastSalesPreview | null; onUpdateKey: () => void; onSkip: () => void; onUnauthorized: (error: ApiError) => void };
@@ -31,10 +32,17 @@ export function PastSales({ base, initial, onUpdateKey, onSkip, onUnauthorized }
     setPrice(pricing.pricePerInvoiceCents);
   }
   async function loadProducts() {
-    const data = await api<SaleProduct[] | { products: SaleProduct[] }>(`${base}/products`);
-    const list = Array.isArray(data) ? data : data.products;
-    if (!Array.isArray(list)) throw new Error('Não foi possível carregar os produtos.');
-    setProducts(list); setProductError('');
+    setProducts(await getProducts(`${base}/products`));
+    setProductError('');
+  }
+  function reportProducts(e: unknown) {
+    setProductError('A importação foi concluída, mas não foi possível consultar a lista de produtos para o Pix avulso. ' + (e instanceof Error ? e.message : 'Tente novamente.'));
+    if (e instanceof ApiError && e.status === 401) onUnauthorized(e);
+  }
+  async function retryProducts() {
+    if (busy) return;
+    setBusy(true);
+    try { await loadProducts(); } catch (e) { reportProducts(e); } finally { setBusy(false); }
   }
   useEffect(() => {
     let mounted = true;
@@ -48,10 +56,7 @@ export function PastSales({ base, initial, onUpdateKey, onSkip, onUnauthorized }
   }, [initial]);
   const needsProducts = (preview.periods || []).some(period => period.available.withoutItems > 0);
   useEffect(() => {
-    if (needsProducts) loadProducts().catch(e => {
-      setProductError(e instanceof Error ? e.message : 'Não foi possível carregar os produtos.');
-      if (e instanceof ApiError && e.status === 401) onUnauthorized(e);
-    });
+    if (needsProducts) loadProducts().catch(reportProducts);
   }, [base, needsProducts]);
   async function perform(action: () => Promise<void>) {
     if (busy) return;
@@ -72,7 +77,7 @@ export function PastSales({ base, initial, onUpdateKey, onSkip, onUnauthorized }
     <p>Revise antes de emitir: vendas que já têm nota no portal da prefeitura ou em outro sistema devem ser marcadas manualmente. Estornos e contestações não entram.</p>
     {preview.warning && <div className="app-notice" role="status"><p>{preview.warning}</p><p>A conexão funcionou. Atualize a chave para permitir a leitura das vendas passadas.</p><button type="button" className="app-secondary" disabled={busy || !!review} onClick={onUpdateKey}>Atualizar key</button></div>}
     {error && <div className="app-alert" role="alert">{error}<button type="button" className="text-button" disabled={busy} onClick={() => void perform(async () => { await Promise.all([refresh(), loadPrice()]); })}>Tentar novamente</button></div>}
-    {productError && <div className="app-alert" role="alert">{productError}<button type="button" className="text-button" disabled={busy} onClick={() => void perform(loadProducts)}>Carregar produtos novamente</button></div>}
+    {needsProducts && productError && <div className="app-alert" role="alert">{productError}<button type="button" className="text-button" disabled={busy} onClick={() => void retryProducts()}>Carregar produtos novamente</button></div>}
     {loading && <p role="status">Buscando vendas sem nota…</p>}
     {sortedPeriods(preview).map(period => <PastSalesPeriodCard key={period.period} period={period} price={price} products={products}
       fallback={fallbacks[period.period] || ''} busy={busy || loading || !!review} result={results[period.period]}
