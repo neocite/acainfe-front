@@ -1,0 +1,11 @@
+.abacatepay-key-guide{margin:22px 0;padding:20px;border:1px solid #4a19421c;border-radius:14px;background:#4a194205}
+.abacatepay-key-guide h3{margin:0 0 10px;font-size:17px;line-height:1.4}
+.abacatepay-key-guide>p{font-size:13px;line-height:1.7}
+.abacatepay-key-guide ol{list-style:none;counter-reset:api-key-step;margin:20px 0;padding:0}
+.abacatepay-key-guide li{counter-increment:api-key-step;position:relative;padding:0 0 20px 40px}
+.abacatepay-key-guide li:last-child{padding-bottom:0}
+.abacatepay-key-guide li:before{content:counter(api-key-step);position:absolute;left:0;top:0;width:26px;height:26px;display:grid;place-items:center;border-radius:50%;background:#4a194210;color:#4a1942;font-size:12px;font-weight:700}
+.abacatepay-key-guide li>strong{display:block;font-size:13px;line-height:1.7}
+.abacatepay-key-guide li>span{display:block;font-size:13px;line-height:1.7;color:#6b5f70;overflow-wrap:anywhere}
+.abacatepay-key-guide .abacatepay-key-guide-note{margin:18px 0 0;padding-top:15px;border-top:1px solid #4a19421c;font-size:12px;color:#6b5f70}
+@media(max-width:480px){.abacatepay-key-guide{padding:16px}.abacatepay-key-guide li{padding-left:36px}}
