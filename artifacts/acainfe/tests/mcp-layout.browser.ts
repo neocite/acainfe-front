@@ -402,7 +402,7 @@ try {
   assert.equal(await evaluate('document.querySelector(".mcp-keys").textContent.includes("Gerar nova chave")'), false);
   assert.ok(await evaluate('document.querySelector(".mcp-keys-empty").textContent.includes("Gere uma chave abaixo para conectar o agente.")'));
   assert.deepEqual(errors, []);
-  await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b=>b.textContent.includes("Configuração")).click()');
+  await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b=>b.textContent.includes("Início")).click()');
   await waitFor('[...document.querySelectorAll("button")].some(b=>b.textContent.includes("Gerar minha chave"))');
   assert.equal(await evaluate('!!document.querySelector(".mcp-keys")'),false);
   await evaluate('[...document.querySelectorAll("button")].find(b=>b.textContent.trim()==="Concluir").click()');

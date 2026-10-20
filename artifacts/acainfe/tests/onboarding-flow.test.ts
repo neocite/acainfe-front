@@ -300,7 +300,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     } });
     try {
       await mount();
-      await click(button('Configuração'));
+      await click(button('Início'));
       assert.equal(container.textContent?.includes('Hermes (CLI)'), false);
       await click(button('Gerar minha chave'));
       assert.equal(mcpRequests, 1);
@@ -365,7 +365,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     assert.ok(container.textContent?.includes('Guarde agora: ela não aparece de novo'));
     assert.equal(keyDeletes.length, 0);
     await click(button('Minha empresa'));
-    await click(button('Configuração'));
+    await click(button('Início'));
     assert.equal(container.textContent?.includes('test-only-mcp-key'), false);
     assert.equal(mcpRequests, 1);
   });
@@ -380,7 +380,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   it('etapa 5 vazia mostra só o gerador da primeira chave e Concluir abre o painel', async () => {
     readyPanel(); await mount();
     assert.equal(container.querySelector('.mcp-keys'), null);
-    await click(button('Configuração'));
+    await click(button('Início'));
     const card = container.querySelector('.wizard-card')!;
     assert.equal(container.querySelector('.mcp-keys'), null);
     assert.ok(card.querySelector('form'));
@@ -398,6 +398,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     company.readiness.recommended = [{ field: 'defaultProduct', message: 'Escolha o produto padrão para o Pix.' }];
     await mount();
     const tabs = [...container.querySelectorAll('.app-tabs button')].map(b => b.textContent?.trim());
+    assert.deepEqual(tabs, ['Início', 'Minha empresa', 'Gateways de pagamento', 'Agentes de IA', 'Saldo']);
     assert.equal(tabs[tabs.indexOf('Minha empresa') + 1], 'Gateways de pagamento');
     assert.equal(tabs.includes('Dados fiscais'), false);
     assert.equal(tabs.includes('Painel'), false);
@@ -412,7 +413,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     assert.ok(container.textContent?.includes('Nenhum (esses pagamentos não geram nota)'));
     assert.ok(button('Atualizar API key'));
     assert.ok(button('Recriar webhook'));
-    await click(button('Configuração'));
+    await click(button('Início'));
     assert.ok(container.textContent?.includes('envio do certificado'));
     assert.equal(gatewayCalls.length, 0);
   });
@@ -463,7 +464,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   });
   it('etapa 5 com chave existente não oferece gerar e leva ao gerenciamento', async () => {
     readyPanel(); keys = [{id:'legacy-key',legacy:true}];
-    await mount(); await click(button('Configuração'));
+    await mount(); await click(button('Início'));
     assert.ok(container.textContent?.includes('Você já tem uma chave.'));
     assert.equal(container.textContent?.includes('Gerar minha chave'),false);
     assert.equal(container.querySelector('.mcp-keys'),null);

@@ -8,3 +8,9 @@ O menu antes chamado “Painel” deve se chamar “Minha empresa”. Dados fisc
 **Why:** O usuário pediu explicitamente essa hierarquia para agrupar as informações da empresa e separar a gestão dos pagamentos.
 
 **How to apply:** Oferecer os detalhes fiscais por um acesso interno com retorno a “Minha empresa”, mantendo esse menu selecionado. Informações, resumos e pendências específicas do gateway ficam em “Gateways de pagamento”, não na área da empresa.
+
+O menu de configuração/onboarding deve se chamar “Início”. “Saldo” deve ser sempre a última aba.
+
+**Why:** O usuário definiu explicitamente esses nomes e essa ordem.
+
+**How to apply:** Ao adicionar ou reorganizar menus, preservar “Saldo” no final e usar “Início” para o acesso ao fluxo inicial.
