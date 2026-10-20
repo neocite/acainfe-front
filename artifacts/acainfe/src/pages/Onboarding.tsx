@@ -6,6 +6,7 @@ import { api, ApiError, phoneMask } from '../lib/api';
 import { isOptionalCompanyField, onboardingCompanyPatch, simplesRateInput, municipalRegistrationHelp, type ReadinessItem, type OptionalCompanyField } from '../lib/company-details';
 import { CompanyRecommendationDialog } from '../components/CompanyRecommendationDialog';
 import { AbacatePayStep } from '../components/AbacatePayStep';
+import { AbacatePayWebhookCard } from '../components/AbacatePayWebhookCard';
 import { FiscalCompanyFields } from '../components/FiscalCompanyFields';
 import { McpKeysSection } from '../components/McpKeysSection';
 import { CompanyCard, TestEnvironmentNotice } from '../components/CompanyCard';
@@ -24,6 +25,7 @@ import '../onboarding.css';
 import '../mobile-fixes.css';
 import '../company-details.css';
 import '../abacatepay-step.css';
+import '../abacatepay-webhook.css';
 import '../past-sales.css';
 import '../products.css';
 import '../fiscal-company.css';
@@ -32,6 +34,7 @@ import '../mcp-keys.css';
 type User = AuthUser;
 type CompanyStatus = CompanyProfile & {
   tenant: { id: string; cnpj?: string; taxRegime?: string; municipalRegistration?: string | null; simplesNacionalTaxRateBps?: number | null; status?: string; integrations?: { abacatepay?: boolean }; certificateExpiresAt?: string; accountant?: unknown; businessType?: string | null; issRateBps?: number | null; environment?: string; approximateTaxes?: ApproximateTaxes | null };
+  abacatepay?: { connected: boolean; connectedAt?: string | null; webhookEndpoint?: string | null; webhookUpToDate?: boolean | null };
   emission?: Emission;
   approximateTaxes?: ApproximateTaxes | null;
   company?: { legalName?: string; tradeName?: string; cityName?: string; uf?: string };
@@ -270,7 +273,14 @@ export default function Onboarding() {
       <button className="app-primary" disabled={busy || billing.amountDueCents <= 0} onClick={() => run(async () => setPix(await api(`${base}/billing/payments`, 'POST')))}>{busy ? <Loader2 className="spin" size={17} /> : <Wallet size={17} />} {billing.amountDueCents > 0 ? 'Pagar com Pix' : 'Tudo em dia'}</button>
       {pix && <div className="pix-section"><h2>Pix de {brl(pix.amountCents)}</h2>{/^data:image\/(png|jpeg|webp);base64,/.test(pix.pixQrCodeImage) && <img src={pix.pixQrCodeImage} alt="QR Code para pagamento Pix" />}<p>Expira em {new Date(pix.expiresAt).toLocaleString('pt-BR')}</p><div className="copy-field"><code>{pix.pixCopyPaste}</code><CopyButton text={pix.pixCopyPaste} /></div><button className="app-secondary" disabled={busy} onClick={() => run(async () => { const b = await api<Billing>(`${base}/billing`); setBilling(b); if (b.amountDueCents <= 0) setPix(null); })}>Verificar pagamento</button></div>}</> : <p>Não foi possível carregar o saldo. Use a aba Saldo para tentar novamente.</p>}</section>
       : view === 'panel' ? <section className="app-card"><span className="app-eyebrow">TUDO NO SEU LUGAR</span><h1>Seu negócio, por aqui.</h1>{errorBox}{status && <><CompanyCard status={status} onFiscalSettings={() => setView('fiscal')} /><div className="panel-grid"><div><small>Status da empresa</small><strong>{companyStatusLabel(status.tenant.status)}</strong></div><div><small>Emissão de notas</small><strong>{status.readiness.canIssue ? 'Empresa pronta' : 'Há pendências'}</strong></div><div><small>Produtos aguardando tributação</small><strong>{Array.isArray(status.pendingTaxReview) ? status.pendingTaxReview.length : status.pendingTaxReview}</strong></div><div><small>Validade do certificado</small><strong>{certificateExpiryLabel(status)}</strong></div></div>
-      {status.readiness.missing.length > 0 && <div className="app-notice"><h3>O que falta para emitir</h3><ul>{status.readiness.missing.map(m => <li key={m.field}>{m.message}</li>)}</ul><button className="app-secondary" onClick={() => { setStep(3); setView('wizard'); }}>Completar dados</button></div>}
+       <AbacatePayWebhookCard
+         base={base}
+         integration={status.abacatepay}
+         onReconnect={() => { setStep(4); setView('wizard'); }}
+         onUnauthorized={handleError}
+         onRefresh={refreshPanel}
+       />
+       {status.readiness.missing.length > 0 && <div className="app-notice"><h3>O que falta para emitir</h3><ul>{status.readiness.missing.map(m => <li key={m.field}>{m.message}</li>)}</ul><button className="app-secondary" onClick={() => { setStep(3); setView('wizard'); }}>Completar dados</button></div>}
        {recommended.length > 0 && <section className="company-recommendations" aria-labelledby="recommendations-title"><h3 id="recommendations-title">Complete quando puder</h3><p>Esses dados são recomendados e não impedem a emissão.</p><ul>{recommended.map(item => <li key={item.field}><span>{item.message}</span>{isOptionalCompanyField(item.field) ? <button className="app-secondary" type="button" disabled={busy} onClick={() => setEditingRecommendation({ ...item, field: item.field as OptionalCompanyField })}>Informar<span className="sr-only"> {item.field === 'municipalRegistration' ? 'CCM' : 'alíquota do Simples'}</span></button> : item.field === 'approximateTaxes' ? <button type="button" className="app-secondary" onClick={() => setView('fiscal')}>Conferir tributos</button> : null}</li>)}</ul></section>}
       {(accountantSkipped || !status.tenant.accountant) && <div className="app-notice"><h3>Seu contador já está por aqui?</h3><p>Cadastre um contato para receber os PDFs, XMLs e a planilha automaticamente todo dia 1.</p><button className="app-secondary" onClick={() => { setStep(3.1); setView('wizard'); }}>Adicionar contador</button></div>}<button className="app-secondary" onClick={refreshPanel} disabled={busy}>Atualizar status</button></>}</section>
       : <div className="wizard-layout"><aside className="wizard-aside"><span className="app-eyebrow">SÓ PRECISA CONFIGURAR UMA VEZ</span><h1>Vamos deixar<br />tudo <em>prontinho.</em></h1><p>Alguns passos agora.<br />Menos trabalho em cada venda.</p><ol>{steps.map((label, i) => <li key={label} className={Math.floor(step) === i + 1 ? 'current' : step > i + 1 ? 'complete' : ''}><span>{step > i + 1 ? <Check size={16} /> : String(i + 1).padStart(2, '0')}</span>{label}</li>)}</ol><div className="aside-secure"><ShieldCheck size={20} /><span>Seus dados protegidos.<br />Sua empresa no controle.</span></div></aside>

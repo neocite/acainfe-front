@@ -1,0 +1,26 @@
+.ap-webhook-card{margin:28px 0;padding:22px;border:1px solid #4a19421c;border-radius:14px;background:#fffdfa;min-width:0}
+.ap-webhook-heading{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.ap-webhook-heading h2{font:700 21px/1.2 'Bricolage Grotesque',sans-serif;color:#4a1942;margin:8px 0 0}
+.ap-webhook-card>p{font-size:12px;line-height:1.7;color:#6b5f70}
+.ap-webhook-connected{margin:14px 0 8px!important}
+.ap-webhook-status{display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border-radius:999px;font-size:11px;font-weight:700}
+.ap-webhook-status-ok{color:#267d45;background:#edf5ec}
+.ap-webhook-endpoint{display:grid;gap:6px;margin:12px 0 18px;font-size:11px;color:#8c7d8e}
+.ap-webhook-endpoint code,.ap-webhook-created code{font-size:11px;line-height:1.7;color:#4a1942;overflow-wrap:anywhere;word-break:break-word}
+.ap-webhook-warning{display:flex;align-items:flex-start;gap:12px;margin-top:14px;padding:15px;border:1px solid #ff9f1c55;border-radius:10px;background:#fff5e3;color:#80551a}
+.ap-webhook-warning>svg{flex:none;margin-top:2px}
+.ap-webhook-warning p,.ap-webhook-neutral p{margin:0 0 12px;font-size:12px;line-height:1.7;color:inherit}
+.ap-webhook-neutral{margin-top:14px;padding:15px;border:1px solid #4a19421c;border-radius:10px;background:#f7f1f4}
+.ap-webhook-created{margin-top:18px;padding:16px;border:1px solid #267d4540;border-radius:10px;background:#edf5ec;color:#275d37;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
+.ap-webhook-created p{margin:8px 0;color:inherit;font-size:12px}
+.ap-webhook-created-title{display:flex;align-items:center;gap:8px;font-weight:700}
+.ap-webhook-created-title svg{flex:none}
+.ap-webhook-created a{display:inline-flex;align-items:center;gap:7px;margin-top:5px;color:#267d45;text-decoration:underline;font-size:11px}
+.ap-webhook-dialog{max-width:min(600px,calc(100vw - 28px));background:#fffdfa;color:#2b2230}
+.ap-webhook-dialog>[data-slot=dialog-description]{line-height:1.7}
+.ap-webhook-key-intro{font-size:12px;line-height:1.7;color:#6b5f70}
+.ap-webhook-dialog .abacatepay-key-guide{margin:8px 0;max-height:260px;overflow:auto}
+.ap-webhook-error{overflow-wrap:anywhere;font-size:12px;line-height:1.6}
+.ap-webhook-dialog-actions{justify-content:flex-end;flex-wrap:wrap}
+.ap-webhook-dialog-actions .app-primary,.ap-webhook-dialog-actions .app-secondary{margin:0}
+@media(max-width:640px){.ap-webhook-card{padding:17px;margin:22px 0}.ap-webhook-heading{align-items:flex-start}.ap-webhook-warning{padding:12px}.ap-webhook-dialog-actions{display:grid;grid-template-columns:1fr;width:100%}.ap-webhook-dialog-actions button{width:100%}}
