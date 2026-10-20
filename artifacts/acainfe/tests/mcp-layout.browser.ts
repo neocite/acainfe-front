@@ -101,7 +101,8 @@ try {
       const { requestId, request } = message.params;
       const path = new URL(request.url).pathname;
       let data: unknown;
-      if (path === '/api/auth/user') data = { id: 'layout-user', email: 'layout@example.test', name: 'Pessoa de teste' };
+      if (path === '/api/public/pricing') data = { pricePerInvoiceCents: 123, monthlyFeeCents: 0 };
+      else if (path === '/api/auth/user') data = { id: 'layout-user', email: 'layout@example.test', name: 'Pessoa de teste' };
       else if (path === '/api/app/me') data = { user: { name: 'Pessoa de teste' }, companies: [company] };
       else if (path === '/api/app/companies/layout-company') data = company;
       else if (path.endsWith('/billing')) data = { amountDueCents: 0 };
@@ -122,6 +123,37 @@ try {
   await send('Page.enable');
   await send('Runtime.enable');
   await send('Fetch.enable', { patterns: [{ urlPattern: '*/api/*', requestStage: 'Request' }] });
+  // Testar a apresentação pública com preço vivo, isolando as chamadas de API no próprio browser.
+  await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  const publicUrl = new URL(appUrl); publicUrl.pathname = '/'; publicUrl.search = ''; publicUrl.hash = '';
+  await send('Page.navigate', { url: publicUrl.toString() });
+  await waitFor('document.querySelector(".ac-hero-price__amount")?.textContent.replace(/\\s+/g, " ").includes("R$ 1,23")');
+  const landing = await evaluate(`(() => ({
+    price:document.querySelector('.ac-hero-price__amount').textContent.replace(/\\s+/g,' ').trim(),
+    monthly:document.querySelector('.ac-hero-price__rule').textContent.replace(/\\s+/g,' ').trim(),
+    examples:[...document.querySelectorAll('.ac-example')].map(el=>el.textContent.replace(/\\s+/g,' ').trim()),
+    heroLinks:[...document.querySelectorAll('.ac-hero-actions a')].map(a=>({text:a.textContent.trim(),href:a.getAttribute('href')})),
+    mainAction:[...document.querySelectorAll('.ac-nav__right a')].map(a=>a.textContent.trim()),
+    sectionOrder:[...document.querySelectorAll('main section[id]')].map(el=>el.id),
+    text:document.querySelector('main').textContent.replace(/\\s+/g,' ')
+  }))()`);
+  assert.ok(landing.price.includes('R$ 1,23'), JSON.stringify(landing));
+  assert.ok(landing.monthly.includes('R$ 0,00') && landing.monthly.includes('Sem cobrança mensal'), JSON.stringify(landing));
+  assert.ok(landing.text.includes('R$ 1,23 por nota emitida com sucesso'), JSON.stringify(landing.text));
+  assert.ok(!landing.text.includes('R$ 0,80'), JSON.stringify(landing.text));
+  for (const [i, expected] of ['R$ 12,30', 'R$ 123,00', 'R$ 615,00'].entries()) {
+    assert.ok(landing.examples[i].includes(expected), JSON.stringify(landing.examples));
+  }
+  assert.ok(landing.examples[0].includes('10 × R$ 1,23'), JSON.stringify(landing.examples));
+  assert.deepEqual(landing.heroLinks.map((link: { text: string }) => link.text), ['Começar agora', 'Como funciona']);
+  assert.equal(landing.heroLinks[0].href, '/app');
+  assert.equal(landing.heroLinks[1].href, '#como-funciona');
+  assert.ok(landing.mainAction.includes('Começar agora'));
+  assert.ok(!landing.text.includes('Começar grátis'));
+  assert.deepEqual(landing.sectionOrder, ['so-paga-se-vender', 'como-funciona', 'preco', 'comparativo', 'compatibilidade', 'faq']);
+  await evaluate('document.querySelector(".ac-hero-actions a[href=\\"#como-funciona\\"]").click()');
+  await waitFor('location.hash === "#como-funciona" && document.querySelector("#como-funciona").getBoundingClientRect().top > 0 && document.querySelector("#como-funciona").getBoundingClientRect().top < 100');
+  console.log('PASS landing: preço, cobrança mensal, exemplos dinâmicos, CTAs corretos, âncora funcional e ordem das seções.');
   for (const width of [1280, 402, 360]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
     if (width === 1280) {

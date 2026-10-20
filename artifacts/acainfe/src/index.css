@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Caveat:wght@600;700&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Caveat:wght@600;700&family=DM+Sans:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @plugin "@tailwindcss/typography";
@@ -677,3 +677,79 @@ html { scroll-behavior: smooth; }
 .ac-modal__box { max-width: 480px; width: 100%; padding: 28px; background: var(--creme); border-radius: 20px; }
 .ac-modal__box h3 { font-size: 1.5rem; margin-bottom: 10px; color: var(--acai-700); }
 .ac-modal__box p { color: var(--texto-suave); line-height: 1.6; margin-bottom: 20px; }
+
+/* Landing typography stays local so the signed-in app retains its existing font system. */
+.ac-page { --app-font-sans: 'DM Sans', system-ui, sans-serif; --font-display: 'Bricolage Grotesque', 'DM Sans', system-ui, sans-serif; font-family: var(--app-font-sans); }
+
+/* Landing refresh — editorial pricing first, with the original illustrated identity intact. */
+.ac-nav { box-shadow: 0 4px 18px rgba(42,14,46,.035); }
+.ac-nav__links { gap: clamp(14px, 2vw, 26px); }
+.ac-nav__links a { font-size: .9rem; }
+.ac-hero { padding: clamp(36px, 5.5vw, 76px) 0 clamp(58px, 7vw, 100px); }
+.ac-hero__grid { gap: clamp(36px, 5.5vw, 76px); }
+.ac-hero h1 { max-width: 12ch; font-size: clamp(3rem, 7.2vw, 6.05rem); }
+.ac-hero__sub { max-width: 46ch; font-size: clamp(1.05rem, 1.4vw, 1.22rem); }
+.ac-hero-price { margin-top: 28px; padding: 18px 22px 16px; max-width: 545px; border-left: 5px solid var(--manga); background: #fffdf8; box-shadow: var(--sombra); border-radius: 4px 20px 20px 4px; }
+.ac-hero-price__amount { color: var(--acai-900); font: 800 clamp(2.35rem, 5vw, 3.7rem)/1 var(--font-display); letter-spacing: -.055em; }
+.ac-hero-price__amount span { display: inline-block; margin-left: 8px; font: 600 .3em/1.25 var(--app-font-sans); letter-spacing: -.01em; color: var(--texto-suave); }
+.ac-hero-price__rule { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; margin-top: 10px; font-size: .92rem; color: var(--texto-suave); }
+.ac-hero-price__rule > span:first-child { color: var(--texto-suave); font: 500 .86rem var(--app-font-sans); }
+.ac-hero-price__rule strong { color: var(--acai-700); }
+.ac-hero-price__rule b { margin-left: 3px; color: var(--acai-700); font-weight: 700; }
+.ac-hero-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 26px; }
+.ac-hero-actions .ac-micro { margin-top: 9px; }
+.ac-hero-foot { margin-top: 16px; max-width: 54ch; color: var(--texto-suave); font-size: .84rem; line-height: 1.5; }
+.ac-stage { min-height: clamp(340px, 36vw, 470px); }
+.ac-stage__blob { width: 100%; background: radial-gradient(circle at 45% 38%, #f0c5dd 0, #f1dce9 54%, #f4e8f1 73%); }
+.ac-bowl { width: min(100%, 420px); }
+.ac-costs { background: linear-gradient(180deg, var(--creme), #fcf1e5); }
+.ac-examples { display: grid; grid-template-columns: 1fr; gap: 12px; margin: 32px 0 0; }
+.ac-example { position: relative; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 18px; padding: 18px 20px; border-top: 1px solid rgba(74,25,66,.18); }
+.ac-example:last-child { border-bottom: 1px solid rgba(74,25,66,.18); }
+.ac-example > span { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; color: var(--acai-700); }
+.ac-example strong { grid-column: 1; grid-row: 2; color: var(--texto-suave); font-size: .88rem; font-weight: 500; }
+.ac-example b { grid-column: 2; grid-row: 1 / span 2; color: var(--acai-900); font: 800 clamp(1.45rem, 3vw, 2rem)/1 var(--font-display); letter-spacing: -.04em; }
+.ac-example--2 { background: rgba(255,255,255,.44); }
+.ac-example--3 { background: var(--acai-100); border-color: transparent; border-radius: 14px; }
+.ac-example-note { max-width: 76ch; color: var(--texto-suave); font-size: .82rem; line-height: 1.55; margin: 14px 0 34px; }
+.ac-costs .ac-calc { margin-top: 0; }
+.ac-args { margin-top: 34px; }
+.ac-arg { border-radius: 4px 20px 20px 4px; box-shadow: none; background: rgba(255,253,248,.78); }
+.ac-arg .n { font-size: 2.4rem; }
+.ac-arg h3 { margin-top: 8px; }
+.ac-bento { margin-top: 38px; }
+.ac-ben { box-shadow: 0 8px 26px -20px rgba(42,14,46,.3); }
+.ac-trust-grid { display: grid; gap: 14px; margin-top: 28px; max-width: 980px; }
+.ac-avail { margin: 0; max-width: none; }
+.ac-avail--independent { border-left-color: var(--acai-500); }
+.ac-flow { margin-top: 28px; }
+.ac-flow > div { border-style: solid; border-color: rgba(74,25,66,.16); }
+.ac-section[id], .ac-costs[id] { scroll-margin-top: 84px; }
+.ac-btn:focus-visible, .ac-burger:focus-visible, .ac-nav a:focus-visible, .ac-mnav a:focus-visible { outline: 3px solid var(--manga-deep); outline-offset: 4px; }
+@media (min-width: 560px) {
+  .ac-examples { grid-template-columns: repeat(3, 1fr); gap: 0; align-items: stretch; }
+  .ac-example { display: flex; align-items: flex-start; flex-direction: column; justify-content: center; min-height: 142px; padding: 20px; border: 1px solid rgba(74,25,66,.15); border-right: 0; border-radius: 0; }
+  .ac-example:first-child { border-radius: 18px 0 0 18px; }
+  .ac-example:last-child { border-right: 1px solid rgba(74,25,66,.15); border-radius: 0 18px 18px 0; }
+  .ac-example--3 { border-color: rgba(74,25,66,.15); }
+  .ac-example strong { margin-top: 3px; }
+  .ac-example b { margin-top: 8px; }
+}
+@media (min-width: 860px) {
+  .ac-trust-grid { grid-template-columns: 1.2fr .8fr; }
+}
+@media (max-width: 559px) {
+  .ac-nav__row { height: 62px; }
+  .ac-hero { padding-top: 34px; }
+  .ac-hero h1 { max-width: 11ch; font-size: clamp(2.75rem, 12vw, 4.1rem); }
+  .ac-hero-price { padding: 17px 17px 15px; }
+  .ac-hero-price__amount span { display: block; margin: 5px 0 0; font-size: .38em; }
+  .ac-hero-actions { align-items: flex-start; gap: 14px 10px; }
+  .ac-hero-actions > div { width: 100%; }
+  .ac-hero-actions .ac-btn--lg { width: 100%; }
+  .ac-stage { min-height: 345px; margin-top: -10px; }
+  .ac-chat { left: 0; bottom: -8px; }
+  .ac-examples { margin-top: 24px; }
+  .ac-example { padding: 16px; }
+  .ac-section { padding: 60px 0; }
+}

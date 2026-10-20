@@ -1,17 +1,17 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'wouter';
-import { ArrowRight, Bot, Check, CloudOff, KeyRound, Layers, Menu, MessageCircle, Palette, Plug, Repeat, Undo2, X } from 'lucide-react';
+import { ArrowRight, Bot, CloudOff, KeyRound, Layers, Menu, MessageCircle, Palette, Plug, Repeat, Undo2, X } from 'lucide-react';
 import { brl } from '@/config/pricing';
 import { usePricing } from '@/components/landing/use-pricing';
 import { Reveal } from '@/components/landing/Reveal';
-import { Bowl, ChatCard, HandArrow, Logo, Squiggle } from '@/components/landing/Art';
+import { Bowl, ChatCard, Logo, Squiggle } from '@/components/landing/Art';
 import { Calculator } from '@/components/landing/Calculator';
 import { Comparison } from '@/components/landing/Comparison';
 import { Faq } from '@/components/landing/Faq';
 import { LegalModal, type LegalKind } from '@/components/landing/Legal';
 
 const NAV = [
-  ['#como-funciona', 'Como funciona'], ['#so-paga-se-vender', 'Só paga se vender'], ['#preco', 'Preço'], ['#comparativo', 'Comparativo'], ['#faq', 'FAQ'],
+  ['#preco', 'Preço'], ['#como-funciona', 'Como funciona'], ['#so-paga-se-vender', 'Mensalidade'], ['#comparativo', 'Comparativo'], ['#faq', 'FAQ'],
 ] as const;
 
 function setMeta(sel: string, attr: string, key: string, value: string) {
@@ -20,7 +20,7 @@ function setMeta(sel: string, attr: string, key: string, value: string) {
   el.setAttribute('content', value);
 }
 
-function Cta({ size = 'lg', children = 'Começar grátis', micro = true }: { size?: 'lg' | 'sm'; children?: ReactNode; micro?: boolean }) {
+function Cta({ size = 'lg', children = 'Começar agora', micro = true }: { size?: 'lg' | 'sm'; children?: ReactNode; micro?: boolean }) {
   return (
     <div>
       <Link href="/app" className={`ac-btn ac-btn--manga ${size === 'lg' ? 'ac-btn--lg' : 'ac-btn--sm'}`}>{children}<ArrowRight size={size === 'lg' ? 20 : 16} /></Link>
@@ -61,7 +61,7 @@ export default function Landing() {
 
   const faq = [
     { q: 'Preciso de certificado digital?', a: 'Sim, o A1 (arquivo .pfx), o mesmo usado no e-CAC. Ele fica criptografado e só serve para assinar suas notas.' },
-    { q: 'Minha cidade já é atendida?', a: 'Começamos por São Bernardo do Campo (Simples Nacional e MEI). Cadastre-se para entrar na lista de espera da sua cidade.' },
+    { q: 'Minha cidade já é atendida?', a: 'No momento, atendemos São Bernardo do Campo (SP), para empresas do Simples Nacional e MEI. Você pode se cadastrar para entrar na lista de espera da sua cidade.' },
     { q: 'Preciso entender de imposto?', a: 'Não. O assistente explica cada escolha em português claro e você só confirma. Na dúvida, mostre ao seu contador: tudo fica registrado.' },
     { q: 'E se a prefeitura sair do ar?', a: 'A nota entra na fila e sai sozinha quando o sistema voltar.' },
     { q: 'Posso cancelar uma nota?', a: 'Pode, pelo assistente. Reembolsos no AbacatePay cancelam a nota automaticamente.' },
@@ -83,8 +83,6 @@ export default function Landing() {
     { c: 'ac-b5', Ic: Palette, t: 'Seu logo na nota', d: 'O PDF sai com a sua marca.' },
     { c: 'ac-b6 ac-ben--dark', Ic: Bot, t: 'Opera pelo seu assistente de IA', d: 'Emita, consulte, reenvie e cancele conversando. Funciona com Claude e outros clientes MCP.' },
   ];
-  const checks = ['Sem mensalidade', 'Sem taxa de adesão', 'Sem plano anual', 'Sem limite de notas', 'Envio por e-mail e WhatsApp incluso', 'Cancelamento e estorno inclusos', 'Acesso pelo MCP incluso'];
-
   return (
     <div className="ac-page">
       <header className="ac-nav">
@@ -95,7 +93,7 @@ export default function Landing() {
           </nav>
           <div className="ac-nav__right">
             <Link href="/app" className="ac-btn ac-btn--ghost ac-btn--sm">Entrar</Link>
-            <Link href="/app" className="ac-btn ac-btn--manga ac-btn--sm">Começar grátis</Link>
+            <Link href="/app" className="ac-btn ac-btn--manga ac-btn--sm">Começar agora</Link>
           </div>
           <button className="ac-burger" aria-label={menu ? 'Fechar menu' : 'Abrir menu'} aria-expanded={menu} onClick={() => setMenu((m) => !m)}>
             {menu ? <X size={22} /> : <Menu size={22} />}
@@ -106,7 +104,7 @@ export default function Landing() {
             {NAV.map(([h, l]) => <a key={h} className="l" href={h} onClick={closeMenu} tabIndex={menu ? 0 : -1}>{l}</a>)}
             <div style={{ padding: 20, display: 'grid', gap: 10 }}>
               <Link href="/app" className="ac-btn ac-btn--ghost" tabIndex={menu ? 0 : -1}>Entrar</Link>
-              <Link href="/app" className="ac-btn ac-btn--manga" tabIndex={menu ? 0 : -1}>Começar grátis</Link>
+              <Link href="/app" className="ac-btn ac-btn--manga" tabIndex={menu ? 0 : -1}>Começar agora</Link>
             </div>
           </div>
         </div>
@@ -116,17 +114,20 @@ export default function Landing() {
         <section className="ac-hero">
           <div className="ac-container ac-hero__grid">
             <div>
-              <span className="ac-pill" style={{ marginBottom: 22 }}>Preço de lançamento: {P} por nota</span>
-              <h1><span>Não vendeu?</span><span className="ac-underline">Não pagou.<Squiggle /></span></h1>
+              <span className="ac-pill" style={{ marginBottom: 22 }}>NFS-e automática para quem vende pelo AbacatePay</span>
+              <h1><span>Nota fiscal</span><span className="ac-underline">sem trabalho manual.<Squiggle /></span></h1>
               <p className="ac-hero__sub">
-                Nota fiscal de serviço automática para quem vende no AbacatePay. Cada pagamento aprovado vira NFS-e, enviada ao seu cliente por e-mail e WhatsApp. <strong>Sem mensalidade: você só paga {P} quando vende.</strong>
+                Cada pagamento aprovado no AbacatePay vira uma NFS-e, enviada ao cliente por e-mail e WhatsApp.
               </p>
-              <div className="ac-stat-row">
-                <div className="ac-note"><span>nada de mensalidade!</span><HandArrow /></div>
-                <div className="ac-stat ac-stat--zero"><small>Mês sem vendas</small><b>→ {brl(0)}</b></div>
-                <div className="ac-stat"><small>Mês de lançamento com 150 vendas</small><b>→ {brl(150 * price)}</b></div>
+              <div className="ac-hero-price" aria-label={`Preço: ${P} por nota emitida com sucesso, sem mensalidade`}>
+                <div className="ac-hero-price__amount">{P}<span> / nota emitida com sucesso</span></div>
+                <div className="ac-hero-price__rule"><span>Mensalidade</span><strong>{brl(fee)}</strong><b>{fee === 0 ? 'Sem cobrança mensal' : 'por mês'}</b></div>
               </div>
-              <div style={{ marginTop: 28 }}><Cta /></div>
+              <div className="ac-hero-actions">
+                <Cta />
+                <a className="ac-btn ac-btn--ghost ac-btn--sm" href="#como-funciona">Como funciona <ArrowRight size={16} /></a>
+              </div>
+              <p className="ac-hero-foot">Sem taxa de adesão. Notas rejeitadas pela prefeitura não são cobradas.</p>
             </div>
             <div className="ac-stage">
               <div className="ac-stage__blob" aria-hidden="true" />
@@ -145,14 +146,13 @@ export default function Landing() {
             </Reveal>
             <div className="ac-args">
               {[
-                ['0', 'Risco zero para começar', 'Lançou o primeiro produto? Não precisa assumir um custo fixo antes da primeira venda.'],
-                ['x', 'Feito para lançamentos', 'Vendeu muito numa semana e pouco no resto do mês? Você paga pelo que vendeu, não por um plano.'],
-                ['%', 'Custo proporcional', `Numa venda de R$ 97, a nota custa ${pctText} do valor. Em mês fraco, a mensalidade pesa muito mais por venda.`],
+                ['01', 'Uma venda, uma nota', 'O custo acompanha as notas emitidas com sucesso, sem compromisso de volume.'],
+                ['02', 'Ritmo de lançamento', 'Vendas concentradas numa semana? O custo segue as notas daquele período.'],
+                ['03', 'Custo proporcional', `Numa venda de R$ 97, a emissão representa ${pctText} do valor.`],
               ].map(([n, t, d], i) => (
                 <Reveal key={t} delay={i * 100}><div className="ac-card ac-arg" style={{ height: '100%' }}><div className="n" aria-hidden="true">{n}</div><h3>{t}</h3><p>{d}</p></div></Reveal>
               ))}
             </div>
-            <Reveal><Calculator price={price} fee={fee} /></Reveal>
           </div>
         </section>
 
@@ -172,6 +172,36 @@ export default function Landing() {
           </div>
         </section>
 
+        <section className="ac-section ac-costs" id="preco">
+          <div className="ac-container">
+            <Reveal>
+              <span className="ac-eyebrow">conta aberta</span>
+              <h2 className="ac-h2" style={{ margin: '8px 0 12px' }}>O total acompanha suas notas.</h2>
+              <p className="ac-lead">Exemplos ilustrativos de uso do açaínfe. Quantidade de notas multiplicada por {P} cada.</p>
+            </Reveal>
+            <div className="ac-examples" aria-label="Exemplos ilustrativos de custos">
+              {[10, 100, 500].map((n, i) => (
+                <Reveal key={n} delay={i * 90}>
+                  <div className={`ac-example ac-example--${i + 1}`}>
+                    <span>{n} notas</span>
+                    <strong>{n} × {P}</strong>
+                    <b>{brl(n * price)}</b>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
+            <p className="ac-example-note">Valores ilustrativos de uso do açaínfe, calculados pela tarifa atual por nota emitida com sucesso. Não são promessa de economia nem comparação com preços de terceiros.</p>
+            <Reveal><Calculator price={price} fee={fee} /></Reveal>
+          </div>
+        </section>
+
+        <section className="ac-section" id="comparativo" style={{ paddingTop: 0 }}>
+          <div className="ac-container">
+            <Reveal><span className="ac-eyebrow">contexto de mercado</span><h2 className="ac-h2" style={{ marginTop: 8 }}>Compare os modelos com cuidado.</h2><p className="ac-lead">Uma referência secundária para entender diferentes estruturas de preço — os planos e recursos não são iguais.</p></Reveal>
+            <Comparison price={price} monthlyFee={fee} />
+          </div>
+        </section>
+
         <section className="ac-section" style={{ paddingTop: 0 }}>
           <div className="ac-container">
             <Reveal><h2 className="ac-h2" style={{ maxWidth: '16ch' }}>Tudo que a nota precisa, <span className="ac-hl-bg">sem você lembrar</span>.</h2></Reveal>
@@ -187,45 +217,18 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="ac-section ac-soft">
+        <section className="ac-section ac-soft" id="compatibilidade">
           <div className="ac-container">
             <Reveal>
-              <span className="ac-eyebrow">para quem é</span>
-              <h2 className="ac-h2" style={{ margin: '8px 0' }}>Feito para quem vende por conta própria.</h2>
+              <span className="ac-eyebrow">compatibilidade e disponibilidade</span>
+              <h2 className="ac-h2" style={{ margin: '8px 0' }}>Para negócios digitais de serviço.</h2>
               <div className="ac-chips">{['Infoprodutores', 'Mentores', 'SaaS e micro-SaaS', 'Agências', 'Consultores', 'Prestadores de serviço'].map((c) => <span className="ac-chip" key={c}>{c}</span>)}</div>
-              <p className="ac-avail">Começamos por <strong>São Bernardo do Campo (SP)</strong> para empresas do <strong>Simples Nacional e MEI</strong>. Sua cidade ainda não está liberada? Cadastre-se mesmo assim: você entra na lista de espera e a gente te avisa por e-mail e WhatsApp assim que liberar.</p>
-            </Reveal>
-          </div>
-        </section>
-
-        <section className="ac-section" id="preco">
-          <div className="ac-container ac-price-wrap">
-            <Reveal className="w-full" >
-              <div className="ac-price" style={{ margin: '0 auto' }}>
-                <span className="ac-price__seal">Preço de lançamento</span>
-                <div className="ac-price__v">{P} <small>por nota</small></div>
-                <ul className="ac-checks">{checks.map((c) => <li key={c}><span className="ck"><Check size={14} strokeWidth={3} /></span>{c}</li>)}</ul>
-                <p className="ac-zero">Emitiu 0 notas no mês? <strong>Pagou R$ 0.</strong></p>
-                <div style={{ marginTop: 28, display: 'grid', justifyItems: 'center' }}><Cta micro={false} /><p className="ac-micro" style={{ color: 'rgba(255,248,238,.7)' }}>Sem mensalidade. Não vendeu, não pagou.</p></div>
+              <div className="ac-trust-grid">
+                <p className="ac-avail"><strong>Disponível hoje em São Bernardo do Campo (SP)</strong><br />Para empresas do Simples Nacional e MEI. Em outras cidades, faça seu cadastro para entrar na lista de espera; avisamos por e-mail e WhatsApp quando houver disponibilidade.</p>
+                <p className="ac-avail ac-avail--independent"><strong>Integração com AbacatePay</strong><br />Produto independente, não afiliado ao AbacatePay. Conecta pagamentos aprovados à emissão de NFS-e e entrega ao cliente por e-mail e WhatsApp.</p>
               </div>
-            </Reveal>
-          </div>
-        </section>
-
-        <section className="ac-section" id="comparativo" style={{ paddingTop: 0 }}>
-          <div className="ac-container">
-            <Reveal><h2 className="ac-h2">Mensalidade é coisa do passado.</h2></Reveal>
-            <Comparison price={price} monthlyFee={fee} />
-          </div>
-        </section>
-
-        <section className="ac-section ac-soft">
-          <div className="ac-container">
-            <Reveal>
-              <span className="ac-eyebrow">integração</span>
-              <h2 className="ac-h2" style={{ maxWidth: '20ch', margin: '8px 0' }}>Feito para quem vende pelo AbacatePay: pagamento aprovado, nota emitida.</h2>
               <div className="ac-flow">
-                {[['venda', 'Pagamento aprovado no AbacatePay'], ['webhook', 'Chega pro açaínfe na hora'], ['mágica fiscal', 'NFS-e emitida'], ['pronto', 'Cliente recebe por e-mail e WhatsApp']].map(([s, t]) => <div key={t}><small>{s}</small>{t}</div>)}
+                {[['venda', 'Pagamento aprovado no AbacatePay'], ['webhook', 'Chega para o açaínfe na hora'], ['emissão', 'NFS-e emitida'], ['entrega', 'Cliente recebe por e-mail e WhatsApp']].map(([s, t]) => <div key={t}><small>{s}</small>{t}</div>)}
               </div>
             </Reveal>
           </div>
