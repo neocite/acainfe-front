@@ -406,11 +406,15 @@ try {
   await waitFor('[...document.querySelectorAll("button")].some(b=>b.textContent.includes("Gerar minha chave"))');
   assert.equal(await evaluate('!!document.querySelector(".mcp-keys")'),false);
   await evaluate('[...document.querySelectorAll("button")].find(b=>b.textContent.trim()==="Concluir").click()');
-  await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b => b.textContent.includes("Painel")).click()');
+  await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b => b.textContent.includes("Minha empresa")).click()');
   await waitFor('!!document.querySelector(".company-summary .text-button")');
   assert.equal(await evaluate('!!document.querySelector(".mcp-keys")'),false);
   items = [{ id:'panel-key',label:'Assistente do painel',last4:'abcd',legacy:false,createdVia:'APP',createdAt:'2026-10-19T12:00:00Z' }];
-  await evaluate('[...document.querySelectorAll(".company-recommendations button")].find(b=>b.textContent==="Escolher produto").click()');
+  assert.equal(await evaluate('!!document.querySelector(".gateway-panel-summary")'),false);
+  assert.equal(await evaluate('!!document.querySelector(".company-recommendations")'),false);
+  await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b=>b.textContent.includes("Gateways de pagamento")).click()');
+  await waitFor('!!document.querySelector(".ap-webhook-card")');
+  await evaluate('[...document.querySelectorAll(".ap-webhook-card button")].find(b=>b.textContent==="Alterar").click()');
   await waitFor('!!document.querySelector(".default-product-choice")');
   for(const width of [1280,360]){
     await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
@@ -429,7 +433,7 @@ try {
   await evaluate('document.querySelector(".default-product-choice input[value=__none__]").click();document.querySelector("form.default-product-choice").requestSubmit()');
   await waitFor('!document.querySelector("[role=dialog]") && document.querySelector(".ap-webhook-card").textContent.includes("Nenhum")');
   assert.deepEqual(decisionCalls.at(-1),{productId:null});
-  console.log('PASS produto padrão: pendência no painel abre gateways, salva produto, atualiza nome e permite nenhum.');
+  console.log('PASS produto padrão: escolha exclusiva nos gateways, salva produto, atualiza nome e permite nenhum.');
   // O webhook usa respostas simuladas no navegador; nenhuma integração real é alterada.
   for (const width of [1280, 360]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -500,10 +504,20 @@ try {
   await waitFor('!!document.querySelector(".past-sales")');
   assert.equal(await evaluate('!!document.querySelector(".wizard-layout")'),false);
   console.log('PASS gateways: atualizar key sem recriar webhook, resumo, limpeza do segredo e vendas antigas sem onboarding; desktop/celular sem overflow.');
-  await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b=>b.textContent.includes("Painel")).click()');
+  await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b=>b.textContent.includes("Minha empresa")).click()');
   await waitFor('!!document.querySelector(".company-summary")');
+  for(const width of [1280,360]){
+    await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+    await evaluate('window.scrollTo({top:0,behavior:"instant"})');
+    assert.equal(await evaluate('!!document.querySelector(".gateway-panel-summary") || !!document.querySelector(".ap-webhook-card")'),false);
+    assert.equal(await evaluate('[...document.querySelectorAll(".app-tabs button")].some(b=>b.textContent.trim()==="Dados fiscais" || b.textContent.trim()==="Painel")'),false);
+    assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'));
+    const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+    await writeFile(join(tmpdir(),`acainfe-minha-empresa-${width}.png`),Buffer.from(shot.data,'base64'));
+  }
   await evaluate('document.querySelector(".company-summary .text-button").click()');
   await waitFor('!!document.querySelector(".fs-card")');
+  assert.ok(await evaluate('document.querySelector(".app-tabs .active").textContent.includes("Minha empresa") && !!document.querySelector(".company-fiscal-view")'));
   for (const width of [1280, 402, 360]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
     const layout = await evaluate(`(() => {
@@ -546,10 +560,10 @@ try {
   company.abacatepay.connected=false;
   await send('Page.navigate',{url:appUrl});
   await waitFor('!!document.querySelector(".app-tabs")');
-  await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b=>b.textContent.includes("Painel")).click()');
-  await waitFor('!!document.querySelector(".gateway-panel-summary")');
+  await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b=>b.textContent.includes("Minha empresa")).click()');
+  await waitFor('!!document.querySelector(".company-summary")');
   assert.equal(await evaluate('!!document.querySelector(".ap-webhook-card")'), false);
-  await evaluate('[...document.querySelectorAll(".gateway-panel-summary button")].find(b=>b.textContent==="Gerenciar").click()');
+  await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b=>b.textContent.includes("Gateways de pagamento")).click()');
   await waitFor('!!document.querySelector(".ap-webhook-card")');
   await evaluate('[...document.querySelectorAll(".ap-webhook-card button")].find(b=>b.textContent==="Conectar AbacatePay").click()');
   await waitFor('!!document.querySelector(".abacatepay-step input[type=password]")');

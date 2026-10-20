@@ -242,18 +242,20 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     company.readiness = { canIssue: true, missing: [], recommended: [] };
     delete company.company;
   }
-  it('Dados fiscais abre pelo link no card da empresa e pelo menu, sem gerar chaves', async () => {
+  it('Dados fiscais fica dentro de Minha empresa, sem aba principal e sem gerar chaves', async () => {
     readyPanel(); await mount();
     const link = container.querySelector<HTMLButtonElement>('.company-summary .text-button');
     assert.ok(link); assert.equal(link.textContent, 'Ver dados fiscais');
     await click(link);
     assert.equal(fiscalRequests, 1);
     assert.ok(container.textContent?.includes('DADOS FISCAIS COMPLETOS'));
-    assert.equal(button('Dados fiscais').className, 'active');
+    assert.equal(button('Minha empresa').className, 'active');
+    assert.equal([...container.querySelectorAll('.app-tabs button')].some(b => b.textContent?.trim() === 'Dados fiscais'), false);
+    assert.ok(container.querySelector('.company-fiscal-view'));
     assert.equal(container.querySelector('.mcp-keys'), null);
-    await click(button('Painel'));
+    await click(button('Voltar para Minha empresa'));
     assert.ok(container.querySelector('.company-summary'));
-    await click(button('Dados fiscais'));
+    await click(container.querySelector<HTMLButtonElement>('.company-summary .text-button')!);
     assert.equal(fiscalRequests, 2);
     assert.equal(mcpRequests, 0);
   });
@@ -362,7 +364,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     assert.equal(list.textContent?.includes('test-only-mcp-key'), false);
     assert.ok(container.textContent?.includes('Guarde agora: ela não aparece de novo'));
     assert.equal(keyDeletes.length, 0);
-    await click(button('Painel'));
+    await click(button('Minha empresa'));
     await click(button('Configuração'));
     assert.equal(container.textContent?.includes('test-only-mcp-key'), false);
     assert.equal(mcpRequests, 1);
@@ -391,15 +393,20 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     assert.equal(container.querySelector('.mcp-keys--onboarding'), null);
     assert.equal(mcpRequests, 0);
   });
-  it('move AbacatePay do painel para o menu entre Painel e Dados fiscais e mantém Configuração para certificado', async () => {
+  it('Minha empresa não mostra gateway nem sua pendência; os controles ficam no menu próprio', async () => {
     readyPanel(); company.abacatepay = { connected: true, webhookUpToDate: true, defaultProduct: { decided: true, productId: null } };
+    company.readiness.recommended = [{ field: 'defaultProduct', message: 'Escolha o produto padrão para o Pix.' }];
     await mount();
     const tabs = [...container.querySelectorAll('.app-tabs button')].map(b => b.textContent?.trim());
-    assert.equal(tabs[tabs.indexOf('Painel') + 1], 'Gateways de pagamento');
-    assert.equal(tabs[tabs.indexOf('Gateways de pagamento') + 1], 'Dados fiscais');
+    assert.equal(tabs[tabs.indexOf('Minha empresa') + 1], 'Gateways de pagamento');
+    assert.equal(tabs.includes('Dados fiscais'), false);
+    assert.equal(tabs.includes('Painel'), false);
     assert.equal(container.querySelector('.ap-webhook-card'), null);
-    assert.ok(container.querySelector('.gateway-panel-summary')?.textContent?.includes('AbacatePay conectado · webhook ativo'));
-    await click(button('Gerenciar'));
+    assert.equal(container.querySelector('.gateway-panel-summary'), null);
+    assert.equal(container.querySelector('.company-recommendations'), null);
+    assert.equal(container.textContent?.includes('AbacatePay conectado'), false);
+    assert.equal(container.textContent?.includes('Escolha o produto padrão para o Pix.'), false);
+    await click(button('Gateways de pagamento'));
     assert.ok(container.querySelector('.pg-screen .ap-webhook-card'));
     assert.ok(container.textContent?.includes('Outros gateways'));
     assert.ok(container.textContent?.includes('Nenhum (esses pagamentos não geram nota)'));
@@ -480,7 +487,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     assert.equal(dom.window.localStorage.length,0);
     assert.equal(dom.window.sessionStorage.length,0);
     assert.equal(mcpRequests,0);
-    await click(button('Painel')); await click(button('Agentes de IA'));
+    await click(button('Minha empresa')); await click(button('Agentes de IA'));
     assert.equal(container.querySelector<HTMLInputElement>('.mcp-guide-paste input')!.value,'');
     assert.equal(container.textContent?.includes(secret),false);
     assert.equal(mcpRequests,0);
