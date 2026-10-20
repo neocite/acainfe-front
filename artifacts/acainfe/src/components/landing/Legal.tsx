@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Link } from 'wouter';
 
 export type LegalKind = 'termos' | 'privacidade' | 'contato';
+export const SUPPORT_EMAIL = 'contato@extractify.com.br';
 const TITLES: Record<LegalKind, string> = { termos: 'Termos de uso', privacidade: 'Política de privacidade', contato: 'Contato' };
 
 export function LegalModal({ kind, onClose }: { kind: LegalKind | null; onClose: () => void }) {
@@ -18,7 +19,7 @@ export function LegalModal({ kind, onClose }: { kind: LegalKind | null; onClose:
         <h3>{TITLES[kind]}</h3>
         <p>
           {kind === 'contato'
-            ? 'O canal de contato ainda será informado pela empresa operadora. Enquanto isso, quem já tem conta pode falar com a gente pelo assistente de IA ou pelo app.'
+            ? <>Fale com a gente pelo e-mail <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>.</>
             : 'Este documento ainda aguarda o preenchimento pela empresa operadora do açaínfe. Nenhum termo com valor jurídico foi publicado nesta página até agora.'}
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>

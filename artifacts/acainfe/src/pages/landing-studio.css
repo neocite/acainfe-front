@@ -149,6 +149,9 @@
 .csr-footer .csr-logo { font-size: 21px; }
 .csr-footer .csr-logo i { left: 33px; width: 5px; height: 5px; }
 .csr-footer > span, .csr-footer > a:not(.csr-logo) { color: #847780; font-size: 9px; }
+.csr-company { display: flex; flex-basis: 100%; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 20px; padding-top: 12px; border-top: 1px solid #e8ded3; color: #746871; font-size: 10px; }
+.csr-company a { text-decoration: underline !important; text-underline-offset: 3px; }
+.csr-company a:focus-visible { outline-offset: 4px; }
 .csr-footer small { flex-basis: 100%; padding-top: 12px; border-top: 1px solid #e8ded3; color: #a1959b; font-size: 8px; }
 .csr-footer-legal { display: flex; flex-wrap: wrap; gap: 16px; }
 .csr-footer-legal button { background: transparent; border: 0; padding: 6px 0; color: #746871; font-size: 10px; }

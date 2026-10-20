@@ -4,7 +4,7 @@ import { brl } from '@/config/pricing';
 import { usePricing } from '@/components/landing/use-pricing';
 import { Calculator } from '@/components/landing/Calculator';
 import { StudioCalculator } from '@/components/landing/StudioCalculator';
-import { LegalModal, type LegalKind } from '@/components/landing/Legal';
+import { LegalModal, SUPPORT_EMAIL, type LegalKind } from '@/components/landing/Legal';
 import './landing-studio.css';
 
 const NAV = [
@@ -129,6 +129,11 @@ export default function Landing() {
       <footer className="csr-footer">
         <a href="#inicio" className="csr-logo" aria-label="açaínfe, início">aça<span>í</span>nfe<i /></a>
         <span>Emissão de NFS-e que acompanha suas vendas.</span><a href="#duvidas">Ajuda e dúvidas ↑</a>
+        <div className="csr-company">
+          <span>O açaínfe é uma marca da Extractify.</span>
+          <span>CNPJ: 28.095.894/0001-60</span>
+          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
+        </div>
         <div className="csr-footer-legal">
           <button type="button" onClick={() => setLegal('termos')}>Termos de uso</button>
           <button type="button" onClick={() => setLegal('privacidade')}>Política de privacidade</button>

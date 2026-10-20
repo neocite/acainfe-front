@@ -137,6 +137,8 @@ try {
     calculator:document.querySelector('.csr-result-main strong').textContent.replace(/\\s+/g,' ').trim(),
     heroLinks:[...document.querySelectorAll('.csr-hero-actions a')].map(a=>({text:a.textContent.replace(/[↗↓]/g,'').trim(),href:a.getAttribute('href')})),
     login:document.querySelector('.csr-nav-link').getAttribute('href'),
+    footer:document.querySelector('.csr-footer').textContent.replace(/\\s+/g,' ').trim(),
+    emailHref:document.querySelector('.csr-company a')?.getAttribute('href'),
     sectionOrder:[...document.querySelectorAll('main section[id]')].map(el=>el.id),
     text:document.querySelector('main').textContent.replace(/\\s+/g,' ')
   }))()`);
@@ -149,6 +151,9 @@ try {
   await evaluate('document.documentElement.style.scrollBehavior = "auto"');
   assert.ok(landing.calculator.includes('R$ 59,04'), landing.calculator);
   assert.ok(landing.text.includes('AbacatePay ou na Hotmart'), landing.text);
+  assert.ok(landing.footer.includes('marca da Extractify') && landing.footer.includes('CNPJ: 28.095.894/0001-60'), landing.footer);
+  assert.ok(landing.footer.includes('contato@extractify.com.br'), landing.footer);
+  assert.equal(landing.emailHref, 'mailto:contato@extractify.com.br');
   assert.deepEqual(landing.heroLinks.map((link: { text: string }) => link.text), ['Começar agora', 'Ver como funciona']);
   assert.equal(landing.heroLinks[0].href, '/app');
   assert.equal(landing.heroLinks[1].href, '#como-funciona');
@@ -166,6 +171,10 @@ try {
   for (const title of ['Termos de uso', 'Política de privacidade', 'Contato']) {
     await evaluate(`[...document.querySelectorAll('.csr-footer-legal button')].find(b=>b.textContent==='${title}').click()`);
     await waitFor(`document.querySelector('.ac-modal h3')?.textContent === '${title}'`);
+    if (title === 'Contato') {
+      assert.equal(await evaluate('document.querySelector(".ac-modal a")?.getAttribute("href")'), 'mailto:contato@extractify.com.br');
+      assert.ok((await evaluate('document.querySelector(".ac-modal p").textContent')).includes('contato@extractify.com.br'));
+    }
     await evaluate('[...document.querySelectorAll(".ac-modal button")].find(b=>b.textContent==="Fechar").click()');
     await waitFor('!document.querySelector(".ac-modal")');
   }
@@ -203,6 +212,28 @@ try {
     const image = await send('Page.captureScreenshot', {format:'png',captureBeyondViewport:true,clip:bounds});
     await writeFile(join(tmpdir(), `acainfe-studio-${width}.png`), Buffer.from(image.data,'base64'));
     console.log(`PASS studio ${width}px: preço da API, presets, teclado, ticket decimal, mês sem venda e sem overflow.`);
+  }
+  for (const width of [1280, 360]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    const footer = await evaluate(`(() => {
+      const root=document.documentElement, section=document.querySelector('.csr-footer');
+      const company=document.querySelector('.csr-company'), email=company.querySelector('a');
+      const data=[...company.querySelectorAll('span')].map(span=>span.textContent.trim());
+      return {pageWidth:root.scrollWidth,viewportWidth:innerWidth,
+        brand:data[0],cnpj:data[1],email:email.textContent.trim(),
+        emailHref:email.getAttribute('href'),companyWidth:company.getBoundingClientRect().width,
+        companyScrollWidth:company.scrollWidth};
+    })()`);
+    assert.ok(footer.pageWidth <= footer.viewportWidth, JSON.stringify(footer));
+    assert.equal(footer.brand, 'O açaínfe é uma marca da Extractify.');
+    assert.equal(footer.cnpj, 'CNPJ: 28.095.894/0001-60');
+    assert.equal(footer.email, 'contato@extractify.com.br');
+    assert.equal(footer.emailHref, 'mailto:contato@extractify.com.br');
+    assert.ok(footer.companyScrollWidth <= footer.companyWidth + 1, JSON.stringify(footer));
+    await evaluate('document.querySelector(".csr-footer").scrollIntoView({behavior:"instant"})');
+    const footerShot = await send('Page.captureScreenshot', {format:'png'});
+    await writeFile(join(tmpdir(), `acainfe-extractify-footer-${width}.png`), Buffer.from(footerShot.data,'base64'));
+    console.log(`PASS rodapé Extractify/CNPJ/e-mail ${width}px: conteúdo visível, link e largura sem overflow.`);
   }
   await evaluate('document.querySelector(".csr-disclosure").click()');
   await waitFor('!!document.querySelector("#csr-calculation-details")');
