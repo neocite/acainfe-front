@@ -119,7 +119,10 @@ export function McpKeysSection({ base, refreshToken, onUnauthorized, onGenerate,
         <h3 id="mcp-keys-title">Chaves do MCP</h3>
         <p>A lista nunca mostra a chave completa, apenas os últimos 4 caracteres. A chave inteira aparece uma única vez, quando é gerada.</p>
       </div>
-      <button type="button" className="app-secondary mcp-keys-generate" disabled={busy} onClick={onGenerate}>Gerar nova chave</button>
+      <div className="mcp-keys-actions">
+        <button type="button" className="app-secondary" disabled={busy || status === 'loading'} onClick={() => void load(false)}>Atualizar</button>
+        <button type="button" className="app-secondary mcp-keys-generate" disabled={busy} onClick={onGenerate}>Gerar nova chave</button>
+      </div>
     </div>
 
     {message && <p className="mcp-keys-status" role="status">{message}</p>}
@@ -143,7 +146,14 @@ export function McpKeysSection({ base, refreshToken, onUnauthorized, onGenerate,
           const created = fmtDate(k.createdAt);
           const used = fmtDate(k.lastUsedAt, true);
           return <li key={k.id} className="mcp-key-row">
-            {k.legacy ? <div className="mcp-key-main"><strong>Chave antiga (sem detalhes)</strong></div> : <>
+            {k.legacy ? <>
+              <div className="mcp-key-main">
+                <strong>{k.last4 || k.lastUsedAt ? 'Chave antiga' : 'Chave antiga (sem detalhes)'}</strong>
+                {k.last4 && <code aria-label={`Termina em ${k.last4}`}>…{k.last4}</code>}
+                {!k.last4 && !k.lastUsedAt && <small className="mcp-key-legacy-help">Ainda não foi usada desde o registro de chaves. Se nenhum agente de IA estiver usando, pode revogar.</small>}
+              </div>
+              {k.lastUsedAt && <dl className="mcp-key-meta"><div><dt>Último uso</dt><dd>{used}</dd></div></dl>}
+            </> : <>
               <div className="mcp-key-main">
                 <strong>{k.label?.trim() || 'Sem nome'}</strong>
                 {k.last4 && <code aria-label={`Termina em ${k.last4}`}>…{k.last4}</code>}
@@ -155,11 +165,12 @@ export function McpKeysSection({ base, refreshToken, onUnauthorized, onGenerate,
               </dl>
             </>}
             <button type="button" className="mcp-key-revoke" disabled={busy}
-              aria-label={`Revogar ${k.legacy ? 'chave antiga' : labelOf(k)}`}
+              aria-label={`Revogar ${k.legacy ? `chave antiga${k.last4 ? ` …${k.last4}` : ''}` : labelOf(k)}`}
               onClick={() => { setMessage(''); setDialogError(''); setTarget(k); }}>Revogar</button>
           </li>;
         })}
       </ul>
+      <p className="mcp-keys-help">Para descobrir qual chave antiga está em uso, use o MCP uma vez e clique em Atualizar: a chave usada passa a mostrar o final e o último uso.</p>
       <button type="button" className="app-secondary mcp-keys-revoke-all" disabled={busy}
         onClick={() => { setMessage(''); setDialogError(''); setConfirmText(''); setAllOpen(true); }}>Revogar todas as chaves</button>
     </>}

@@ -101,9 +101,52 @@ describe('Chaves MCP: confirmações e estados da interface', () => {
     assert.ok(rows[1].textContent?.includes('Sem nome'));
     assert.ok(rows[1].textContent?.includes('19/10/2026 14:05'));
     assert.ok(rows[2].textContent?.includes('Chave antiga (sem detalhes)'));
+    assert.ok(rows[2].textContent?.includes('Ainda não foi usada desde o registro de chaves. Se nenhum agente de IA estiver usando, pode revogar.'));
     assert.equal(rows[2].querySelector('dl'), null);
     assert.equal(rows[2].querySelector('code'), null);
     assert.equal(deletions().length, 0);
+  });
+  it('chaves antigas mostram final e/ou último uso sem inventar nome nem data de criação', async () => {
+    keys = [
+      { id: 'legacy-both', legacy: true, last4: 'abcd', lastUsedAt: '2026-10-19T14:05:00' },
+      { id: 'legacy-final', legacy: true, last4: '1234' },
+      { id: 'legacy-use', legacy: true, lastUsedAt: '2026-10-19T15:30:00' },
+    ];
+    await mount();
+    const rows = [...container.querySelectorAll('.mcp-key-row')];
+    assert.ok(rows[0].textContent?.includes('Chave antiga'));
+    assert.ok(rows[0].textContent?.includes('…abcd'));
+    assert.ok(rows[0].textContent?.includes('Último uso'));
+    assert.ok(rows[0].textContent?.includes('19/10/2026 14:05'));
+    assert.ok(rows[1].textContent?.includes('…1234'));
+    assert.equal(rows[1].querySelector('dl'), null);
+    assert.equal(rows[2].querySelector('code'), null);
+    assert.ok(rows[2].textContent?.includes('19/10/2026 15:30'));
+    for (const row of rows) {
+      assert.equal(row.textContent?.includes('Criada em'), false);
+      assert.equal(row.textContent?.includes('Sem nome'), false);
+      assert.equal(row.textContent?.includes('sem detalhes'), false);
+      assert.equal(row.textContent?.includes('Ainda não foi usada'), false);
+    }
+    assert.ok(container.textContent?.includes('Para descobrir qual chave antiga está em uso, use o MCP uma vez e clique em Atualizar: a chave usada passa a mostrar o final e o último uso.'));
+    await click(rows[0].querySelector('button')!);
+    assert.ok(dialog().textContent?.includes('Revogar a chave …abcd?'));
+    await click(button('Cancelar', dialog()));
+  });
+  it('Atualizar faz apenas GET e revela os dados registrados após uso de uma chave antiga', async () => {
+    keys = [{ id: 'legacy-key', legacy: true }];
+    await mount();
+    assert.ok(container.textContent?.includes('Chave antiga (sem detalhes)'));
+    keys = [{ id: 'legacy-key', legacy: true, last4: '5678', lastUsedAt: '2026-10-19T16:40:00' }];
+    await click(button('Atualizar'));
+    assert.equal(calls.filter(call => call.method === 'GET').length, 2);
+    assert.equal(calls.every(call => call.path === '/api/app/companies/test-company/mcp-keys'), true);
+    assert.equal(calls.some(call => call.method !== 'GET'), false);
+    assert.ok(container.textContent?.includes('…5678'));
+    assert.ok(container.textContent?.includes('19/10/2026 16:40'));
+    assert.equal(container.textContent?.includes('Chave antiga (sem detalhes)'), false);
+    assert.equal(container.textContent?.includes('Ainda não foi usada'), false);
+    assert.equal(generated, 0);
   });
   it('cancelar a revogação não envia DELETE', async () => {
     await mount(); await click(button('Revogar'));

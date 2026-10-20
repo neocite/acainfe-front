@@ -14,3 +14,9 @@ Gerar uma nova chave não revoga as anteriores. A revogação deve ser uma açã
 **Why:** Uma empresa pode conectar diferentes agentes simultaneamente. A intenção é permitir invalidar uma credencial vazada sem interromper as outras conexões, ou revogar todas deliberadamente.
 
 **How to apply:** Não transformar geração em rotação automática. Explicar a interrupção e a irreversibilidade antes de revogar; após revogar todas, oferecer geração sem criá-la automaticamente.
+
+Uma chave antiga sem detalhes não é necessariamente uma chave que nunca foi usada. O rastreamento das antigas começa no uso posterior à implantação do registro de chaves.
+
+**Why:** O usuário confirmou que a API identifica o final e o último uso de uma chave antiga quando ela volta a ser usada; isso não recupera o histórico anterior nem a data de criação.
+
+**How to apply:** Não tratar todas as chaves antigas como permanentemente sem detalhes, nem apresentar ausência de registro como prova de inatividade histórica. Orientar a usar o MCP e atualizar a lista para identificar a conexão antes de decidir revogar.

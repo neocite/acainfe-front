@@ -3,6 +3,10 @@
 .mcp-keys-head h3{font:700 20px 'Bricolage Grotesque',sans-serif;color:#4a1942;margin:0 0 6px}
 .mcp-keys-head p{font-size:12px;line-height:1.7;color:#6b5f70;margin:0}
 .mcp-keys-generate{flex-shrink:0}
+.mcp-keys-actions{display:flex;flex-wrap:wrap;gap:8px;flex-shrink:0}
+.mcp-keys-help,.mcp-key-legacy-help{font-size:11px;line-height:1.7;color:#6b5f70}
+.mcp-key-legacy-help{flex-basis:100%}
+.mcp-keys-help{margin:14px 0 0}
 .mcp-keys-status{font-size:12px;color:#267d45;background:#edf5ec;border-radius:9px;padding:11px 13px;margin:16px 0 0}
 .mcp-keys-warn{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;font-size:12px;color:#8e671e;background:#fff5e3;border:1px solid #ff9f1c26;border-radius:9px;padding:11px 13px;margin-top:14px}
 .mcp-keys-warn button{background:none;border:0;color:#7b2d6b;text-decoration:underline;cursor:pointer;font:inherit}
@@ -31,4 +35,4 @@
 .mcp-keys-dialog .app-field{margin:6px 0}
 .mcp-keys-dialog-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:10px;margin-top:8px}
 .mcp-keys .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-@media(max-width:700px){.mcp-keys{padding:16px}.mcp-keys-head{flex-direction:column}.mcp-keys-generate{width:100%}.mcp-key-row{grid-template-columns:1fr}.mcp-key-revoke{justify-self:start}.mcp-keys-dialog-actions button{flex:1}}
+@media(max-width:700px){.mcp-keys{padding:16px}.mcp-keys-head{flex-direction:column}.mcp-keys-actions{width:100%}.mcp-keys-actions button{flex:1}.mcp-key-row{grid-template-columns:1fr}.mcp-key-revoke{justify-self:start}.mcp-keys-dialog-actions button{flex:1}}
