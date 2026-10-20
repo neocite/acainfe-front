@@ -11,6 +11,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   let createRoot: typeof import('react-dom/client').createRoot;
   let modules: ViteDevServer;
   let company: any, details: any, patches: any[], profilesRequested: number, detailRequests: number, mcpRequests: number;
+  let keys: any[], keyGets: number, keyDeletes: string[], generatedLabels: any[], generationError: boolean;
   const descriptors = new Map<string, PropertyDescriptor | undefined>();
   const originalFetch = globalThis.fetch;
   before(async () => {
@@ -47,6 +48,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   });
   beforeEach(() => {
     patches = []; profilesRequested = 0; details = undefined; detailRequests = 0; mcpRequests = 0;
+    keys = []; keyGets = 0; keyDeletes = []; generatedLabels = []; generationError = false;
     company = {
       tenant: { id: 'test-company', taxRegime: 'SIMPLES_NACIONAL', municipalRegistration: '123', integrations: {} },
       company: { legalName: 'EMPRESA DE TESTE' }, availability: { status: 'AVAILABLE' },
@@ -69,10 +71,24 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
         ];
       } else if (path.endsWith('/billing')) data = { amountDueCents: 0 };
       else if (path.endsWith('/products?pendingTaxReview=true')) data = [];
+      else if (path === '/api/app/companies/test-company/mcp-keys' && method === 'GET') {
+        keyGets++; data = { items: keys };
+      }
+      else if (path.startsWith('/api/app/companies/test-company/mcp-keys') && method === 'DELETE') {
+        assert.equal(init?.body, undefined);
+        keyDeletes.push(path);
+        if (path.endsWith('/mcp-keys')) { data = { revoked: keys.length }; keys = []; }
+        else { keys = keys.filter(item => !path.endsWith(`/${item.id}`)); data = { revoked: true, remaining: keys.length }; }
+      }
       else if (path === '/api/app/companies/test-company/mcp-key' && method === 'POST') {
         mcpRequests++;
+        const body = JSON.parse(String(init?.body));
+        generatedLabels.push(body);
+        if (generationError) return new Response(JSON.stringify({ message: 'Limite de 10 chaves ativas.' }), { status: 409, headers: { 'content-type': 'application/json' } });
+        const key = { id: `key-${mcpRequests}`, label: body.label, last4: 'abcd', createdAt: '2026-10-19T12:00:00Z', createdVia: 'APP', legacy: false };
+        keys = [key, ...keys];
         data = { apiKey: 'test-only-mcp-key', mcpUrl: 'https://example.test/mcp',
-          claudeCodeCommand: 'claude mcp add acainfe --transport http https://example.test/mcp' };
+          claudeCodeCommand: 'claude mcp add acainfe --transport http https://example.test/mcp', key };
       }
       else if (path === '/api/app/companies/test-company' && method === 'GET') {
         detailRequests++;
@@ -230,5 +246,55 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
       if (descriptor) Object.defineProperty(navigator, 'clipboard', descriptor);
       else delete (navigator as any).clipboard;
     }
+  });
+  it('gerencia chaves a partir do painel sem exigir gerar outra e atualiza a lista após criar com nome', async () => {
+    readyPanel();
+    keys = [{ id: 'existing-key', label: 'Integração existente', last4: '1234', createdAt: '2026-10-19T12:00:00Z', createdVia: 'APP', legacy: false }];
+    await mount();
+    assert.ok(container.textContent?.includes('Chaves do MCP'));
+    assert.ok(container.textContent?.includes('Integração existente'));
+    assert.equal(mcpRequests, 0);
+    await click(button('Gerar nova chave'));
+    const label = [...container.querySelectorAll('label')].find(node => node.textContent?.includes('Nome da chave (opcional)'))!;
+    const input = label.querySelector('input')!;
+    assert.equal(input.maxLength, 60);
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value')!.set!.call(input, 'Claude Code do notebook');
+      input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    });
+    const beforeGets = keyGets;
+    await click(button('Gerar minha chave'));
+    assert.deepEqual(generatedLabels, [{ label: 'Claude Code do notebook' }]);
+    assert.ok(keyGets > beforeGets);
+    const list = container.querySelector('.mcp-keys')!;
+    assert.ok(list.textContent?.includes('Claude Code do notebook'));
+    assert.ok(list.textContent?.includes('Integração existente'));
+    assert.equal(list.textContent?.includes('test-only-mcp-key'), false);
+    assert.ok(container.textContent?.includes('não será exibida de novo'));
+    assert.equal(keyDeletes.length, 0);
+    await click(button('Painel'));
+    await click(button('Configuração'));
+    assert.equal(container.textContent?.includes('test-only-mcp-key'), false);
+    assert.equal(mcpRequests, 1);
+  });
+  it('409 mantém a lista disponível e orienta revogar uma chave antiga', async () => {
+    readyPanel(); generationError = true;
+    await mount(); await click(button('Gerar nova chave')); await click(button('Gerar minha chave'));
+    assert.ok(container.textContent?.includes('Limite de 10 chaves ativas.'));
+    assert.ok(container.textContent?.includes('Revogue uma chave antiga'));
+    assert.ok(container.querySelector('.mcp-keys'));
+    assert.equal(container.textContent?.includes('test-only-mcp-key'), false);
+  });
+  it('revogar a chave recém-gerada remove também seu segredo e as instruções da tela', async () => {
+    readyPanel(); await mount(); await click(button('Gerar nova chave')); await click(button('Gerar minha chave'));
+    assert.ok(container.textContent?.includes('test-only-mcp-key'));
+    await click(container.querySelector('.mcp-key-revoke')!);
+    const dialog = document.querySelector('[role="dialog"]')!;
+    const confirm = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find(node => node.textContent === 'Revogar chave')!;
+    await click(confirm);
+    assert.equal(container.textContent?.includes('test-only-mcp-key'), false);
+    assert.equal(container.textContent?.includes('URL do servidor MCP'), false);
+    assert.ok(container.textContent?.includes('Chave revogada'));
+    assert.ok(container.textContent?.includes('Gerar minha chave'));
   });
 });

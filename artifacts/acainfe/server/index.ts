@@ -11,6 +11,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { PRICE_PER_INVOICE_CENTS, brl } from '../src/config/pricing';
 import { isAllowedAppRoute } from './app-routes';
+import { appUpstreamPath, appJsonBody } from './app-proxy-request';
 
 declare module 'express-session' {
   interface SessionData {
@@ -173,10 +174,11 @@ async function proxyApi(req: express.Request, res: express.Response) {
       form.append('file', new Blob([new Uint8Array(req.file.buffer)]), req.file.originalname);
       form.append('password', req.body.password);
       body = form;
-    } else if (!['GET', 'HEAD'].includes(req.method)) {
-      headers['Content-Type'] = 'application/json'; body = JSON.stringify(req.body);
+    } else {
+      body = appJsonBody(req.method, req.body);
+      if (body !== undefined) headers['Content-Type'] = 'application/json';
     }
-    const upstreamPath = req.originalUrl.replace(/^\/api\/app/, '/v1/app');
+    const upstreamPath = appUpstreamPath(req.originalUrl);
     const response = await fetch(`${apiBase()}${upstreamPath}`, { method: req.method, headers, body, redirect: 'error', signal: AbortSignal.timeout(45000) });
     const data = await response.json();
     res.status(response.status).json(data);

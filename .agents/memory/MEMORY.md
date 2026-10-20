@@ -3,3 +3,4 @@
 - [Genéricos JSX na prévia](dev-jsx-generics.md) — tags com parâmetro genérico explícito podem quebrar o injetor de metadados, mesmo com build válido.
 - [Vendas passadas](past-sales-rules.md) — competência original, consentimento para meses anteriores e marcação manual de notas emitidas fora do app.
 - [Perfis fiscais](fiscal-business-rules.md) — público não contábil; API aplica perfis, MicroSaaS pede confirmação e ISS não é o padrão de tributos aproximados.
+- [Chaves MCP](mcp-key-lifecycle.md) — gerenciamento sem gerar outra chave; nova chave não revoga as anteriores e revogação exige confirmação explícita.

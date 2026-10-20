@@ -47,7 +47,7 @@ describe('Servidor e login na publicação', () => {
     }
   });
   it('não libera usuário ou empresas sem sessão', async () => {
-    for (const route of ['/api/auth/user', '/api/app/me', '/api/app/fiscal-profiles', '/api/app/companies/company/products']) {
+    for (const route of ['/api/auth/user', '/api/app/me', '/api/app/fiscal-profiles', '/api/app/companies/company/products', '/api/app/companies/company/mcp-keys', '/api/app/companies/company/past-sales/reconcile?period=2026-10']) {
       const response = await fetch(`${base}${route}`);
       assert.equal(response.status, 401);
       assert.match(response.headers.get('content-type') || '', /application\/json/);
@@ -60,6 +60,17 @@ describe('Servidor e login na publicação', () => {
   it('não cria nem confirma produtos sem sessão', async () => {
     for (const route of ['/api/app/companies/company/products', '/api/app/companies/company/products/p-1/confirm-tax']) {
       const response = await fetch(`${base}${route}`, { method: 'POST', headers: { 'content-type': 'application/json', origin: base }, body: '{}' });
+      assert.equal(response.status, 401);
+      assert.equal((await response.json()).error, 'UNAUTHORIZED');
+    }
+  });
+  it('não permite revogar chaves ou aplicar conciliação sem sessão', async () => {
+    for (const [method, route] of [
+      ['DELETE', '/api/app/companies/company/mcp-keys/key-1'],
+      ['DELETE', '/api/app/companies/company/mcp-keys'],
+      ['POST', '/api/app/companies/company/past-sales/reconcile/apply'],
+    ]) {
+      const response = await fetch(`${base}${route}`, { method, headers: { origin: base } });
       assert.equal(response.status, 401);
       assert.equal((await response.json()).error, 'UNAUTHORIZED');
     }
