@@ -7,7 +7,7 @@ O usuário do açaínfe não é contador. Perguntar “O que você vende?” em 
 
 **Why:** O usuário forneceu essa orientação de produto para reduzir o trabalho contábil no cadastro e evitar apresentar uma sugestão ainda em validação como configuração confirmada.
 
-**How to apply:** A API define os perfis, sugestões e avisos; o app exibe e confirma, sem inventar tributação. Só solicitar ISS se a API indicar a falta: no Simples ele é calculado; fora dele pode vir da prefeitura. O padrão editável de 6% solicitado anteriormente continua sendo de tributos aproximados, não uma alíquota de ISS.
+**How to apply:** A API define os perfis, sugestões e avisos; o app exibe e confirma, sem inventar tributação. Só solicitar ISS se a API indicar a falta: no Simples ele é calculado; fora dele pode vir da prefeitura. Não confundir Simples, ISS e IBPT; as regras de percentuais estão em optional-tax-details.md.
 
 Ao corrigir uma etapa do cadastro, verificar também a continuidade das etapas vizinhas na página completa, não apenas os componentes isolados.
 

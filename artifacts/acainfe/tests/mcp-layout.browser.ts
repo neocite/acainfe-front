@@ -24,6 +24,20 @@ const company = {
   company: { legalName: 'EMPRESA DE TESTE VISUAL' },
   availability: { status: 'AVAILABLE' }, readiness: { canIssue: true, missing: [], recommended: [] }, pendingTaxReview: 0,
 };
+const fiscal = {
+  company: { cnpj: '12345678000195', legalName: 'EMPRESA DE TESTE VISUAL', tradeName: 'Negócio de teste',
+    municipalRegistration: '123456', city: { code: '3548708', name: 'São Bernardo do Campo', uf: 'SP' },
+    taxRegimeLabel: 'Simples Nacional', simplesNacionalTaxRateBps: 600, simplesRateIsEstimate: true,
+    cnaes: [{ code: '6201-5/01', description: 'Desenvolvimento de software', primary: true }] },
+  emission: { systemLabel: 'GINFES', environment: 'PRODUCTION', approvalRequired: false, series: '900', nextNumber: 1 },
+  issRate: { bps: 201, source: 'SIMPLES_ESTIMATE' },
+  approximateTaxes: { rateBps: 1553, descriptionTemplate: 'Valor aprox dos tributos: R$ [ValorTributos]. Fonte: IBPT' },
+  certificate: { present: true, expiresAt: '2027-12-31', expired: false, daysUntilExpiry: 437 },
+  accountant: { name: 'Contabilidade de teste', email: 'contador@example.test' },
+  products: [{ name: 'Assinatura de software', status: 'PENDING_REVIEW', nationalServiceCode: '010701', localServiceCode: '0107', nbsCode: '115022000', warnings: ['Confirme a sugestão de tributação com seu contador antes de emitir.'] }],
+  readiness: { missing: [], recommended: [{ field: 'approximateTaxes', message: 'Confirme o percentual do IBPT com seu contador.' }] },
+  text: 'Resumo fiscal para conferência.',
+};
 let items: unknown[] = [{
   id: 'layout-key', label: 'Claude Code do notebook', last4: 'abcd',
   createdAt: '2026-10-20T12:00:00Z', lastUsedAt: null, createdVia: 'APP', legacy: false,
@@ -93,6 +107,7 @@ try {
       else if (path.endsWith('/billing')) data = { amountDueCents: 0 };
       else if (path.endsWith('/products')) data = [];
       else if (path.endsWith('/mcp-keys')) data = { items };
+      else if (path.endsWith('/fiscal-settings')) data = fiscal;
       else data = { message: 'Rota não prevista no teste' };
       // Toda chamada /api é interceptada; nunca cria/revoga chaves reais.
       void send('Fetch.fulfillRequest', {
@@ -149,6 +164,48 @@ try {
   assert.ok(await evaluate('document.querySelector(".mcp-keys-empty").textContent.includes("Gere uma acima para conectar o assistente.")'));
   assert.deepEqual(errors, []);
   console.log('PASS estado vazio: orientação para o gerador acima, sem botão duplicado.');
+  await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b => b.textContent.includes("Painel")).click()');
+  await waitFor('!!document.querySelector(".company-summary .text-button")');
+  await evaluate('document.querySelector(".company-summary .text-button").click()');
+  await waitFor('!!document.querySelector(".fs-card")');
+  for (const width of [1280, 402, 360]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    const layout = await evaluate(`(() => {
+      const cards = [...document.querySelectorAll('.fs-card')];
+      const rects = cards.map(el => { const r=el.getBoundingClientRect(); return {left:r.left,right:r.right,width:r.width}; });
+      return {viewport:innerWidth,scrollWidth:document.documentElement.scrollWidth,
+        rects, headings:cards.map(el=>el.getAttribute('aria-label')), text:document.querySelector('.fs-wrap').textContent,
+        emissionControls:document.querySelector('[aria-label="Emissão"]').querySelectorAll('input,select,button').length};
+    })()`);
+    assert.ok(layout.scrollWidth <= layout.viewport, JSON.stringify(layout));
+    assert.ok(layout.rects.every((r: any) => r.left >= 0 && r.right <= width && r.width > 0));
+    assert.equal(layout.emissionControls, 0);
+    assert.ok(layout.text.includes('2,01%') && layout.text.includes('15,53%'));
+    assert.equal(layout.text.includes('Modo teste'), false);
+    for (const title of ['Empresa', 'Emissão', 'Tributação padrão dos produtos', 'ISS', 'Tributos aproximados', 'Certificado A1', 'Contador', 'Produtos', 'Pendências']) assert.ok(layout.headings.includes(title));
+    if (width < 500) assert.ok(layout.rects.every((r: any) => Math.abs(r.left - layout.rects[0].left) < 1 && Math.abs(r.width - layout.rects[0].width) < 1));
+    const metrics = await send('Page.getLayoutMetrics');
+    const screenshot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { ...metrics.cssContentSize, scale: 1 } });
+    const file = join(tmpdir(), `acainfe-fiscal-layout-${width}.png`);
+    await writeFile(file, Buffer.from(screenshot.data, 'base64'));
+    console.log(`PASS dados fiscais ${width}px: navegação pelo card, dados e tabela responsiva, ambiente somente leitura, sem overflow. ${file}`);
+  }
+  // Retomar a etapa 3 com os novos dados sem tocar na autenticação real.
+  Object.assign(company, { emission: fiscal.emission, approximateTaxes: fiscal.approximateTaxes,
+    readiness: { canIssue: false, missing: [{ field: 'municipalRegistration', message: 'A prefeitura exige seu CCM.' }], recommended: [{ field: 'approximateTaxes', message: 'Confirme o IBPT.' }] } });
+  await send('Page.navigate', { url: appUrl });
+  await waitFor('!!document.querySelector(".approximate-taxes-fields")');
+  for (const width of [1280, 360]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+    assert.equal(await evaluate('document.querySelector(".tax-preview").textContent.includes("R$ 15,53")'), true);
+    const metrics = await send('Page.getLayoutMetrics');
+    const screenshot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, clip: { ...metrics.cssContentSize, scale: 1 } });
+    const file = join(tmpdir(), `acainfe-fiscal-onboarding-${width}.png`);
+    await writeFile(file, Buffer.from(screenshot.data, 'base64'));
+    console.log(`PASS etapa 3 ${width}px: campos fiscais e prévia sem overflow. ${file}`);
+  }
+  assert.deepEqual(errors, []);
 } finally {
   socket?.close();
   await new Promise<void>(resolve => {

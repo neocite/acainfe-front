@@ -4,6 +4,8 @@ const appRoutes = [
   ['POST', /^\/onboarding\/certificate$/],
   ['GET', /^\/companies\/[a-zA-Z0-9_-]+$/], ['PATCH', /^\/companies\/[a-zA-Z0-9_-]+$/],
   ['PUT', /^\/companies\/[a-zA-Z0-9_-]+\/accountant$/],
+  ['GET', /^\/companies\/[a-zA-Z0-9_-]+\/fiscal-settings$/],
+  ['POST', /^\/companies\/[a-zA-Z0-9_-]+\/fiscal-settings\/send$/],
   ['POST', /^\/companies\/[a-zA-Z0-9_-]+\/(?:abacatepay|mcp-key|billing\/payments)$/],
   ['GET', /^\/companies\/[a-zA-Z0-9_-]+\/mcp-keys$/],
   ['DELETE', /^\/companies\/[a-zA-Z0-9_-]+\/mcp-keys(?:\/[a-zA-Z0-9_-]+)?$/],

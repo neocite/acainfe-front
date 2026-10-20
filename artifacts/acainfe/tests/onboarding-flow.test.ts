@@ -10,7 +10,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   let Onboarding: typeof import('../src/pages/Onboarding').default;
   let createRoot: typeof import('react-dom/client').createRoot;
   let modules: ViteDevServer;
-  let company: any, details: any, patches: any[], profilesRequested: number, detailRequests: number, mcpRequests: number;
+  let company: any, details: any, patches: any[], profilesRequested: number, detailRequests: number, mcpRequests: number, fiscalRequests: number;
   let keys: any[], keyGets: number, keyDeletes: string[], generatedLabels: any[], generationError: boolean;
   const descriptors = new Map<string, PropertyDescriptor | undefined>();
   const originalFetch = globalThis.fetch;
@@ -47,7 +47,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     }
   });
   beforeEach(() => {
-    patches = []; profilesRequested = 0; details = undefined; detailRequests = 0; mcpRequests = 0;
+    patches = []; profilesRequested = 0; details = undefined; detailRequests = 0; mcpRequests = 0; fiscalRequests = 0;
     keys = []; keyGets = 0; keyDeletes = []; generatedLabels = []; generationError = false;
     company = {
       tenant: { id: 'test-company', taxRegime: 'SIMPLES_NACIONAL', municipalRegistration: '123', integrations: {} },
@@ -89,6 +89,10 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
         keys = [key, ...keys];
         data = { apiKey: 'test-only-mcp-key', mcpUrl: 'https://example.test/mcp',
           claudeCodeCommand: 'claude mcp add acainfe --transport http https://example.test/mcp', key };
+      }
+      else if (path === '/api/app/companies/test-company/fiscal-settings' && method === 'GET') {
+        fiscalRequests++;
+        data = { company: { legalName: 'DADOS FISCAIS COMPLETOS' }, emission: { systemLabel: 'Emissor Nacional', environment: 'PRODUCTION' }, text: 'Resumo de teste' };
       }
       else if (path === '/api/app/companies/test-company' && method === 'GET') {
         detailRequests++;
@@ -132,7 +136,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     await selectBusiness(businessType);
     await click(container.querySelector('input[name="numbering"][value="no"]')!);
     await submit();
-    assert.deepEqual(patches, [{ businessType, issuesElsewhere: false }]);
+    assert.deepEqual(patches, [{ businessType, issuesElsewhere: false, municipalRegistration: '123', simplesNacionalTaxRateBps: 600, approximateTaxes: { rateBps: 1553, descriptionTemplate: 'Valor aprox dos tributos: R$ [ValorTributos]. Fonte: IBPT' } }]);
     assert.ok(container.textContent?.includes('Quem é seu contador?'));
     await click(button('Não tenho contador agora'));
     assert.ok(container.textContent?.includes('Conecte seu AbacatePay'));
@@ -161,12 +165,59 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
       input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     });
     await submit();
-    assert.deepEqual(patches[0], { businessType: 'MICROSAAS', issRateBps: 250, issuesElsewhere: false });
+    assert.deepEqual(patches[0], { businessType: 'MICROSAAS', issRateBps: 250, issuesElsewhere: false, municipalRegistration: '123', simplesNacionalTaxRateBps: 600, approximateTaxes: { rateBps: 1553, descriptionTemplate: 'Valor aprox dos tributos: R$ [ValorTributos]. Fonte: IBPT' } });
     assert.ok(container.textContent?.includes('Quem é seu contador?'));
   });
   it('não mostra ISS em empresa que não precisa informá-lo', async () => {
     await mount();
     assert.equal(container.textContent?.includes('Alíquota de ISS do seu município'), false);
+  });
+  it('CCM ausente e obrigatório aparece com a mensagem da API e bloqueia o PATCH', async () => {
+    company.tenant.municipalRegistration = '';
+    company.readiness.missing.push({ field: 'municipalRegistration', message: 'A prefeitura de São Bernardo exige seu CCM.' });
+    await mount(); await selectBusiness('INFOPRODUCER');
+    await click(container.querySelector('input[name="numbering"][value="no"]')!);
+    const field = [...container.querySelectorAll('label')].find(node => node.textContent?.startsWith('Inscrição municipal'))!;
+    assert.equal(field.querySelector('input')!.required, true);
+    assert.ok(field.textContent?.includes('A prefeitura de São Bernardo exige seu CCM.'));
+    await submit();
+    assert.equal(patches.length, 0);
+    assert.ok(container.textContent?.includes('A prefeitura de São Bernardo exige seu CCM.'));
+  });
+  it('CCM apenas recomendado não bloqueia e tributos sugeridos são enviados sem ambiente', async () => {
+    company.tenant.municipalRegistration = '';
+    company.readiness.recommended = [
+      { field: 'municipalRegistration', message: 'CCM recomendado pela prefeitura.' },
+      { field: 'approximateTaxes', message: 'Confirme o IBPT.' },
+    ];
+    company.emission = { system: 'GINFES', systemLabel: 'GINFES de São Bernardo', environment: 'PRODUCTION' };
+    await mount(); await selectBusiness('INFOPRODUCER');
+    await click(container.querySelector('input[name="numbering"][value="no"]')!);
+    const input = [...container.querySelectorAll('label')].find(node => node.textContent?.startsWith('Inscrição municipal'))!.querySelector('input')!;
+    assert.equal(input.required, false);
+    assert.ok(container.querySelector('.approximate-taxes-fields.app-notice'));
+    assert.ok(container.textContent?.includes('Valor aprox dos tributos: R$ 15,53. Fonte: IBPT'));
+    assert.ok(container.textContent?.includes('Suas notas serão emitidas pelo: GINFES de São Bernardo'));
+    assert.equal(container.textContent?.includes('Modo teste'), false);
+    await submit();
+    assert.equal(patches.length, 1);
+    assert.equal(patches[0].municipalRegistration, undefined);
+    assert.equal(patches[0].environment, undefined);
+    assert.equal(patches[0].emission, undefined);
+    assert.equal(patches[0].approximateTaxes.rateBps, 1553);
+    assert.ok(container.textContent?.includes('Quem é seu contador?'));
+  });
+  it('preserva tributos já cadastrados e o modo teste só aparece se informado pela API', async () => {
+    company.tenant.approximateTaxes = { rateBps: 201, descriptionTemplate: 'Total R$ [ValorTributos]' };
+    company.emission = { system: 'NACIONAL', systemLabel: 'Emissor Nacional', environment: 'HOMOLOGATION' };
+    await mount();
+    assert.ok(container.textContent?.includes('Modo teste'));
+    assert.ok(container.textContent?.includes('Total R$ 2,01'));
+    const percent = [...container.querySelectorAll('label')].find(node => node.textContent?.startsWith('Percentual (%)'))!.querySelector('input')!;
+    assert.equal(percent.value, '2,01');
+    await selectBusiness('MICROSAAS'); await click(container.querySelector('input[name="numbering"][value="no"]')!);
+    await submit();
+    assert.deepEqual(patches[0].approximateTaxes, company.tenant.approximateTaxes);
   });
   function readyPanel() {
     company.tenant.integrations.abacatepay = true;
@@ -174,6 +225,21 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     company.readiness = { canIssue: true, missing: [], recommended: [] };
     delete company.company;
   }
+  it('Dados fiscais abre pelo link no card da empresa e pelo menu, sem gerar chaves', async () => {
+    readyPanel(); await mount();
+    const link = container.querySelector<HTMLButtonElement>('.company-summary .text-button');
+    assert.ok(link); assert.equal(link.textContent, 'Ver dados fiscais');
+    await click(link);
+    assert.equal(fiscalRequests, 1);
+    assert.ok(container.textContent?.includes('DADOS FISCAIS COMPLETOS'));
+    assert.equal(button('Dados fiscais').className, 'active');
+    assert.equal(container.querySelector('.mcp-keys'), null);
+    await click(button('Painel'));
+    assert.ok(container.querySelector('.company-summary'));
+    await click(button('Dados fiscais'));
+    assert.equal(fiscalRequests, 2);
+    assert.equal(mcpRequests, 0);
+  });
   it('painel consulta detalhes, exibe nome, data e status em português e preserva ao atualizar', async () => {
     readyPanel();
     details = { ...company, tenant: { ...company.tenant, legalName: 'RAZÃO SOCIAL COMPLETA' },

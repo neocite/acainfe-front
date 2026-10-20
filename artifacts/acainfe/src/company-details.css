@@ -1,4 +1,12 @@
 .company-recommendations{margin:24px 0;padding:20px;border:1px solid #ccdae6;border-radius:14px;background:#f1f6fa;color:#344c60}
+.app-tabs{flex-wrap:wrap}
+.approximate-taxes-fields{margin:24px 0;padding-top:20px;border-top:1px solid #4a19421a}
+.approximate-taxes-fields h3{font-size:17px;color:#4a1942;margin:0 0 10px}
+.approximate-taxes-fields>p{font-size:12px;line-height:1.7}
+.app-field textarea{width:100%;padding:14px 15px;border:1px solid #4a194226;border-radius:9px;background:#fffdfa;font-size:13px;color:#2b2230;outline:none;font-family:inherit;resize:vertical;min-width:0}
+.app-field textarea:focus{border-color:#7b2d6b;box-shadow:0 0 0 3px #7b2d6b14}
+.tax-preview{border-radius:10px;padding:12px 14px;background:#f4e8f140;overflow-wrap:anywhere;font-size:12px}
+.tax-preview small{color:#7b2d6b}.tax-preview p{margin:6px 0;line-height:1.7}
 .company-recommendations h3{margin:0 0 8px;font-size:17px}
 .company-recommendations>p{font-size:13px;line-height:1.6}
 .company-recommendations ul{list-style:none;padding:0;margin:16px 0 0}

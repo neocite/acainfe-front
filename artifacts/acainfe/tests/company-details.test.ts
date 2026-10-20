@@ -60,11 +60,14 @@ describe('Dados fiscais e obrigatoriedade do CCM no cadastro', () => {
     assert.equal(isOptionalCompanyField('numbering'), false);
     assert.equal(isOptionalCompanyField('toString'), false);
   });
-  it('exige CCM no cadastro e mostra erro no campo', () => {
+  it('exige CCM somente nas pendências obrigatórias e mostra a mensagem da prefeitura', () => {
+    const missing = [{ field: 'municipalRegistration', message: 'São Bernardo exige inscrição municipal.' }];
     for (const value of ['', '   ']) {
-      assert.throws(() => onboardingCompanyPatch(recommended, { municipalRegistration: value, simplesNacionalTaxRateBps: '6,00' }),
-        (error: unknown) => error instanceof ApiError && error.status === 422 && !!(error.details as Record<string, string>).municipalRegistration);
+      assert.throws(() => onboardingCompanyPatch([], { municipalRegistration: value, simplesNacionalTaxRateBps: '' }, missing),
+        (error: unknown) => error instanceof ApiError && error.status === 422 && (error.details as Record<string, string>).municipalRegistration === missing[0].message);
     }
+    assert.deepEqual(onboardingCompanyPatch(recommended, blank), {});
+    assert.deepEqual(onboardingCompanyPatch([], { ...blank, municipalRegistration: '123' }, missing), { municipalRegistration: '123' });
   });
   it('inicia em 6%, envia 600 Bps e permite alterar para 625 Bps', () => {
     const rate = simplesRateInput(null, recommended);
@@ -77,10 +80,10 @@ describe('Dados fiscais e obrigatoriedade do CCM no cadastro', () => {
     assert.equal(simplesRateInput(0, recommended), '0,00');
     assert.equal(simplesRateInput(null, []), '');
   });
-  it('retoma a coleta do CCM em vez de pular ao AbacatePay ou painel', () => {
+  it('CCM apenas recomendado não força retorno ao cadastro', () => {
     for (const connected of [false, true]) {
       const company = { readiness: { canIssue: true, recommended }, availability: { status: 'READY' }, tenant: { integrations: { abacatepay: connected } } };
-      assert.deepEqual(onboardingEntry(company), { step: 3, view: 'wizard' });
+      assert.deepEqual(onboardingEntry(company), connected ? { step: 5, view: 'panel' } : { step: 4, view: 'wizard' });
     }
   });
 });

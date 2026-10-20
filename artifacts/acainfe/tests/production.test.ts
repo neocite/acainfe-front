@@ -47,7 +47,7 @@ describe('Servidor e login na publicação', () => {
     }
   });
   it('não libera usuário ou empresas sem sessão', async () => {
-    for (const route of ['/api/auth/user', '/api/app/me', '/api/app/fiscal-profiles', '/api/app/companies/company/products', '/api/app/companies/company/mcp-keys', '/api/app/companies/company/past-sales/reconcile?period=2026-10']) {
+    for (const route of ['/api/auth/user', '/api/app/me', '/api/app/fiscal-profiles', '/api/app/companies/company/products', '/api/app/companies/company/mcp-keys', '/api/app/companies/company/past-sales/reconcile?period=2026-10', '/api/app/companies/company/fiscal-settings']) {
       const response = await fetch(`${base}${route}`);
       assert.equal(response.status, 401);
       assert.match(response.headers.get('content-type') || '', /application\/json/);
@@ -69,6 +69,7 @@ describe('Servidor e login na publicação', () => {
       ['DELETE', '/api/app/companies/company/mcp-keys/key-1'],
       ['DELETE', '/api/app/companies/company/mcp-keys'],
       ['POST', '/api/app/companies/company/past-sales/reconcile/apply'],
+      ['POST', '/api/app/companies/company/fiscal-settings/send'],
     ]) {
       const response = await fetch(`${base}${route}`, { method, headers: { origin: base } });
       assert.equal(response.status, 401);
