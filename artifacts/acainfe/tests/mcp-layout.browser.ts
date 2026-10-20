@@ -22,6 +22,7 @@ const errors: string[] = [];
 let publicPrice = 123;
 const company = {
   tenant: { id: 'layout-company', status: 'ACTIVE', taxRegime: 'SIMPLES_NACIONAL', integrations: { abacatepay: true } },
+  abacatepay: { connected: true, connectedAt: '2026-10-01T12:00:00Z', webhookEndpoint: 'https://old.example.test/hooks/abacatepay', webhookUpToDate: false as boolean | null },
   company: { legalName: 'EMPRESA DE TESTE VISUAL' },
   availability: { status: 'AVAILABLE' }, readiness: { canIssue: true, missing: [], recommended: [] }, pendingTaxReview: 0,
 };
@@ -43,6 +44,7 @@ let items: unknown[] = [{
   id: 'layout-key', label: 'Claude Code do notebook', last4: 'abcd',
   createdAt: '2026-10-20T12:00:00Z', lastUsedAt: null, createdVia: 'APP', legacy: false,
 }];
+const webhookCalls: { method: string; body: unknown }[] = [];
 
 function send(method: string, params: object = {}, root = false): Promise<any> {
   const id = ++sequence;
@@ -104,6 +106,7 @@ try {
       const { requestId, request } = message.params;
       const path = new URL(request.url).pathname;
       let data: unknown;
+      let responseCode = 200;
       if (path === '/api/public/pricing') data = { pricePerInvoiceCents: publicPrice, monthlyFeeCents: 0 };
       else if (path === '/api/auth/user') data = { id: 'layout-user', email: 'layout@example.test', name: 'Pessoa de teste' };
       else if (path === '/api/app/me') data = { user: { name: 'Pessoa de teste' }, companies: [company] };
@@ -112,10 +115,21 @@ try {
       else if (path.endsWith('/products')) data = [];
       else if (path.endsWith('/mcp-keys')) data = { items };
       else if (path.endsWith('/fiscal-settings')) data = fiscal;
+      else if (path.endsWith('/abacatepay/webhook') && request.method === 'POST') {
+        const body = request.postData ? JSON.parse(request.postData) : undefined;
+        webhookCalls.push({ method: request.method, body });
+        if (!body?.apiKey) { responseCode = 403; data = { message: 'Permissão WEBHOOK:CREATE necessária.' }; }
+        else {
+          const previous = { webhookId: 'old-hook', endpoint: company.abacatepay.webhookEndpoint };
+          company.abacatepay.webhookEndpoint = 'https://current.example.test/hooks/abacatepay';
+          company.abacatepay.webhookUpToDate = true;
+          data = { webhookId: 'new-hook', endpoint: company.abacatepay.webhookEndpoint, previous };
+        }
+      }
       else data = { message: 'Rota não prevista no teste' };
       // Toda chamada /api é interceptada; nunca cria/revoga chaves reais.
       void send('Fetch.fulfillRequest', {
-        requestId, responseCode: data ? 200 : 404,
+        requestId, responseCode: data ? responseCode : 404,
         responseHeaders: [{ name: 'content-type', value: 'application/json' }],
         body: Buffer.from(JSON.stringify(data)).toString('base64'),
       }).catch(error => errors.push(String(error)));
@@ -367,6 +381,50 @@ try {
   console.log('PASS estado vazio: orientação para o gerador acima, sem botão duplicado.');
   await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b => b.textContent.includes("Painel")).click()');
   await waitFor('!!document.querySelector(".company-summary .text-button")');
+  // O webhook usa respostas simuladas no navegador; nenhuma integração real é alterada.
+  for (const width of [1280, 360]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    await waitFor('!!document.querySelector(".ap-webhook-warning")');
+    await evaluate('document.querySelector(".ap-webhook-card").scrollIntoView({block:"center"})');
+    const layout = await evaluate(`(() => {
+      const card=document.querySelector('.ap-webhook-card'),r=card.getBoundingClientRect();
+      return {text:card.textContent, width:r.width,left:r.left,right:r.right,scroll:document.documentElement.scrollWidth,viewport:innerWidth};
+    })()`);
+    assert.ok(layout.text.includes('Conectado desde 01/10/2026') && layout.text.includes('As vendas novas não estão virando nota.'));
+    assert.ok(layout.scroll <= layout.viewport && layout.left >= 0 && layout.right <= width, JSON.stringify(layout));
+    const cardClip = await evaluate('(() => {const r=document.querySelector(".ap-webhook-card").getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1};})()');
+    let shot = await send('Page.captureScreenshot', { format:'png',captureBeyondViewport:true,clip:cardClip });
+    await writeFile(join(tmpdir(),`acainfe-webhook-card-${width}.png`),Buffer.from(shot.data,'base64'));
+    await evaluate('document.querySelector(".ap-webhook-card button").click()');
+    await waitFor('!!document.querySelector(".ap-webhook-dialog")');
+    await evaluate('Promise.all(document.querySelector(".ap-webhook-dialog").getAnimations().map(animation=>animation.finished)).then(()=>true)');
+    assert.equal(await evaluate('document.querySelector(".ap-webhook-dialog").scrollWidth <= document.querySelector(".ap-webhook-dialog").clientWidth'), true);
+    assert.ok(await evaluate('document.querySelector(".ap-webhook-dialog").textContent.includes("O antigo deixa de funcionar.")'));
+    const dialogLayout = await evaluate('(() => {const r=document.querySelector(".ap-webhook-dialog").getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom};})()');
+    assert.ok(dialogLayout.left >= 0 && dialogLayout.right <= width && dialogLayout.top >= 0 && dialogLayout.bottom <= 901, JSON.stringify(dialogLayout));
+    // O diálogo é fixo: capturar o viewport, não um recorte com scroll da página.
+    shot = await send('Page.captureScreenshot', { format:'png',captureBeyondViewport:false });
+    await writeFile(join(tmpdir(),`acainfe-webhook-dialog-${width}.png`),Buffer.from(shot.data,'base64'));
+    await evaluate('[...document.querySelectorAll(".ap-webhook-dialog button")].find(b=>b.textContent==="Cancelar").click()');
+    await waitFor('!document.querySelector(".ap-webhook-dialog")');
+    console.log(`PASS webhook ${width}px: card e confirmação alinhados, sem overflow e cancelar sem POST.`);
+  }
+  assert.equal(webhookCalls.length, 0);
+  await evaluate('document.querySelector(".ap-webhook-card button").click()');
+  await waitFor('!!document.querySelector(".ap-webhook-dialog")');
+  await evaluate('document.querySelector(".ap-webhook-dialog form").requestSubmit()');
+  await waitFor('!!document.querySelector("#abacatepay-webhook-api-key")');
+  assert.equal(await evaluate('document.querySelector(".ap-webhook-dialog").scrollWidth <= document.querySelector(".ap-webhook-dialog").clientWidth'), true);
+  await evaluate(`(() => {
+    const input=document.querySelector('#abacatepay-webhook-api-key');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'test-browser-key');
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+  })()`);
+  await evaluate('document.querySelector(".ap-webhook-dialog form").requestSubmit()');
+  await waitFor('!!document.querySelector(".ap-webhook-status-ok") && !!document.querySelector(".ap-webhook-created")');
+  assert.deepEqual(webhookCalls, [{method:'POST',body:undefined},{method:'POST',body:{apiKey:'test-browser-key'}}]);
+  assert.ok(await evaluate('document.querySelector(".ap-webhook-created").textContent.includes("https://old.example.test/hooks/abacatepay")'));
+  console.log('PASS webhook: POST vazio, permissão, retry com API key, recarga da empresa, selo ativo e exclusão manual do antigo.');
   await evaluate('document.querySelector(".company-summary .text-button").click()');
   await waitFor('!!document.querySelector(".fs-card")');
   for (const width of [1280, 402, 360]) {

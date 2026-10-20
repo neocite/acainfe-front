@@ -4,6 +4,7 @@ import { act, createElement } from 'react';
 import { JSDOM } from 'jsdom';
 import type { Root } from 'react-dom/client';
 import { isAllowedAppRoute } from '../server/app-routes';
+import { appJsonBody, appUpstreamPath } from '../server/app-proxy-request';
 
 describe('AbacatePay: gestão do webhook', () => {
   let dom: JSDOM, root: Root, container: HTMLElement, modules: import('vite').ViteDevServer;
@@ -112,6 +113,9 @@ describe('AbacatePay: gestão do webhook', () => {
     assert.equal(isAllowedAppRoute('DELETE', '/companies/test-company/abacatepay/webhook'), false);
     assert.equal(isAllowedAppRoute('POST', '/companies/test-company/abacatepay/webhooks'), false);
     assert.equal(isAllowedAppRoute('POST', '/companies/../abacatepay/webhook'), false);
+    assert.equal(appUpstreamPath('/api/app/companies/test-company/abacatepay/webhook'), '/v1/app/companies/test-company/abacatepay/webhook');
+    assert.equal(appJsonBody('POST', undefined), undefined);
+    assert.equal(appJsonBody('POST', { apiKey: 'test-key' }), '{"apiKey":"test-key"}');
   });
 
   it('mostra a conexão, a data, o endereço e o alerta para webhook antigo', async () => {
