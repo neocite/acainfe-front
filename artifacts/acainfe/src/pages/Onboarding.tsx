@@ -295,8 +295,11 @@ export default function Onboarding() {
             <div className="first-prompt"><Sparkles size={19} /><div><strong>Sua primeira conversa</strong><p>Use o prompt <code>configurar_empresa</code> ou diga: “quero definir a tributação dos meus produtos”.</p><CopyButton text="quero definir a tributação dos meus produtos" /></div></div><button type="button" disabled={busy} className="text-button" onClick={() => { if (confirm('Preparar uma nova chave? As anteriores continuam válidas. Copie sua chave atual antes de continuar.')) prepareMcpKey(); }}>Gerar outra chave (as anteriores continuam válidas)</button><button type="button" className="app-primary" onClick={() => { setMcp(null); setView('panel'); void refreshPanel(); }}>Ir para meu painel <ArrowRight size={18} /></button></>}
         </>}
         {step !== 5 && <div className="form-actions">{step === 2 && <button type="button" className="app-secondary" onClick={() => setStep(1)} disabled={busy}><ArrowLeft size={16} /> Voltar</button>}<button className="app-primary" type="submit" disabled={busy || (!!error && error.includes('ACAINFE_APP_KEY'))}>{busy ? <><Loader2 className="spin" size={17} /> Salvando…</> : <>{step === 2 ? 'Enviar certificado' : step === 3 ? 'Continuar' : 'Salvar e continuar'}<ArrowRight size={17} /></>}</button></div>}
-      </form></ValidationContext.Provider>}</section></div>}
-      {id && !isWaitlist && (view === 'panel' || (view === 'wizard' && step === 5)) && <McpKeysSection
+      </form></ValidationContext.Provider>}
+      {id && step === 5 && <McpKeysSection key={base} base={base} variant="onboarding"
+        refreshToken={mcpRevision} onUnauthorized={handleError} onGenerate={prepareMcpKey} onRevoked={handleMcpRevoked} />}
+      </section></div>}
+      {id && !isWaitlist && view === 'panel' && <McpKeysSection
         key={base} base={base} refreshToken={mcpRevision} onUnauthorized={handleError}
         onGenerate={prepareMcpKey} onRevoked={handleMcpRevoked} />}
       <p className="app-bottom-note"><ShieldCheck size={14} /> Sem mensalidade. Não vendeu, não pagou.</p>

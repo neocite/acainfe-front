@@ -267,6 +267,12 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     assert.deepEqual(generatedLabels, [{ label: 'Claude Code do notebook' }]);
     assert.ok(keyGets > beforeGets);
     const list = container.querySelector('.mcp-keys')!;
+    assert.ok(list.classList.contains('mcp-keys--onboarding'));
+    assert.ok(container.querySelector('.wizard-card')?.contains(list));
+    assert.ok(container.querySelector('.wizard-layout')?.contains(list));
+    assert.equal(list.querySelector('h3')?.textContent, 'Chaves ativas');
+    assert.equal(list.textContent?.includes('Gerar nova chave'), false);
+    assert.equal(list.closest('form'), null);
     assert.ok(list.textContent?.includes('Claude Code do notebook'));
     assert.ok(list.textContent?.includes('Integração existente'));
     assert.equal(list.textContent?.includes('test-only-mcp-key'), false);
@@ -284,6 +290,28 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     assert.ok(container.textContent?.includes('Revogue uma chave antiga'));
     assert.ok(container.querySelector('.mcp-keys'));
     assert.equal(container.textContent?.includes('test-only-mcp-key'), false);
+  });
+  it('etapa 5 vazia usa o gerador acima e o painel mantém seus botões de geração', async () => {
+    readyPanel(); await mount();
+    const panelList = container.querySelector('.mcp-keys')!;
+    assert.equal(panelList.classList.contains('mcp-keys--onboarding'), false);
+    assert.equal(panelList.querySelector('h3')?.textContent, 'Chaves do MCP');
+    assert.equal([...panelList.querySelectorAll('button')].filter(node => node.textContent === 'Gerar nova chave').length, 2);
+    await click(button('Configuração'));
+    const list = container.querySelector('.mcp-keys')!;
+    const card = container.querySelector('.wizard-card')!;
+    assert.ok(card.contains(list));
+    assert.equal(container.querySelectorAll('.mcp-keys').length, 1);
+    assert.ok(card.querySelector('form'));
+    assert.ok(list.textContent?.includes('Nenhuma chave ativa'));
+    assert.ok(list.textContent?.includes('Gere uma acima para conectar o assistente.'));
+    assert.equal(list.textContent?.includes('Gerar nova chave'), false);
+    assert.ok(container.textContent?.includes('Gerar minha chave'));
+    assert.ok(container.querySelector('.wizard-aside'));
+    await click(button('Painel'));
+    assert.ok(container.querySelector('.mcp-keys-generate'));
+    assert.equal(container.querySelector('.mcp-keys--onboarding'), null);
+    assert.equal(mcpRequests, 0);
   });
   it('revogar a chave recém-gerada remove também seu segredo e as instruções da tela', async () => {
     readyPanel(); await mount(); await click(button('Gerar nova chave')); await click(button('Gerar minha chave'));

@@ -6,6 +6,7 @@ import { listMcpKeys, revokeMcpKey, revokeAllMcpKeys, type McpKeyItem } from '..
 
 type Props = {
   base: string;
+  variant?: 'panel' | 'onboarding';
   refreshToken?: number;
   onUnauthorized: (error: ApiError) => void;
   onGenerate: () => void;
@@ -24,7 +25,8 @@ const origins: Record<string, string> = { APP: 'Painel', API: 'API', ADMIN: 'Adm
 const errMsg = (e: unknown, fallback: string) => (e instanceof Error && e.message ? e.message : fallback);
 const labelOf = (k: McpKeyItem) => k.label?.trim() || (k.last4 ? `…${k.last4}` : k.legacy ? 'Chave antiga' : 'Sem nome');
 
-export function McpKeysSection({ base, refreshToken, onUnauthorized, onGenerate, onRevoked }: Props) {
+export function McpKeysSection({ base, variant = 'panel', refreshToken, onUnauthorized, onGenerate, onRevoked }: Props) {
+  const embedded = variant === 'onboarding';
   const [items, setItems] = useState<McpKeyItem[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [loadError, setLoadError] = useState('');
@@ -113,15 +115,15 @@ export function McpKeysSection({ base, refreshToken, onUnauthorized, onGenerate,
     void load(true);
   }
 
-  return <section className="mcp-keys" aria-labelledby="mcp-keys-title">
+  return <section className={`mcp-keys${embedded ? ' mcp-keys--onboarding' : ''}`} aria-labelledby="mcp-keys-title">
     <div className="mcp-keys-head">
       <div>
-        <h3 id="mcp-keys-title">Chaves do MCP</h3>
+        <h3 id="mcp-keys-title">{embedded ? 'Chaves ativas' : 'Chaves do MCP'}</h3>
         <p>A lista nunca mostra a chave completa, apenas os últimos 4 caracteres. A chave inteira aparece uma única vez, quando é gerada.</p>
       </div>
       <div className="mcp-keys-actions">
         <button type="button" className="app-secondary" disabled={busy || status === 'loading'} onClick={() => void load(false)}>Atualizar</button>
-        <button type="button" className="app-secondary mcp-keys-generate" disabled={busy} onClick={onGenerate}>Gerar nova chave</button>
+        {!embedded && <button type="button" className="app-secondary mcp-keys-generate" disabled={busy} onClick={onGenerate}>Gerar nova chave</button>}
       </div>
     </div>
 
@@ -137,8 +139,8 @@ export function McpKeysSection({ base, refreshToken, onUnauthorized, onGenerate,
     </div>}
     {status === 'ready' && items.length === 0 && <div className="mcp-keys-empty">
       <strong>Nenhuma chave ativa</strong>
-      <p>Nenhum agente de IA consegue usar o MCP agora. Gere uma chave para conectar.</p>
-      <button type="button" className="app-primary" onClick={onGenerate}>Gerar nova chave</button>
+      <p>{embedded ? 'Gere uma acima para conectar o assistente.' : 'Nenhum agente de IA consegue usar o MCP agora. Gere uma chave para conectar.'}</p>
+      {!embedded && <button type="button" className="app-primary" onClick={onGenerate}>Gerar nova chave</button>}
     </div>}
     {status === 'ready' && items.length > 0 && <>
       <ul className="mcp-keys-list">

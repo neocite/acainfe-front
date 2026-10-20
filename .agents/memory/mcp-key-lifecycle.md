@@ -9,6 +9,12 @@ O usuário deve conseguir consultar e revogar chaves existentes sem gerar outra 
 
 **How to apply:** Preservar o acesso ao gerenciamento tanto pelo painel quanto pelo onboarding; não condicionar a lista à geração de um segredo novo.
 
+No onboarding, manter um único ponto de geração: o campo de nome e o botão do card “Seu assistente”. O gerenciamento deve ficar visualmente junto desse card, sem repetir os botões de gerar chave. No painel, a seção continua autônoma e pode oferecer geração.
+
+**Why:** O usuário relatou desalinhamento e duplicação de ações quando a lista ficou fora da coluna do assistente; pediu contextos distintos para onboarding e painel.
+
+**How to apply:** Ao reorganizar a etapa, preservar os passos à esquerda, conferir margens no celular e não aplicar a remoção das ações de geração à seção do painel.
+
 Gerar uma nova chave não revoga as anteriores. A revogação deve ser uma ação explícita e confirmada, pois interrompe imediatamente os agentes e integrações que dependem da chave.
 
 **Why:** Uma empresa pode conectar diferentes agentes simultaneamente. A intenção é permitir invalidar uma credencial vazada sem interromper as outras conexões, ou revogar todas deliberadamente.
