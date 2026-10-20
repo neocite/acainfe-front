@@ -66,9 +66,9 @@ describe('Chaves MCP: confirmações e estados da interface', () => {
     };
   });
   afterEach(async () => { await act(async () => root.unmount()); container.remove(); globalThis.fetch = originalFetch; });
-  async function mount(refreshToken = 0, companyBase = base) {
+  async function mount(refreshToken = 0, companyBase = base, variant: 'panel' | 'onboarding' = 'panel') {
     await act(async () => root.render(createElement(Section, {
-      base: companyBase, refreshToken, onGenerate: () => { generated++; },
+      base: companyBase, refreshToken, variant, onGenerate: () => { generated++; },
       onUnauthorized: () => { unauthorized++; }, onRevoked: (ids?: string[]) => { revoked.push(ids); },
     })));
   }
@@ -128,14 +128,14 @@ describe('Chaves MCP: confirmações e estados da interface', () => {
       assert.equal(row.textContent?.includes('sem detalhes'), false);
       assert.equal(row.textContent?.includes('Ainda não foi usada'), false);
     }
-    assert.ok(container.textContent?.includes('Para descobrir qual chave antiga está em uso, use o MCP uma vez e clique em Atualizar: a chave usada passa a mostrar o final e o último uso.'));
+    assert.ok(container.textContent?.includes('Para descobrir qual chave antiga está em uso, use o MCP uma vez e clique em Atualizar status: a chave usada passa a mostrar o final e o último uso.'));
     await click(rows[0].querySelector('button')!);
     assert.ok(dialog().textContent?.includes('Revogar a chave …abcd?'));
     await click(button('Cancelar', dialog()));
   });
   it('Atualizar faz apenas GET e revela os dados registrados após uso de uma chave antiga', async () => {
     keys = [{ id: 'legacy-key', legacy: true }];
-    await mount();
+    await mount(0, base, 'onboarding');
     assert.ok(container.textContent?.includes('Chave antiga (sem detalhes)'));
     keys = [{ id: 'legacy-key', legacy: true, last4: '5678', lastUsedAt: '2026-10-19T16:40:00' }];
     await click(button('Atualizar'));
@@ -147,6 +147,12 @@ describe('Chaves MCP: confirmações e estados da interface', () => {
     assert.equal(container.textContent?.includes('Chave antiga (sem detalhes)'), false);
     assert.equal(container.textContent?.includes('Ainda não foi usada'), false);
     assert.equal(generated, 0);
+  });
+  it('painel tem rótulo e geração no cabeçalho, sem Atualizar separado', async () => {
+    await mount();
+    assert.ok(container.textContent?.includes('ASSISTENTE DE IA'));
+    assert.ok(container.querySelector('.mcp-keys-head')?.textContent?.includes('Gerar nova chave'));
+    assert.equal([...container.querySelectorAll('button')].some(node => node.textContent?.trim() === 'Atualizar'), false);
   });
   it('cancelar a revogação não envia DELETE', async () => {
     await mount(); await click(button('Revogar'));

@@ -20,6 +20,7 @@ let sessionId: string | undefined;
 const pending = new Map<number, { resolve: (result: any) => void; reject: (error: Error) => void }>();
 const errors: string[] = [];
 let publicPrice = 123;
+let keyListRequests = 0;
 const company = {
   tenant: { id: 'layout-company', status: 'ACTIVE', taxRegime: 'SIMPLES_NACIONAL', integrations: { abacatepay: true } },
   abacatepay: { connected: true, connectedAt: '2026-10-01T12:00:00Z', webhookEndpoint: 'https://old.example.test/hooks/abacatepay', webhookUpToDate: false as boolean | null },
@@ -113,7 +114,7 @@ try {
       else if (path === '/api/app/companies/layout-company') data = company;
       else if (path.endsWith('/billing')) data = { amountDueCents: 0 };
       else if (path.endsWith('/products')) data = [];
-      else if (path.endsWith('/mcp-keys')) data = { items };
+      else if (path.endsWith('/mcp-keys')) { keyListRequests++; data = { items }; }
       else if (path.endsWith('/fiscal-settings')) data = fiscal;
       else if (path.endsWith('/abacatepay/webhook') && request.method === 'POST') {
         const body = request.postData ? JSON.parse(request.postData) : undefined;
@@ -381,6 +382,12 @@ try {
   console.log('PASS estado vazio: orientação para o gerador acima, sem botão duplicado.');
   await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b => b.textContent.includes("Painel")).click()');
   await waitFor('!!document.querySelector(".company-summary .text-button")');
+  await waitFor('!!document.querySelector(".app-card .mcp-keys-empty")');
+  items = [{ id:'panel-key',label:'Assistente do painel',last4:'abcd',legacy:false,createdVia:'APP',createdAt:'2026-10-19T12:00:00Z' }];
+  const beforePanelRefresh = keyListRequests;
+  await evaluate('[...document.querySelectorAll(".app-card button")].find(b => b.textContent === "Atualizar status").click()');
+  await waitFor('!!document.querySelector(".app-card .mcp-key-row")');
+  assert.ok(keyListRequests > beforePanelRefresh, 'Atualizar status deve recarregar as chaves');
   // O webhook usa respostas simuladas no navegador; nenhuma integração real é alterada.
   for (const width of [1280, 360]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -392,6 +399,21 @@ try {
     })()`);
     assert.ok(layout.text.includes('Conectado desde 01/10/2026') && layout.text.includes('As vendas novas não estão virando nota.'));
     assert.ok(layout.scroll <= layout.viewport && layout.left >= 0 && layout.right <= width, JSON.stringify(layout));
+    const keysLayout = await evaluate(`(() => {
+      const webhook=document.querySelector('.ap-webhook-card'),keys=document.querySelector('.mcp-keys');
+      const w=webhook.getBoundingClientRect(),k=keys.getBoundingClientRect();
+      const ws=getComputedStyle(webhook),ks=getComputedStyle(keys);
+      return {sameParent:webhook.parentElement===keys.parentElement,adjacent:webhook.nextElementSibling===keys,
+        leftDelta:Math.abs(w.left-k.left),rightDelta:Math.abs(w.right-k.right),
+        stylesMatch:['padding','borderRadius','border','backgroundColor','marginTop','marginBottom'].every(p=>ws[p]===ks[p]),
+        hasEyebrow:keys.textContent.includes('ASSISTENTE DE IA'),
+        hasRefresh:[...keys.querySelectorAll('button')].some(b=>b.textContent==='Atualizar')};
+    })()`);
+    assert.ok(keysLayout.sameParent && keysLayout.adjacent && keysLayout.stylesMatch && keysLayout.hasEyebrow && !keysLayout.hasRefresh, JSON.stringify(keysLayout));
+    assert.ok(keysLayout.leftDelta < 1 && keysLayout.rightDelta < 1, JSON.stringify(keysLayout));
+    const keysClip=await evaluate('(() => {const r=document.querySelector(".mcp-keys").getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1};})()');
+    const keysShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:keysClip});
+    await writeFile(join(tmpdir(),`acainfe-panel-keys-${width}.png`),Buffer.from(keysShot.data,'base64'));
     const cardClip = await evaluate('(() => {const r=document.querySelector(".ap-webhook-card").getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1};})()');
     let shot = await send('Page.captureScreenshot', { format:'png',captureBeyondViewport:true,clip:cardClip });
     await writeFile(join(tmpdir(),`acainfe-webhook-card-${width}.png`),Buffer.from(shot.data,'base64'));

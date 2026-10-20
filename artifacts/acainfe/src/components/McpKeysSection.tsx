@@ -118,11 +118,12 @@ export function McpKeysSection({ base, variant = 'panel', refreshToken, onUnauth
   return <section className={`mcp-keys${embedded ? ' mcp-keys--onboarding' : ''}`} aria-labelledby="mcp-keys-title">
     <div className="mcp-keys-head">
       <div>
+        {!embedded && <span className="mcp-keys-eyebrow">ASSISTENTE DE IA</span>}
         <h3 id="mcp-keys-title">{embedded ? 'Chaves ativas' : 'Chaves do MCP'}</h3>
         <p>A lista nunca mostra a chave completa, apenas os últimos 4 caracteres. A chave inteira aparece uma única vez, quando é gerada.</p>
       </div>
       <div className="mcp-keys-actions">
-        <button type="button" className="app-secondary" disabled={busy || status === 'loading'} onClick={() => void load(false)}>Atualizar</button>
+        {embedded && <button type="button" className="app-secondary" disabled={busy || status === 'loading'} onClick={() => void load(false)}>Atualizar</button>}
         {!embedded && <button type="button" className="app-secondary mcp-keys-generate" disabled={busy} onClick={onGenerate}>Gerar nova chave</button>}
       </div>
     </div>
@@ -172,7 +173,7 @@ export function McpKeysSection({ base, variant = 'panel', refreshToken, onUnauth
           </li>;
         })}
       </ul>
-      <p className="mcp-keys-help">Para descobrir qual chave antiga está em uso, use o MCP uma vez e clique em Atualizar: a chave usada passa a mostrar o final e o último uso.</p>
+      <p className="mcp-keys-help">Para descobrir qual chave antiga está em uso, use o MCP uma vez e clique em {embedded ? 'Atualizar' : 'Atualizar status'}: a chave usada passa a mostrar o final e o último uso.</p>
       <button type="button" className="app-secondary mcp-keys-revoke-all" disabled={busy}
         onClick={() => { setMessage(''); setDialogError(''); setConfirmText(''); setAllOpen(true); }}>Revogar todas as chaves</button>
     </>}

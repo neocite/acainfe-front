@@ -210,6 +210,7 @@ export default function Onboarding() {
   }, [id, step]);
 
   async function refreshPanel() {
+    setMcpRevision(revision => revision + 1);
     await run(async () => { const s = await api<CompanyStatus>(base); applyStatus(s); });
   }
   async function submit(event: FormEvent) {
@@ -280,6 +281,8 @@ export default function Onboarding() {
          onUnauthorized={handleError}
          onRefresh={refreshPanel}
        />
+       <McpKeysSection key={base} base={base} variant="panel" refreshToken={mcpRevision} onUnauthorized={handleError}
+         onGenerate={prepareMcpKey} onRevoked={handleMcpRevoked} />
        {status.readiness.missing.length > 0 && <div className="app-notice"><h3>O que falta para emitir</h3><ul>{status.readiness.missing.map(m => <li key={m.field}>{m.message}</li>)}</ul><button className="app-secondary" onClick={() => { setStep(3); setView('wizard'); }}>Completar dados</button></div>}
        {recommended.length > 0 && <section className="company-recommendations" aria-labelledby="recommendations-title"><h3 id="recommendations-title">Complete quando puder</h3><p>Esses dados são recomendados e não impedem a emissão.</p><ul>{recommended.map(item => <li key={item.field}><span>{item.message}</span>{isOptionalCompanyField(item.field) ? <button className="app-secondary" type="button" disabled={busy} onClick={() => setEditingRecommendation({ ...item, field: item.field as OptionalCompanyField })}>Informar<span className="sr-only"> {item.field === 'municipalRegistration' ? 'CCM' : 'alíquota do Simples'}</span></button> : item.field === 'approximateTaxes' ? <button type="button" className="app-secondary" onClick={() => setView('fiscal')}>Conferir tributos</button> : null}</li>)}</ul></section>}
       {(accountantSkipped || !status.tenant.accountant) && <div className="app-notice"><h3>Seu contador já está por aqui?</h3><p>Cadastre um contato para receber os PDFs, XMLs e a planilha automaticamente todo dia 1.</p><button className="app-secondary" onClick={() => { setStep(3.1); setView('wizard'); }}>Adicionar contador</button></div>}<button className="app-secondary" onClick={refreshPanel} disabled={busy}>Atualizar status</button></>}</section>
@@ -325,9 +328,6 @@ export default function Onboarding() {
       {id && step === 5 && <McpKeysSection key={base} base={base} variant="onboarding"
         refreshToken={mcpRevision} onUnauthorized={handleError} onGenerate={prepareMcpKey} onRevoked={handleMcpRevoked} />}
       </section></div>}
-      {id && !isWaitlist && view === 'panel' && <McpKeysSection
-        key={base} base={base} refreshToken={mcpRevision} onUnauthorized={handleError}
-        onGenerate={prepareMcpKey} onRevoked={handleMcpRevoked} />}
       <p className="app-bottom-note"><ShieldCheck size={14} /> Sem mensalidade. Não vendeu, não pagou.</p>
       {editingRecommendation && <CompanyRecommendationDialog base={base} item={editingRecommendation} onSaved={applyStatus} onClose={() => setEditingRecommendation(null)} onUnauthorized={handleError} />}
     </div></div>;
