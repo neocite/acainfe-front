@@ -12,6 +12,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   let modules: ViteDevServer;
   let company: any, details: any, patches: any[], profilesRequested: number, detailRequests: number, mcpRequests: number, fiscalRequests: number;
   let keys: any[], keyGets: number, keyDeletes: string[], generatedLabels: any[], generationError: boolean;
+  let gatewayCalls: any[], gatewayFailure: boolean;
   const descriptors = new Map<string, PropertyDescriptor | undefined>();
   const originalFetch = globalThis.fetch;
   before(async () => {
@@ -49,6 +50,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   beforeEach(() => {
     patches = []; profilesRequested = 0; details = undefined; detailRequests = 0; mcpRequests = 0; fiscalRequests = 0;
     keys = []; keyGets = 0; keyDeletes = []; generatedLabels = []; generationError = false;
+    gatewayCalls = []; gatewayFailure = false;
     company = {
       tenant: { id: 'test-company', taxRegime: 'SIMPLES_NACIONAL', municipalRegistration: '123', integrations: {} },
       company: { legalName: 'EMPRESA DE TESTE' }, availability: { status: 'AVAILABLE' },
@@ -69,7 +71,15 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
           { businessType: 'INFOPRODUCER', label: 'Infoprodutor', examples: 'Cursos, treinamentos, mentorias', validated: true },
           { businessType: 'MICROSAAS', label: 'MicroSaaS', examples: 'Assinaturas e licenças de software', validated: false },
         ];
-      } else if (path.endsWith('/billing')) data = { amountDueCents: 0 };
+      } else if (path.endsWith('/abacatepay') && method === 'POST') {
+        gatewayCalls.push(JSON.parse(String(init?.body)));
+        if (gatewayFailure) return new Response(JSON.stringify({ message: 'Permissão CUSTOMER:READ ausente.' }), { status: 422, headers: { 'content-type': 'application/json' } });
+        company.abacatepay = { ...company.abacatepay, connected: true };
+        data = { imported: 3, pendingTaxReview: [{ id: 'p1', name: 'Curso' }], skippedTestProducts: ['Teste'], mergedDuplicates: [{ name: 'Curso', externalId: 'duplicate', productId: 'p1' }], defaultProduct: { decided: true, productId: null } };
+      } else if (path.endsWith('/products')) data = { items: [] };
+      else if (path.endsWith('/past-sales')) data = { periods: [] };
+      else if (path === '/api/public/pricing') data = { pricePerInvoiceCents: 80 };
+      else if (path.endsWith('/billing')) data = { amountDueCents: 0 };
       else if (path.endsWith('/products?pendingTaxReview=true')) data = [];
       else if (path.endsWith('/mcp-connection')) data = {
         mcpUrl: 'https://example.test/mcp', keyPlaceholder: '<SUA_CHAVE>',
@@ -380,6 +390,69 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     assert.equal(container.querySelector('.mcp-keys-generate'), null);
     assert.equal(container.querySelector('.mcp-keys--onboarding'), null);
     assert.equal(mcpRequests, 0);
+  });
+  it('move AbacatePay do painel para o menu entre Painel e Dados fiscais e mantém Configuração para certificado', async () => {
+    readyPanel(); company.abacatepay = { connected: true, webhookUpToDate: true, defaultProduct: { decided: true, productId: null } };
+    await mount();
+    const tabs = [...container.querySelectorAll('.app-tabs button')].map(b => b.textContent?.trim());
+    assert.equal(tabs[tabs.indexOf('Painel') + 1], 'Gateways de pagamento');
+    assert.equal(tabs[tabs.indexOf('Gateways de pagamento') + 1], 'Dados fiscais');
+    assert.equal(container.querySelector('.ap-webhook-card'), null);
+    assert.ok(container.querySelector('.gateway-panel-summary')?.textContent?.includes('AbacatePay conectado · webhook ativo'));
+    await click(button('Gerenciar'));
+    assert.ok(container.querySelector('.pg-screen .ap-webhook-card'));
+    assert.ok(container.textContent?.includes('Outros gateways'));
+    assert.ok(container.textContent?.includes('Nenhum (esses pagamentos não geram nota)'));
+    assert.ok(button('Atualizar API key'));
+    assert.ok(button('Recriar webhook'));
+    await click(button('Configuração'));
+    assert.ok(container.textContent?.includes('envio do certificado'));
+    assert.equal(gatewayCalls.length, 0);
+  });
+  it('atualiza key pelo proxy com o contrato exato, limpa o segredo e mostra o resumo sem recriar webhook', async () => {
+    readyPanel(); company.abacatepay = { connected: true, webhookUpToDate: true, defaultProduct: { decided: true, productId: null } };
+    await mount(); await click(button('Gateways de pagamento')); await click(button('Atualizar API key'));
+    const input = container.querySelector<HTMLInputElement>('.pg-update input[type=password]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value')!.set!.call(input, 'fixture-new-key');
+      input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    });
+    await submit();
+    assert.deepEqual(gatewayCalls, [{ apiKey: 'fixture-new-key', scanPastSales: true }]);
+    assert.equal(input.value, '');
+    assert.ok(container.textContent?.includes('3 produtos importados'));
+    assert.ok(container.textContent?.includes('1 produto de teste ignorado'));
+    assert.ok(container.textContent?.includes('1 duplicado unificado'));
+    assert.ok(container.textContent?.includes('1 produto aguarda'));
+    assert.equal(container.textContent?.includes('fixture-new-key'), false);
+    assert.equal(dom.window.localStorage.length, 0);
+    await click(button('Voltar aos gateways'));
+    assert.ok(container.querySelector('.ap-webhook-status-ok'));
+    await click(button('Vendas sem nota'));
+    assert.ok(container.querySelector('.past-sales'));
+    assert.equal(container.querySelector('.wizard-layout'), null);
+  });
+  it('mostra erro da API na atualização e apaga a key mesmo quando falha', async () => {
+    readyPanel(); gatewayFailure = true; company.abacatepay = { connected: true, webhookUpToDate: null };
+    await mount(); await click(button('Gateways de pagamento'));
+    assert.equal(container.querySelector('.ap-webhook-status'), null);
+    await click(button('Atualizar API key'));
+    const input = container.querySelector<HTMLInputElement>('.pg-update input')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value')!.set!.call(input, 'fixture-denied');
+      input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    });
+    await submit();
+    assert.ok(container.textContent?.includes('Permissão CUSTOMER:READ ausente.'));
+    assert.equal(input.value, '');
+  });
+  it('abre conexão não conectada no menu de gateways, sem depender do onboarding', async () => {
+    readyPanel(); company.abacatepay = { connected: false };
+    await mount(); await click(button('Gateways de pagamento')); await click(button('Conectar AbacatePay'));
+    assert.ok(container.querySelector('.pg-screen .abacatepay-step'));
+    assert.equal(container.querySelector('.wizard-layout'), null);
+    for (const permission of ['PRODUCT:READ','WEBHOOK:CREATE','CHECKOUT:READ','TRANSPARENT:READ','SUBSCRIPTION:READ','CUSTOMER:READ']) assert.ok(container.textContent?.includes(permission));
+    assert.equal(gatewayCalls.length,0);
   });
   it('etapa 5 com chave existente não oferece gerar e leva ao gerenciamento', async () => {
     readyPanel(); keys = [{id:'legacy-key',legacy:true}];

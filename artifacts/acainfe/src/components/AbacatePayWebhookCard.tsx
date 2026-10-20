@@ -5,9 +5,10 @@ import { AbacatePayKeyGuide } from './AbacatePayKeyGuide';
 import { DefaultProductChoice } from './DefaultProductChoice';
 import { getProducts, type Product } from '../lib/products';
 import type { DefaultProductDecision } from '../lib/past-sales';
+import { CopyButton } from './CopyButton';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog';
 
-type Integration = {
+export type Integration = {
   connected: boolean;
   connectedAt?: string | null;
   webhookEndpoint?: string | null;
@@ -28,6 +29,8 @@ type Props = {
   onRefresh: () => Promise<void>;
   defaultProduct?: DefaultProductDecision;
   chooseToken?: number;
+  onUpdateKey?: () => void;
+  onPastSales?: () => void;
 };
 
 function dateLabel(value?: string | null) {
@@ -38,7 +41,7 @@ function dateLabel(value?: string | null) {
   }).format(date);
 }
 
-export function AbacatePayWebhookCard({ base, integration, onReconnect, onUnauthorized, onRefresh, defaultProduct, chooseToken }: Props) {
+export function AbacatePayWebhookCard({ base, integration, onReconnect, onUnauthorized, onRefresh, defaultProduct, chooseToken, onUpdateKey, onPastSales }: Props) {
   const [choiceOpen, setChoiceOpen] = React.useState(false);
   const [list, setList] = React.useState<Product[] | null>(null);
   const [listError, setListError] = React.useState('');
@@ -51,8 +54,8 @@ export function AbacatePayWebhookCard({ base, integration, onReconnect, onUnauth
     });
   }, [base]);
   React.useEffect(() => { if (isConnected) loadList(); }, [isConnected, loadList]);
-  const lastToken = React.useRef(chooseToken);
-  React.useEffect(() => { if (chooseToken !== lastToken.current) { lastToken.current = chooseToken; if (isConnected) setChoiceOpen(true); } }, [chooseToken, isConnected]);
+  const lastToken = React.useRef<number | undefined>(undefined);
+  React.useEffect(() => { if (isConnected && chooseToken && chooseToken !== lastToken.current) { lastToken.current = chooseToken; setChoiceOpen(true); } }, [chooseToken, isConnected]);
   const dpName = !defaultProduct ? 'Não informado pela API' : !defaultProduct.decided ? 'Pendente' : defaultProduct.productId === null ? 'Nenhum (esses pagamentos não geram nota)' : list ? (list.find(p => p.id === defaultProduct.productId)?.name ?? 'Produto não encontrado na lista') : listError ? 'Não foi possível consultar o nome' : 'Carregando…';
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [apiKey, setApiKey] = React.useState('');
@@ -124,6 +127,9 @@ export function AbacatePayWebhookCard({ base, integration, onReconnect, onUnauth
         {connected && integration?.webhookUpToDate === true && (
           <span className="ap-webhook-status ap-webhook-status-ok"><CheckCircle2 size={16} /> Webhook ativo</span>
         )}
+        {connected && integration?.webhookUpToDate === false && (
+          <span className="ap-webhook-status ap-webhook-status-warn"><AlertTriangle size={16} /> Webhook desatualizado</span>
+        )}
       </div>
 
       {!connected ? <>
@@ -143,8 +149,10 @@ export function AbacatePayWebhookCard({ base, integration, onReconnect, onUnauth
           <div className="ap-webhook-endpoint">
             <span>Endereço do webhook</span>
             <code>{integration.webhookEndpoint}</code>
+            <CopyButton text={integration.webhookEndpoint} />
           </div>
         )}
+        <p className="app-muted">Use “Recriar webhook” se as vendas pararam de chegar ou se o webhook estiver desatualizado. Depois, apague o webhook antigo no painel do AbacatePay.</p>
         {integration?.webhookUpToDate === false ? (
           <div className="ap-webhook-warning" role="alert">
             <AlertTriangle size={18} />
@@ -158,7 +166,16 @@ export function AbacatePayWebhookCard({ base, integration, onReconnect, onUnauth
             <p>Se as vendas pararam de virar nota, recrie o webhook.</p>
             <button type="button" className="app-secondary" onClick={openDialog}>Recriar webhook</button>
           </div>
-        ) : null}
+        ) : (
+          <div className="ap-webhook-neutral">
+            <p>Precisa trocar o endereço do webhook? Você pode recriá-lo a qualquer momento.</p>
+            <button type="button" className="app-secondary" onClick={openDialog}>Recriar webhook</button>
+          </div>
+        )}
+        {(onUpdateKey || onPastSales) && <div className="ap-webhook-extra">
+          {onPastSales && <button type="button" className="app-secondary" onClick={onPastSales}>Vendas sem nota</button>}
+          {onUpdateKey && <button type="button" className="app-secondary" onClick={onUpdateKey}>Atualizar API key</button>}
+        </div>}
       </>}
 
       {created && (
@@ -170,6 +187,7 @@ export function AbacatePayWebhookCard({ base, integration, onReconnect, onUnauth
           </a>
         </div>
       )}
+      {error && !dialogOpen && <p className="danger-text" role="alert">{error}</p>}
     </section>
 
     <Dialog open={choiceOpen} onOpenChange={setChoiceOpen}>

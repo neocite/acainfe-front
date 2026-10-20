@@ -1,0 +1,17 @@
+.pg-screen{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;min-width:0}
+.pg-screen>*{min-width:0}
+.pg-screen h1{margin:0}
+.pg-screen>.ap-webhook-card{margin:0}
+.pg-back{justify-self:start}
+.pg-update{padding:22px;border:1px solid #4a19421c;border-radius:14px;background:#fffdfa;display:grid;gap:14px}
+.pg-update h2{margin:0}
+.pg-update p{font-size:13px;line-height:1.7;color:#6b5f70;margin:0}
+.pg-result{display:grid;gap:6px}
+.pg-soon{font-size:12px;color:#6b5f70;border:1px dashed #4a19422e;border-radius:14px;padding:18px;margin:0}
+.pg-soon h2{font-size:17px!important;margin:0 0 8px}.pg-soon p{margin:0}
+.gateway-panel-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #4a19421c;border-radius:14px;padding:16px;margin:20px 0;font-size:13px;line-height:1.6}
+.gateway-panel-summary .text-button{flex-shrink:0}
+.pg-screen h1{overflow-wrap:anywhere}.pg-screen .past-sales{min-width:0}
+.ap-webhook-status-warn{display:inline-flex;align-items:center;gap:6px;color:#8a4b00;background:#fff1d6;border-radius:999px;padding:4px 10px;font-size:12px}
+.ap-webhook-extra{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+@media(max-width:640px){.pg-update{padding:17px}.ap-webhook-extra button{width:100%}}

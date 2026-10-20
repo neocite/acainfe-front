@@ -47,6 +47,7 @@ let items: unknown[] = [{
 }];
 const webhookCalls: { method: string; body: unknown }[] = [];
 const decisionCalls: unknown[] = [];
+const gatewayCalls: unknown[] = [];
 const pastPeriod = { period:'2026-10',isCurrentMonth:true,requiresConfirmation:false,available:{count:1,totalCents:10000,withoutItems:0},alreadyIssued:0,imported:0,refunded:0,ignored:0 };
 let pastItem = { id:'sale-test',paidAt:'2026-10-10T12:00:00Z',amountCents:10000,status:'AVAILABLE',ignoredReason:'' };
 
@@ -124,7 +125,11 @@ try {
         company.readiness.recommended=[];
         data={defaultProduct:company.abacatepay.defaultProduct};
       }
-      else if (path.endsWith('/abacatepay')) data={imported:1,pastSales:{periods:[pastPeriod]},defaultProduct:{decided:false,productId:null,suggestedProductId:'product-test',options:[{id:'product-test',name:'Curso de teste'}]}};
+      else if (path.endsWith('/abacatepay')) {
+        gatewayCalls.push(JSON.parse(request.postData!));
+        company.abacatepay.connected=true;
+        data={imported:1,pendingTaxReview:[{id:'product-test',name:'Curso de teste'}],skippedTestProducts:['Teste'],mergedDuplicates:[],pastSales:{periods:[pastPeriod]},defaultProduct:{decided:false,productId:null,suggestedProductId:'product-test',options:[{id:'product-test',name:'Curso de teste'}]}};
+      }
       else if (path.endsWith('/past-sales/items')) data={items:[pastItem]};
       else if (path.endsWith('/past-sales/ignore')) {
         const body=JSON.parse(request.postData!);
@@ -424,7 +429,7 @@ try {
   await evaluate('document.querySelector(".default-product-choice input[value=__none__]").click();document.querySelector("form.default-product-choice").requestSubmit()');
   await waitFor('!document.querySelector("[role=dialog]") && document.querySelector(".ap-webhook-card").textContent.includes("Nenhum")');
   assert.deepEqual(decisionCalls.at(-1),{productId:null});
-  console.log('PASS produto padrão no painel: pendência abre escolha, salva produto, atualiza nome e permite nenhum.');
+  console.log('PASS produto padrão: pendência no painel abre gateways, salva produto, atualiza nome e permite nenhum.');
   // O webhook usa respostas simuladas no navegador; nenhuma integração real é alterada.
   for (const width of [1280, 360]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -470,6 +475,33 @@ try {
   assert.deepEqual(webhookCalls, [{method:'POST',body:undefined},{method:'POST',body:{apiKey:'test-browser-key'}}]);
   assert.ok(await evaluate('document.querySelector(".ap-webhook-created").textContent.includes("https://old.example.test/hooks/abacatepay")'));
   console.log('PASS webhook: POST vazio, permissão, retry com API key, recarga da empresa, selo ativo e exclusão manual do antigo.');
+  assert.ok(await evaluate('[...document.querySelectorAll(".ap-webhook-card button")].some(b=>b.textContent==="Recriar webhook")'));
+  await evaluate('[...document.querySelectorAll(".ap-webhook-card button")].find(b=>b.textContent==="Atualizar API key").click()');
+  await waitFor('!!document.querySelector(".pg-update input[type=password]")');
+  for (const width of [1280,360]) {
+    await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+    assert.ok(await evaluate('document.documentElement.scrollWidth<=innerWidth'));
+    const clip=await evaluate('(() => {const r=document.querySelector(".pg-screen").getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1};})()');
+    const shot=await send('Page.captureScreenshot',{format:'png',clip,captureBeyondViewport:true});
+    await writeFile(join(tmpdir(),`acainfe-gateways-update-${width}.png`),Buffer.from(shot.data,'base64'));
+  }
+  await evaluate(`(() => {const input=document.querySelector('.pg-update input[type=password]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'fixture-updated-key');
+    input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  await evaluate('document.querySelector(".pg-update form").requestSubmit()');
+  await waitFor('!!document.querySelector(".pg-result")');
+  assert.deepEqual(gatewayCalls,[{apiKey:'fixture-updated-key',scanPastSales:true}]);
+  assert.equal(await evaluate('document.querySelector(".pg-update input[type=password]").value'),'');
+  assert.ok(await evaluate('document.querySelector(".pg-result").textContent.includes("1 produto importado")'));
+  assert.equal(webhookCalls.length,2);
+  await evaluate('document.querySelector(".pg-back").click()');
+  await waitFor('!!document.querySelector(".ap-webhook-card")');
+  await evaluate('[...document.querySelectorAll(".ap-webhook-card button")].find(b=>b.textContent==="Vendas sem nota").click()');
+  await waitFor('!!document.querySelector(".past-sales")');
+  assert.equal(await evaluate('!!document.querySelector(".wizard-layout")'),false);
+  console.log('PASS gateways: atualizar key sem recriar webhook, resumo, limpeza do segredo e vendas antigas sem onboarding; desktop/celular sem overflow.');
+  await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b=>b.textContent.includes("Painel")).click()');
+  await waitFor('!!document.querySelector(".company-summary")');
   await evaluate('document.querySelector(".company-summary .text-button").click()');
   await waitFor('!!document.querySelector(".fs-card")');
   for (const width of [1280, 402, 360]) {
@@ -515,6 +547,9 @@ try {
   await send('Page.navigate',{url:appUrl});
   await waitFor('!!document.querySelector(".app-tabs")');
   await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b=>b.textContent.includes("Painel")).click()');
+  await waitFor('!!document.querySelector(".gateway-panel-summary")');
+  assert.equal(await evaluate('!!document.querySelector(".ap-webhook-card")'), false);
+  await evaluate('[...document.querySelectorAll(".gateway-panel-summary button")].find(b=>b.textContent==="Gerenciar").click()');
   await waitFor('!!document.querySelector(".ap-webhook-card")');
   await evaluate('[...document.querySelectorAll(".ap-webhook-card button")].find(b=>b.textContent==="Conectar AbacatePay").click()');
   await waitFor('!!document.querySelector(".abacatepay-step input[type=password]")');
@@ -538,7 +573,8 @@ try {
   await waitFor('document.querySelector(".past-sales-review").textContent.includes("Ignorada: pagamento de teste")');
   for(const width of [1280,360]){
     await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
-    assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
+    const overflow=await evaluate('({viewport:innerWidth,scroll:document.documentElement.scrollWidth,elements:[...document.querySelectorAll("body *")].filter(el=>{const r=el.getBoundingClientRect();return r.right>innerWidth+1&&r.width>0}).slice(0,12).map(el=>({tag:el.tagName,cls:el.className,width:el.getBoundingClientRect().width}))})');
+    assert.ok(overflow.scroll<=overflow.viewport,JSON.stringify(overflow));
     const clip=await evaluate('(() => {const r=document.querySelector(".past-sales-review").getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1};})()');
     const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip});
     await writeFile(join(tmpdir(),`acainfe-ignored-sales-${width}.png`),Buffer.from(shot.data,'base64'));

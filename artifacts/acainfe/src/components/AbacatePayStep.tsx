@@ -12,9 +12,10 @@ type Props = {
   onConnected: (connection: AbacatePayConnection) => void;
   onContinue: () => void;
   onUnauthorized: (error: ApiError) => void;
+  completionLabel?: string;
 };
 
-export function AbacatePayStep({ base, onConnected, onContinue, onUnauthorized }: Props) {
+export function AbacatePayStep({ base, onConnected, onContinue, onUnauthorized, completionLabel = 'Continuar' }: Props) {
   const [apiKey, setApiKey] = React.useState('');
   const [scan, setScan] = React.useState(true);
   const [scanned, setScanned] = React.useState(true);
@@ -49,7 +50,7 @@ export function AbacatePayStep({ base, onConnected, onContinue, onUnauthorized }
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) onUnauthorized(e);
       setError(e instanceof Error ? e.message : 'Não foi possível conectar. Tente novamente.');
-    } finally { busyRef.current = false; setBusy(false); }
+    } finally { setApiKey(''); busyRef.current = false; setBusy(false); }
   }
 
   const openUpdate = () => { setEditing(true); setError(''); };
@@ -70,7 +71,7 @@ export function AbacatePayStep({ base, onConnected, onContinue, onUnauthorized }
       <label className="app-field">Sua API key do AbacatePay
         <input type="password" value={apiKey} autoComplete="off" disabled={busy} placeholder="Cole sua chave aqui" required aria-invalid={!!error} aria-describedby={error ? errorId : undefined}
           onChange={e => setApiKey(e.target.value)} />
-        <small>Usada pelo servidor para criar o webhook, importar seus produtos e ler as vendas já recebidas. Fica guardada criptografada.</small>
+        <small>Usada pelo servidor para criar o webhook, importar seus produtos e ler as vendas já recebidas. O açaínfe não guarda a key neste app; a conexão é gerenciada pela API.</small>
       </label>
       {error && <div className="app-alert as-field-error" role="alert" id={errorId}><AlertCircle size={15} /><span>{error}</span></div>}
       <div className="as-block">
@@ -112,7 +113,7 @@ export function AbacatePayStep({ base, onConnected, onContinue, onUnauthorized }
         : <div className="as-actions">
             {!warning && <p className="as-note" style={{ flexBasis: '100%', margin: 0 }}>
               {scanned ? 'Não encontramos vendas sem nota no período escolhido.' : 'Você pulou a busca por vendas antigas.'}</p>}
-            <button type="button" className="app-primary" onClick={onContinue}>Continuar <ArrowRight size={17} /></button>
+            <button type="button" className="app-primary" onClick={onContinue}>{completionLabel} <ArrowRight size={17} /></button>
           </div>}
     </>}
   </div>;

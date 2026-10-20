@@ -1,4 +1,5 @@
 import * as React from "react";
+import "./abacatepay-key-guide.css";
 
 export function AbacatePayKeyGuide() {
   return (

@@ -84,7 +84,7 @@ describe('Etapa 4: conexão e busca opcional de vendas', () => {
     assert.equal(container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked, true);
     assert.equal(container.querySelector('select')!.value, '3');
     assert.deepEqual([...container.querySelectorAll('option')].map(node => node.value), ['0', '3', '6', '12']);
-    assert.ok(container.textContent?.includes('Fica guardada criptografada.'));
+    assert.ok(container.textContent?.includes('O açaínfe não guarda a key neste app'));
     assert.ok(container.textContent?.includes('Só mostramos uma prévia. Nada é emitido sem você confirmar.'));
     assert.equal(container.querySelector('a')?.getAttribute('href'), 'https://app.abacatepay.com');
   });
@@ -147,12 +147,12 @@ describe('Etapa 4: conexão e busca opcional de vendas', () => {
     assert.equal(calls.length, 1);
     await click(button('Continuar')); assert.equal(continued, 1);
   });
-  it('422 fica abaixo da key, preserva o valor e permite corrigir', async () => {
+  it('422 fica abaixo da key, limpa o segredo e permite informar outra key', async () => {
     status = 422; await mount(); await enterKey(); await click(button('Conectar AbacatePay'));
     const input = container.querySelector<HTMLInputElement>('input[type="password"]')!;
     const error = document.getElementById(input.getAttribute('aria-describedby')!);
     assert.ok(error?.textContent?.includes('API key do AbacatePay inválida'));
-    assert.equal(input.value, '  chave-ficticia  ');
+    assert.equal(input.value, '');
     assert.equal(connected, 0);
     status = 200; await enterKey('nova-key-ficticia'); await click(button('Conectar AbacatePay'));
     assert.equal(calls.at(-1)?.body.apiKey, 'nova-key-ficticia');
