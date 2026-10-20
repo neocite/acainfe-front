@@ -4,3 +4,4 @@
 - [Vendas passadas](past-sales-rules.md) — competência original, consentimento para meses anteriores e marcação manual de notas emitidas fora do app.
 - [Perfis fiscais](fiscal-business-rules.md) — público não contábil; API aplica perfis, MicroSaaS pede confirmação e ISS não é o padrão de tributos aproximados.
 - [Chaves MCP](mcp-key-lifecycle.md) — gerenciamento sem gerar outra chave; nova chave não revoga as anteriores e revogação exige confirmação explícita.
+- [Plataformas de venda](sales-platforms.md) — o posicionamento do produto inclui AbacatePay e Hotmart; menção comercial não implica paridade técnica.

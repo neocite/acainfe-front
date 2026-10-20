@@ -37,8 +37,8 @@ export default function Landing() {
   const pctText = pct < 1 ? 'menos de 1%' : `cerca de ${pct.toFixed(1).replace('.', ',')}%`;
 
   useEffect(() => {
-    const title = 'açaínfe: nota fiscal automática, sem mensalidade, para quem vende no AbacatePay';
-    const desc = `Não vendeu? Não pagou. NFS-e automática a cada venda no AbacatePay, por ${P} por nota, sem mensalidade.`;
+    const title = 'açaínfe: nota fiscal automática, sem mensalidade, para quem vende no AbacatePay e na Hotmart';
+    const desc = `Não vendeu? Não pagou. NFS-e automática para vendas no AbacatePay e na Hotmart, por ${P} por nota, sem mensalidade.`;
     const origin = window.location.origin;
     document.title = title;
     document.documentElement.lang = 'pt-BR';
@@ -66,12 +66,12 @@ export default function Landing() {
     { q: 'Posso cancelar uma nota?', a: 'Pode, pelo assistente. Reembolsos no AbacatePay cancelam a nota automaticamente.' },
     { q: 'E se eu não vender nada no mês?', a: 'Você não paga nada. Não existe mensalidade, adesão nem plano: a cobrança é só por nota emitida.' },
     { q: 'Como sou cobrado?', a: `${P} por nota emitida com sucesso. Notas rejeitadas pela prefeitura não são cobradas.` },
-    { q: 'Vocês são do AbacatePay?', a: 'Não. O açaínfe é um produto independente, feito para quem vende pelo AbacatePay.' },
+    { q: 'Vocês são do AbacatePay ou da Hotmart?', a: 'Não. O açaínfe é um produto independente, feito para quem vende pelo AbacatePay e pela Hotmart.' },
   ];
 
   const steps = [
     { Ic: KeyRound, t: 'Entre e envie seu certificado A1.', d: 'Encontramos seus dados fiscais.' },
-    { Ic: Plug, t: 'Conecte o AbacatePay.', d: 'Uma chave. O resto fica por nossa conta.' },
+    { Ic: Plug, t: 'Conecte AbacatePay ou Hotmart.', d: 'Conecte a plataforma das suas vendas.' },
     { Ic: MessageCircle, t: 'Configure seus produtos com a IA.', d: 'Depois, cada venda aprovada vira nota.' },
   ];
   const bens = [
@@ -113,10 +113,10 @@ export default function Landing() {
         <section className="ac-hero">
           <div className="ac-container ac-hero__grid">
             <div>
-              <span className="ac-pill" style={{ marginBottom: 22 }}>NFS-e automática para quem vende pelo AbacatePay</span>
+              <span className="ac-pill" style={{ marginBottom: 22 }}>NFS-e automática para AbacatePay e Hotmart</span>
               <h1><span>Nota fiscal</span><span className="ac-underline">sem trabalho manual.<Squiggle /></span></h1>
               <p className="ac-hero__sub">
-                Cada pagamento aprovado no AbacatePay vira uma NFS-e, enviada ao cliente por e-mail e WhatsApp.
+                Cada pagamento aprovado no AbacatePay ou na Hotmart vira uma NFS-e, enviada ao cliente por e-mail e WhatsApp.
               </p>
               <div className="ac-hero-price" aria-label={`Preço: ${P} por nota emitida com sucesso, sem mensalidade`}>
                 <div className="ac-hero-price__amount">{P}<span> / nota emitida com sucesso</span></div>
@@ -201,10 +201,10 @@ export default function Landing() {
               <div className="ac-chips">{['Infoprodutores', 'Mentores', 'SaaS e micro-SaaS', 'Agências', 'Consultores', 'Prestadores de serviço'].map((c) => <span className="ac-chip" key={c}>{c}</span>)}</div>
               <div className="ac-trust-grid">
                 <p className="ac-avail"><strong>Disponível hoje em São Bernardo do Campo (SP)</strong><br />Para empresas do Simples Nacional e MEI. Em outras cidades, faça seu cadastro para entrar na lista de espera; avisamos por e-mail e WhatsApp quando houver disponibilidade.</p>
-                <p className="ac-avail ac-avail--independent"><strong>Integração com AbacatePay</strong><br />Produto independente, não afiliado ao AbacatePay. Conecta pagamentos aprovados à emissão de NFS-e e entrega ao cliente por e-mail e WhatsApp.</p>
+                <p className="ac-avail ac-avail--independent"><strong>Integração com AbacatePay e Hotmart</strong><br />Produto independente, não afiliado ao AbacatePay nem à Hotmart. Conecta pagamentos aprovados à emissão de NFS-e e entrega ao cliente por e-mail e WhatsApp.</p>
               </div>
               <div className="ac-flow">
-                {[['venda', 'Pagamento aprovado no AbacatePay'], ['webhook', 'Chega para o açaínfe na hora'], ['emissão', 'NFS-e emitida'], ['entrega', 'Cliente recebe por e-mail e WhatsApp']].map(([s, t]) => <div key={t}><small>{s}</small>{t}</div>)}
+                {[['venda', 'Pagamento aprovado no AbacatePay ou na Hotmart'], ['webhook', 'Chega para o açaínfe na hora'], ['emissão', 'NFS-e emitida'], ['entrega', 'Cliente recebe por e-mail e WhatsApp']].map(([s, t]) => <div key={t}><small>{s}</small>{t}</div>)}
               </div>
             </Reveal>
           </div>
@@ -236,7 +236,7 @@ export default function Landing() {
               <button className="lk" onClick={() => setLegal('contato')}>Contato</button>
             </div>
           </div>
-          <p style={{ marginTop: 28, fontSize: '.8rem', opacity: .75 }}>O açaínfe não é afiliado ao AbacatePay.</p>
+          <p style={{ marginTop: 28, fontSize: '.8rem', opacity: .75 }}>O açaínfe não é afiliado ao AbacatePay nem à Hotmart.</p>
         </div>
       </footer>
       <LegalModal kind={legal} onClose={() => setLegal(null)} />

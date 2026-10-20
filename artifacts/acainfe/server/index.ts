@@ -197,7 +197,7 @@ const root = path.resolve(import.meta.dirname, '..');
 function escapeHtml(value: string) { return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'); }
 async function pageHtml(template: string, req: express.Request) {
   const pricing = await getPricing();
-  const description = `Não vendeu? Não pagou. NFS-e automática a cada venda no AbacatePay, por ${brl(pricing.pricePerInvoiceCents)} por nota, sem mensalidade.`;
+  const description = `Não vendeu? Não pagou. NFS-e automática para vendas no AbacatePay e na Hotmart, por ${brl(pricing.pricePerInvoiceCents)} por nota, sem mensalidade.`;
   return template.replaceAll('__SEO_DESCRIPTION__', escapeHtml(description)).replaceAll('__APP_ORIGIN__', escapeHtml(origin(req)));
 }
 if (process.env.NODE_ENV === 'production') {
