@@ -1,0 +1,66 @@
+Quero melhorar a landing page da açaínfe: deixar mais fácil de entender e mais bonita, sem perder a identidade visual (roxo escuro, laranja, fundo creme, tipografia atual, tom de voz direto e honesto).
+
+## 1. Remover a Spedy da página toda
+- Procure "Spedy" e "spedy" no código inteiro e remova todas as referências: a linha da tabela, os destaques, as notas de rodapé, as fontes consultadas e o simulador de 12 meses (o "R$ 890,00 no seu bolso" usa o plano anual da Spedy).
+- Remova a faixa amarela "Na coluna de 100 notas, Spedy Essencial... é a opção mais barata da tabela". Ela será substituída pela mensagem dinâmica da calculadora (item 2).
+
+## 2. Uma calculadora simples no lugar de três seções
+Substitua estas três seções por uma única seção, com âncora #calculadora:
+- "O total acompanha suas notas" (cards de 10 / 100 / 500 notas)
+- "Quanto você pagaria em 12 meses?" (simulador com gráfico de barras e abas)
+- "Compare os modelos com cuidado" (tabela)
+
+Título sugerido: "Quanto você pagaria por mês?"
+Subtítulo: "Coloque quantas notas você emite por mês e compare com os planos de entrada dos concorrentes."
+
+### Entrada
+- Um campo numérico grande + um slider sincronizados: "Quantas notas por mês?"
+- Faixa de 0 a 500, valor inicial 30.
+- Atalhos clicáveis: 10, 50, 100, 200.
+
+### Resultado (atualiza em tempo real, sem botão)
+- Card de destaque da açaínfe: "açaínfe: R$ X/mês" e, logo abaixo, "R$ Y por ano".
+- Abaixo, uma lista de barras horizontais (uma por concorrente), ordenada da mais barata para a mais cara, com o custo mensal e a diferença em relação à açaínfe ("+R$ 86,90/mês" ou "R$ 12,00 mais barato").
+- Frase-resumo em destaque, com a maior economia: "Com 30 notas por mês, você economiza até R$ 1.996,80 por ano."
+- Seletor "Por mês / Por ano" (o anual é o mensal × 12).
+
+### Regras de preço (planos de entrada, mensais)
+- açaínfe: R$ 0,80 × notas. Sem mensalidade. 0 notas = R$ 0,00.
+- Focus NFe Solo: R$ 94,90, com 100 notas incluídas; cada nota extra custa R$ 0,11.
+- Notazz Bronze: R$ 133,90, com 100 notas incluídas; preço da nota extra não divulgado. Taxa de adesão anunciada: R$ 133,90 (só na nota de rodapé, não entra na conta mensal).
+- eNotas Basic: R$ 137,00, com 60 notas incluídas; cada nota extra custa R$ 0,77.
+- NFE.io Base: R$ 190,00, com 250 notas incluídas; preço da nota extra não divulgado.
+Fórmula: mensalidade + max(0, notas − incluídas) × preço da extra.
+Quando o número de notas passar do limite incluído e o preço da extra não for divulgado, NÃO invente valor: mostre "Acima do plano — consulte" em cinza e deixe esse concorrente fora do cálculo de economia.
+
+### Mensagem honesta (mantenha o tom "a conta é sua")
+- Se a açaínfe for a mais barata: "Com N notas por mês, a açaínfe é a opção mais barata desta comparação."
+- Se algum concorrente sair mais barato: "Com N notas por mês, o [plano] sai mais barato que a açaínfe. Dizemos isso porque a conta é sua."
+  (Hoje isso acontece com o Focus NFe Solo a partir de 122 notas/mês.)
+
+### Valores para conferir (mensal)
+| notas | açaínfe | Focus | Notazz | eNotas | NFE.io |
+| 0   | 0,00   | 94,90  | 133,90 | 137,00 | 190,00 |
+| 10  | 8,00   | 94,90  | 133,90 | 137,00 | 190,00 |
+| 50  | 40,00  | 94,90  | 133,90 | 137,00 | 190,00 |
+| 100 | 80,00  | 94,90  | 133,90 | 167,80 | 190,00 |
+| 150 | 120,00 | 100,40 | consulte | 206,30 | 190,00 |
+
+### Detalhes e fontes
+- Embaixo da calculadora, um link "Ver tabela completa e fontes" que abre a tabela atual (sem a Spedy), com mensalidade, notas incluídas e nota extra, mais o texto das fontes e a data da consulta (19/10/2026).
+- Mantenha o aviso de que os planos e os recursos não são iguais, em texto pequeno.
+
+## 3. Deixar mais fácil de entender e mais bonita
+- Menu: troque "Mensalidade" e "Comparativo" por um único "Calculadora" que leva a #calculadora. Confira se todas as âncoras funcionam, incluindo #como-funciona.
+- Hero: abaixo do "R$ 0,80 por nota emitida com sucesso", adicione um link "Calcule quanto você economiza →" para #calculadora.
+- Seção "Mensalidade cobra até no mês que você não vendeu nada": mantenha os 3 cards, mas com texto mais curto (no máximo 2 linhas cada).
+- "Como funciona": deixe os 3 passos mais visuais, com números grandes, ícones e uma linha de conexão entre eles; uma frase curta por passo.
+- Mais respiro entre as seções e hierarquia clara: um título, uma frase de apoio e um único CTA por seção.
+- Todos os valores em formato brasileiro (R$ 1.234,56).
+- Mobile: a calculadora precisa funcionar bem a partir de 360px de largura (slider fácil de arrastar, barras empilhadas, sem rolagem horizontal). A tabela de detalhes pode rolar na horizontal só dentro do próprio bloco.
+- Acessibilidade: contraste AA, labels nos campos, o slider deve funcionar pelo teclado e o resultado deve ser anunciado com aria-live.
+
+## Não mexer
+FAQ, "Tudo que a nota precisa", "Para negócios digitais de serviço", CTA final e rodapé ficam como estão (só ajustes de espaçamento, se precisar).
+
+Quando terminar, teste a calculadora com os valores da tabela acima e confirme que não sobrou nenhuma menção à Spedy no código.

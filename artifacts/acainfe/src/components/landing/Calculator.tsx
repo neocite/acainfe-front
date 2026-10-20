@@ -1,140 +1,106 @@
-import { useMemo, useRef, useState, type PointerEvent } from 'react';
-import { annualCost, brl, plans, profiles, SOURCES } from '@/config/pricing';
+import { useMemo, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { brl, monthlyCost, plans, SOURCES } from '@/config/pricing';
 
-const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-const CUSTOM = 'Personalizado';
-const W = 640, H = 300, PL = 46, PR = 66, PT = 30, PB = 30;
-
-export function Calculator({ price, fee }: { price: number; fee: number }) {
-  const presetNames = Object.keys(profiles);
-  const [mode, setMode] = useState(presetNames[0]);
-  const [custom, setCustom] = useState<number[]>([...profiles[presetNames[0]]]);
-  const svgRef = useRef<SVGSVGElement>(null);
-  const dragging = useRef(false);
-  const isCustom = mode === CUSTOM;
-  const months = isCustom ? custom : profiles[mode];
-
-  const calc = useMemo(() => {
-    const total = months.reduce((a, b) => a + b, 0);
-    const acai = total * price + fee * 12;
-    const rows = plans.map((p) => ({ p, cost: annualCost(p, months) }));
-    const valid = rows.filter((r): r is { p: typeof r.p; cost: number } => r.cost !== null).sort((a, b) => a.cost - b.cost);
-    const unavailable = rows.filter((r) => r.cost === null).map((r) => r.p.name);
-    return { total, acai, cheapest: valid[0] ?? null, unavailable };
-  }, [months, price, fee]);
-
-  const line = calc.cheapest ? calc.cheapest.p.monthly : 0;
-  const unit = Math.max(price, 1);
-  const maxNotes = Math.max(...months, 10);
-  const maxCents = Math.max(maxNotes * unit, line, unit * 10) * 1.12;
-  const iw = W - PL - PR, ih = H - PT - PB;
-  const yOf = (cents: number) => PT + ih - (cents / maxCents) * ih;
-  const slot = iw / 12;
-  const ticks = [0, 0.25, 0.5, 0.75, 1];
-
-  const setMonth = (i: number, v: number) => setCustom((c) => c.map((x, k) => (k === i ? Math.max(0, Math.min(9999, Math.round(v))) : x)));
-  const fromPointer = (e: PointerEvent<SVGSVGElement>) => {
-    const svg = svgRef.current; if (!svg) return;
-    const r = svg.getBoundingClientRect();
-    const x = ((e.clientX - r.left) / r.width) * W, y = ((e.clientY - r.top) / r.height) * H;
-    const i = Math.floor((x - PL) / slot);
-    if (i < 0 || i > 11) return;
-    const cents = ((PT + ih - y) / ih) * maxCents;
-    setMonth(i, cents / unit);
-  };
-  const pickMode = (m: string) => { if (m === CUSTOM) setCustom([...months]); setMode(m); };
-
-  const better = calc.cheapest && calc.acai < calc.cheapest.cost;
-  const diff = calc.cheapest ? calc.cheapest.cost - calc.acai : 0;
+export function Calculator({ price }: { price: number }) {
+  const [notes, setNotes] = useState(30);
+  const [period, setPeriod] = useState<'month' | 'year'>('month');
+  const acaiMonthly = notes * price;
+  const rows = useMemo(() => plans
+    .map((plan) => ({ plan, cost: monthlyCost(plan, notes) }))
+    .sort((a, b) => {
+      if (a.cost === null) return b.cost === null ? 0 : 1;
+      if (b.cost === null) return -1;
+      return a.cost - b.cost;
+    }), [notes]);
+  const valid = rows.filter((row): row is { plan: (typeof plans)[number]; cost: number } => row.cost !== null);
+  const least = valid[0];
+  const winnerIsAcai = !least || acaiMonthly <= least.cost;
+  const maxCost = Math.max(acaiMonthly, ...valid.map(({ cost }) => cost), 1);
+  const highestDifference = valid.reduce((best, row) => row.cost - acaiMonthly > best.amount
+    ? { amount: row.cost - acaiMonthly, plan: row.plan.name }
+    : best, { amount: 0, plan: '' });
+  const periodValue = (cents: number) => cents * (period === 'year' ? 12 : 1);
+  const setCount = (value: number) => setNotes(Math.max(0, Math.min(500, Math.round(Number.isFinite(value) ? value : 0))));
+  const savings = highestDifference.amount * 12;
+  const setupPlan = plans.find((plan) => plan.setup);
 
   return (
-    <div className="ac-calc" id="calculadora">
-      <span className="ac-eyebrow" style={{ color: 'var(--manga)' }}>faça a conta do seu jeito</span>
-      <h3>Quanto você pagaria em 12 meses?</h3>
-      <div className="ac-tabs" role="tablist" aria-label="Perfil de vendas">
-        {[...presetNames, CUSTOM].map((n) => (
-          <button key={n} role="tab" aria-selected={mode === n} className="ac-tab" onClick={() => pickMode(n)}>{n}</button>
-        ))}
-      </div>
-      <div className="ac-calc__grid">
-        <div>
-          <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className={`ac-chart ${isCustom ? 'is-custom' : ''}`} role="img"
-            aria-label={`Notas por mês: ${months.join(', ')}. Linha tracejada: mensalidade de ${brl(line)}.`}
-            onPointerDown={(e) => { if (!isCustom) return; dragging.current = true; (e.target as Element).setPointerCapture?.(e.pointerId); fromPointer(e); }}
-            onPointerMove={(e) => dragging.current && fromPointer(e)}
-            onPointerUp={() => { dragging.current = false; }}>
-            {ticks.map((t) => {
-              const c = t * maxCents;
-              return (
-                <g key={t}>
-                  <line x1={PL} x2={W - PR} y1={yOf(c)} y2={yOf(c)} stroke="#FFF8EE" strokeOpacity={t === 0 ? 0.5 : 0.1} />
-                  <text x={PL - 8} y={yOf(c) + 4} textAnchor="end" fontSize="11" fill="#E9B8DF">{Math.round(c / unit)}</text>
-                  <text x={W - PR + 8} y={yOf(c) + 4} fontSize="11" fill="#FFC56B">{brl(c).replace(',00', '')}</text>
-                </g>
-              );
-            })}
-            <text x={PL - 8} y={14} textAnchor="end" fontSize="11" fontWeight="700" fill="#E9B8DF">notas</text>
-            <text x={W - PR + 8} y={14} fontSize="11" fontWeight="700" fill="#FFC56B">R$ / mês</text>
-            {months.map((n, i) => {
-              const x = PL + i * slot + slot * 0.16, w = slot * 0.68, y = yOf(n * unit);
-              return (
-                <g key={i}>
-                  <rect className="bar" x={x} width={w} rx="6" style={{ y: `${y}px`, height: `${Math.max(PT + ih - y, n > 0 ? 2 : 0)}px` }} fill={isCustom ? '#D274C0' : '#B957A6'} />
-                  <text x={x + w / 2} y={y - 6} textAnchor="middle" fontSize="11" fontWeight="700" fill="#FFF8EE">{n}</text>
-                  <text x={x + w / 2} y={H - 10} textAnchor="middle" fontSize="11" fill="#FFF8EE" fillOpacity=".7">{MONTHS[i]}</text>
-                </g>
-              );
-            })}
-            {calc.cheapest && (
-              <g>
-                <line x1={PL} x2={W - PR} y1={yOf(line)} y2={yOf(line)} stroke="#FF9F1C" strokeWidth="3" strokeDasharray="9 7" strokeLinecap="round" />
-                <text x={W - PR - 4} y={yOf(line) - 7} textAnchor="end" fontSize="11" fontWeight="700" fill="#FF9F1C">mensalidade {brl(line)}</text>
-              </g>
-            )}
-          </svg>
-          <div className="ac-legend">
-            <span><i /> Barras: notas emitidas no mês (eixo esquerdo). A altura equivale ao que você paga no açaínfe, na escala {brl(price)} por nota (eixo direito).</span>
-            <span><i className="dash" /> Tracejado: mensalidade do plano de entrada mais barato{calc.cheapest ? ` (${calc.cheapest.p.name})` : ''}, em R$, igual em todo mês.</span>
+    <div className="ac-calc">
+      <header className="ac-calc__intro">
+        <span className="ac-eyebrow">a conta é sua</span>
+        <h2 className="ac-h2">Quanto você pagaria por mês?</h2>
+        <p className="ac-lead">Coloque quantas notas você emite por mês e compare com os planos de entrada dos concorrentes.</p>
+      </header>
+      <div className="ac-calc__layout">
+        <section className="ac-calc__controls" aria-label="Volume de notas">
+          <label className="ac-calc__label" htmlFor="invoice-count">Quantas notas por mês?</label>
+          <div className="ac-calc__input-wrap">
+            <input id="invoice-count" className="ac-calc__number" type="number" inputMode="numeric" min="0" max="500" step="1" value={notes}
+              aria-label="Quantas notas você emite por mês?" onChange={(event) => setCount(Number(event.target.value))} />
+            <span>notas</span>
           </div>
-          {isCustom && (
-            <>
-              <p className="ac-legend" style={{ marginTop: 10 }}>Arraste nas barras ou digite as notas de cada mês:</p>
-              <div className="ac-custom">
-                {MONTHS.map((m, i) => (
-                  <label key={m}>{m}
-                    <input type="number" inputMode="numeric" min={0} max={9999} value={custom[i]} aria-label={`Notas em ${m}`}
-                      onChange={(e) => setMonth(i, Number(e.target.value) || 0)} />
-                  </label>
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-        <div className="ac-result" aria-live="polite">
-          <p>No ano, você pagaria</p>
-          <strong className="big">{brl(calc.acai)}</strong>
-          <p>no açaínfe ({calc.total} notas).</p>
-          {calc.cheapest ? (
-            <>
-              <p style={{ marginTop: 14 }}>No plano de entrada mais barato com mensalidade ({calc.cheapest.p.name}):</p>
-              <strong className="big" style={{ fontSize: '2rem' }}>{brl(calc.cheapest.cost)}</strong>
-              {better ? (
-                <div className="diff">Diferença<strong>{brl(diff)} no seu bolso</strong></div>
-              ) : (
-                <div className="diff warn">Com esse volume constante, um plano com mensalidade pode sair mais barato. Fale com a gente: temos condições para volume.</div>
-              )}
-            </>
-          ) : (
-            <p style={{ marginTop: 14 }}>Todos os planos de entrada pesquisados exigem plano maior para esse volume.</p>
-          )}
-          {calc.unavailable.length > 0 && (
-            <ul className="ac-plain-list">
-              {calc.unavailable.map((n) => <li key={n}>{n}: requer plano maior</li>)}
-            </ul>
-          )}
-        </div>
+          <input className="ac-calc__range" type="range" min="0" max="500" step="1" value={notes}
+            aria-label="Ajuste a quantidade de notas por mês" aria-valuetext={`${notes} notas por mês`}
+            onChange={(event) => setCount(Number(event.target.value))} />
+          <div className="ac-calc__range-labels" aria-hidden="true"><span>0</span><span>500</span></div>
+          <div className="ac-calc__presets" aria-label="Atalhos de quantidade">
+            {[10, 50, 100, 200].map((value) => <button type="button" key={value} aria-pressed={notes === value} onClick={() => setCount(value)}>{value}</button>)}
+          </div>
+          <p className="ac-calc__hint">Sem mensalidade. Com zero notas, a conta é zero.</p>
+        </section>
+
+        <section className="ac-calc__results" aria-label="Comparação de custos">
+          <div className="ac-calc__period" role="group" aria-label="Período dos valores">
+            <button type="button" aria-pressed={period === 'month'} onClick={() => setPeriod('month')}>Por mês</button>
+            <button type="button" aria-pressed={period === 'year'} onClick={() => setPeriod('year')}>Por ano</button>
+          </div>
+          <div className="ac-calc__hero-result" aria-live="polite" aria-atomic="true">
+            <span>açaínfe</span>
+            <strong>{brl(periodValue(acaiMonthly))}<small>/{period === 'year' ? 'ano' : 'mês'}</small></strong>
+            <p>{period === 'month' ? `${brl(periodValue(acaiMonthly * 12))} por ano` : `equivale a ${brl(acaiMonthly)} por mês`}</p>
+          </div>
+          <div className="ac-calc__rank-heading"><span>Planos de entrada</span><span>{period === 'year' ? 'por ano' : 'por mês'}</span></div>
+          <ol className="ac-rank-list" aria-label="Planos concorrentes ordenados do menor para o maior custo">
+            {rows.map(({ plan, cost }, index) => {
+              const unavailable = cost === null;
+              const value = unavailable ? null : periodValue(cost);
+              const diff = unavailable ? null : cost - acaiMonthly;
+              const width = unavailable ? 0 : Math.max(0, (cost / maxCost) * 100);
+              return (
+                <li className={`ac-rank-row ${unavailable ? 'is-unknown' : ''}`} key={plan.name} data-plan={plan.name} data-rank={index + 1}>
+                  <div className="ac-rank-row__meta"><strong>{plan.name}</strong><strong className="ac-rank-row__cost">{unavailable ? 'Acima do plano — consulte' : brl(value!)}</strong></div>
+                  <div className="ac-rank-track" aria-hidden="true"><span style={{ width: `${width}%` }} /></div>
+                  <p className="ac-rank-row__difference">
+                    {unavailable ? 'Preço da nota extra não divulgado' : diff! > 0 ? `+${brl(periodValue(diff!))} ${period === 'year' ? '/ ano' : '/mês'}` : diff! < 0 ? `${brl(periodValue(Math.abs(diff!)))} mais barato` : 'Mesmo custo'}
+                  </p>
+                </li>
+              );
+            })}
+          </ol>
+          <div className={`ac-calc__truth ${winnerIsAcai ? 'is-acai' : 'is-competitor'}`} aria-live="polite">
+            <span className="ac-calc__truth-mark" aria-hidden="true">{winnerIsAcai ? '✓' : '↗'}</span>
+            <p>{winnerIsAcai
+              ? `Com ${notes} notas por mês, a açaínfe é a opção mais barata desta comparação.${highestDifference.plan ? ` Você economiza até ${brl(savings)} por ano frente ao ${highestDifference.plan}.` : ''}`
+              : `Com ${notes} notas por mês, o ${least?.plan.name} sai mais barato que a açaínfe. Dizemos isso porque a conta é sua.${highestDifference.amount > 0 ? ` O ${highestDifference.plan} custa ${brl(highestDifference.amount)} a mais por mês (${brl(highestDifference.amount * 12)} por ano).` : ''}`}</p>
+          </div>
+        </section>
       </div>
-      <p className="ac-calc__foot">{SOURCES}</p>
+      <details className="ac-calc__details">
+        <summary><span>Ver tabela completa e fontes</span><ChevronDown size={18} aria-hidden="true" /></summary>
+        <div className="ac-tablewrap" role="region" aria-label="Tabela detalhada de preços" tabIndex={0}>
+          <table className="ac-table ac-table--wide">
+            <thead><tr><th scope="col">Plano de entrada</th><th scope="col">Mensalidade</th><th scope="col">Notas incluídas</th><th scope="col">Nota extra</th></tr></thead>
+            <tbody>
+              <tr className="me"><th scope="row">açaínfe</th><td>Sem mensalidade</td><td>—</td><td>{brl(price)} por nota emitida com sucesso</td></tr>
+              {plans.map((plan) => <tr key={plan.name}><th scope="row">{plan.name}</th><td>{brl(plan.monthly)}</td><td>{plan.included}</td><td>{plan.extra === null ? 'Não divulgado' : brl(plan.extra)}</td></tr>)}
+            </tbody>
+          </table>
+        </div>
+        {setupPlan && <p className="ac-fine">{setupPlan.name}: taxa de adesão anunciada de {brl(setupPlan.setup!)}. Não entra no custo mensal nem na economia calculada.</p>}
+        <p className="ac-fine">{SOURCES}</p>
+        <p className="ac-fine">Os planos e recursos não são iguais; a comparação considera apenas os preços e limites publicados.</p>
+      </details>
     </div>
   );
 }

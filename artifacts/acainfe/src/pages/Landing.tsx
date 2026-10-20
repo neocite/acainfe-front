@@ -6,12 +6,11 @@ import { usePricing } from '@/components/landing/use-pricing';
 import { Reveal } from '@/components/landing/Reveal';
 import { Bowl, ChatCard, Logo, Squiggle } from '@/components/landing/Art';
 import { Calculator } from '@/components/landing/Calculator';
-import { Comparison } from '@/components/landing/Comparison';
 import { Faq } from '@/components/landing/Faq';
 import { LegalModal, type LegalKind } from '@/components/landing/Legal';
 
 const NAV = [
-  ['#preco', 'Preço'], ['#como-funciona', 'Como funciona'], ['#so-paga-se-vender', 'Mensalidade'], ['#comparativo', 'Comparativo'], ['#faq', 'FAQ'],
+  ['#calculadora', 'Calculadora'], ['#como-funciona', 'Como funciona'], ['#faq', 'FAQ'],
 ] as const;
 
 function setMeta(sel: string, attr: string, key: string, value: string) {
@@ -71,9 +70,9 @@ export default function Landing() {
   ];
 
   const steps = [
-    { Ic: KeyRound, t: 'Entre com o Google e envie seu certificado A1.', d: 'A gente descobre seu CNPJ, sua cidade e suas atividades sozinho.' },
-    { Ic: Plug, t: 'Conecte o AbacatePay com uma chave.', d: 'Criamos o webhook e importamos seus produtos. Zero configuração manual.' },
-    { Ic: MessageCircle, t: 'Converse com a IA uma vez.', d: 'Ela te ajuda a definir como cada produto é tributado. Depois disso, cada venda vira nota sozinha.' },
+    { Ic: KeyRound, t: 'Entre e envie seu certificado A1.', d: 'Encontramos seus dados fiscais.' },
+    { Ic: Plug, t: 'Conecte o AbacatePay.', d: 'Uma chave. O resto fica por nossa conta.' },
+    { Ic: MessageCircle, t: 'Configure seus produtos com a IA.', d: 'Depois, cada venda aprovada vira nota.' },
   ];
   const bens = [
     { c: 'ac-b1', Ic: Layers, t: 'Nota diferente por produto', d: 'Curso, mentoria e consultoria têm códigos de serviço diferentes. A gente emite certo, item por item.' },
@@ -123,6 +122,7 @@ export default function Landing() {
                 <div className="ac-hero-price__amount">{P}<span> / nota emitida com sucesso</span></div>
                 <div className="ac-hero-price__rule"><span>Mensalidade</span><strong>{brl(fee)}</strong><b>{fee === 0 ? 'Sem cobrança mensal' : 'por mês'}</b></div>
               </div>
+              <a className="ac-hero-calc-link" href="#calculadora">Calcule quanto você economiza <ArrowRight size={17} aria-hidden="true" /></a>
               <div className="ac-hero-actions">
                 <Cta />
                 <a className="ac-btn ac-btn--ghost ac-btn--sm" href="#como-funciona">Como funciona <ArrowRight size={16} /></a>
@@ -146,9 +146,9 @@ export default function Landing() {
             </Reveal>
             <div className="ac-args">
               {[
-                ['01', 'Uma venda, uma nota', 'O custo acompanha as notas emitidas com sucesso, sem compromisso de volume.'],
-                ['02', 'Ritmo de lançamento', 'Vendas concentradas numa semana? O custo segue as notas daquele período.'],
-                ['03', 'Custo proporcional', `Numa venda de R$ 97, a emissão representa ${pctText} do valor.`],
+                ['01', 'Uma venda, uma nota', 'Você paga apenas pelas notas emitidas com sucesso.'],
+                ['02', 'Ritmo de lançamento', 'Vendeu em uma semana? Só essas notas entram na conta.'],
+                ['03', 'Custo proporcional', `Numa venda de R$ 97, a emissão custa ${pctText} do valor.`],
               ].map(([n, t, d], i) => (
                 <Reveal key={t} delay={i * 100}><div className="ac-card ac-arg" style={{ height: '100%' }}><div className="n" aria-hidden="true">{n}</div><h3>{t}</h3><p>{d}</p></div></Reveal>
               ))}
@@ -172,33 +172,9 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="ac-section ac-costs" id="preco">
+        <section className="ac-section ac-costs" id="calculadora">
           <div className="ac-container">
-            <Reveal>
-              <span className="ac-eyebrow">conta aberta</span>
-              <h2 className="ac-h2" style={{ margin: '8px 0 12px' }}>O total acompanha suas notas.</h2>
-              <p className="ac-lead">Exemplos ilustrativos de uso do açaínfe. Quantidade de notas multiplicada por {P} cada.</p>
-            </Reveal>
-            <div className="ac-examples" aria-label="Exemplos ilustrativos de custos">
-              {[10, 100, 500].map((n, i) => (
-                <Reveal key={n} delay={i * 90}>
-                  <div className={`ac-example ac-example--${i + 1}`}>
-                    <span>{n} notas</span>
-                    <strong>{n} × {P}</strong>
-                    <b>{brl(n * price)}</b>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-            <p className="ac-example-note">Valores ilustrativos de uso do açaínfe, calculados pela tarifa atual por nota emitida com sucesso. Não são promessa de economia nem comparação com preços de terceiros.</p>
-            <Reveal><Calculator price={price} fee={fee} /></Reveal>
-          </div>
-        </section>
-
-        <section className="ac-section" id="comparativo" style={{ paddingTop: 0 }}>
-          <div className="ac-container">
-            <Reveal><span className="ac-eyebrow">contexto de mercado</span><h2 className="ac-h2" style={{ marginTop: 8 }}>Compare os modelos com cuidado.</h2><p className="ac-lead">Uma referência secundária para entender diferentes estruturas de preço — os planos e recursos não são iguais.</p></Reveal>
-            <Comparison price={price} monthlyFee={fee} />
+            <Reveal><Calculator price={price} /></Reveal>
           </div>
         </section>
 

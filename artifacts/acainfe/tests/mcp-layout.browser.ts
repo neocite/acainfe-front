@@ -19,6 +19,7 @@ let sequence = 0;
 let sessionId: string | undefined;
 const pending = new Map<number, { resolve: (result: any) => void; reject: (error: Error) => void }>();
 const errors: string[] = [];
+let publicPrice = 123;
 const company = {
   tenant: { id: 'layout-company', status: 'ACTIVE', taxRegime: 'SIMPLES_NACIONAL', integrations: { abacatepay: true } },
   company: { legalName: 'EMPRESA DE TESTE VISUAL' },
@@ -60,6 +61,8 @@ async function waitFor(expression: string) {
     if (await evaluate(expression)) return;
     await delay(100);
   }
+  console.error('Estado ao expirar espera:', await evaluate(`({url:location.href,scrollY,viewport:innerHeight,
+    anchors:[...document.querySelectorAll('main section[id]')].map(el=>({id:el.id,top:el.getBoundingClientRect().top}))})`));
   throw new Error(`Página não chegou ao estado esperado: ${expression}`);
 }
 
@@ -101,7 +104,7 @@ try {
       const { requestId, request } = message.params;
       const path = new URL(request.url).pathname;
       let data: unknown;
-      if (path === '/api/public/pricing') data = { pricePerInvoiceCents: 123, monthlyFeeCents: 0 };
+      if (path === '/api/public/pricing') data = { pricePerInvoiceCents: publicPrice, monthlyFeeCents: 0 };
       else if (path === '/api/auth/user') data = { id: 'layout-user', email: 'layout@example.test', name: 'Pessoa de teste' };
       else if (path === '/api/app/me') data = { user: { name: 'Pessoa de teste' }, companies: [company] };
       else if (path === '/api/app/companies/layout-company') data = company;
@@ -131,7 +134,7 @@ try {
   const landing = await evaluate(`(() => ({
     price:document.querySelector('.ac-hero-price__amount').textContent.replace(/\\s+/g,' ').trim(),
     monthly:document.querySelector('.ac-hero-price__rule').textContent.replace(/\\s+/g,' ').trim(),
-    examples:[...document.querySelectorAll('.ac-example')].map(el=>el.textContent.replace(/\\s+/g,' ').trim()),
+    calculator:document.querySelector('.ac-calc__hero-result')?.textContent.replace(/\\s+/g,' ').trim(),
     heroLinks:[...document.querySelectorAll('.ac-hero-actions a')].map(a=>({text:a.textContent.trim(),href:a.getAttribute('href')})),
     mainAction:[...document.querySelectorAll('.ac-nav__right a')].map(a=>a.textContent.trim()),
     sectionOrder:[...document.querySelectorAll('main section[id]')].map(el=>el.id),
@@ -141,19 +144,103 @@ try {
   assert.ok(landing.monthly.includes('R$ 0,00') && landing.monthly.includes('Sem cobrança mensal'), JSON.stringify(landing));
   assert.ok(landing.text.includes('R$ 1,23 por nota emitida com sucesso'), JSON.stringify(landing.text));
   assert.ok(!landing.text.includes('R$ 0,80'), JSON.stringify(landing.text));
-  for (const [i, expected] of ['R$ 12,30', 'R$ 123,00', 'R$ 615,00'].entries()) {
-    assert.ok(landing.examples[i].includes(expected), JSON.stringify(landing.examples));
-  }
-  assert.ok(landing.examples[0].includes('10 × R$ 1,23'), JSON.stringify(landing.examples));
+  await evaluate('document.fonts.ready.then(() => true)');
+  // Navegação rápida entre âncoras não deve competir com a animação de scroll no teste.
+  await evaluate('document.documentElement.style.scrollBehavior = "auto"');
+  assert.ok(landing.calculator.includes('R$ 36,90') && landing.calculator.includes('R$ 442,80'), landing.calculator);
   assert.deepEqual(landing.heroLinks.map((link: { text: string }) => link.text), ['Começar agora', 'Como funciona']);
   assert.equal(landing.heroLinks[0].href, '/app');
   assert.equal(landing.heroLinks[1].href, '#como-funciona');
   assert.ok(landing.mainAction.includes('Começar agora'));
   assert.ok(!landing.text.includes('Começar grátis'));
-  assert.deepEqual(landing.sectionOrder, ['so-paga-se-vender', 'como-funciona', 'preco', 'comparativo', 'compatibilidade', 'faq']);
+  assert.deepEqual(landing.sectionOrder, ['so-paga-se-vender', 'como-funciona', 'calculadora', 'compatibilidade', 'faq']);
   await evaluate('document.querySelector(".ac-hero-actions a[href=\\"#como-funciona\\"]").click()');
   await waitFor('location.hash === "#como-funciona" && document.querySelector("#como-funciona").getBoundingClientRect().top > 0 && document.querySelector("#como-funciona").getBoundingClientRect().top < 100');
-  console.log('PASS landing: preço, cobrança mensal, exemplos dinâmicos, CTAs corretos, âncora funcional e ordem das seções.');
+  for (const id of ['calculadora', 'como-funciona', 'faq']) {
+    await evaluate(`document.querySelector('.ac-nav__links a[href="#${id}"]').click()`);
+    await waitFor(`location.hash === "#${id}" && document.querySelector("#${id}").getBoundingClientRect().top >= 0 && document.querySelector("#${id}").getBoundingClientRect().top < innerHeight / 2`);
+  }
+  assert.equal(await evaluate('document.querySelector(".ac-hero-calc-link").getAttribute("href")'), '#calculadora');
+  publicPrice = 80;
+  await send('Page.navigate', { url: publicUrl.toString() });
+  await waitFor('!!document.querySelector("#invoice-count")');
+  const money = (cents: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100).replace(/\s+/g, ' ');
+  const readCalculator = () => evaluate(`(() => {
+    const text = el => el.textContent.replace(/\\s+/g,' ').trim();
+    return { count:document.querySelector('#invoice-count').value, slider:document.querySelector('.ac-calc__range').value,
+      result:text(document.querySelector('.ac-calc__hero-result > strong')), secondary:text(document.querySelector('.ac-calc__hero-result p')),
+      truth:text(document.querySelector('.ac-calc__truth')),
+      rows:[...document.querySelectorAll('.ac-rank-row')].map(row=>({name:row.dataset.plan,cost:text(row.querySelector('.ac-rank-row__cost')),difference:text(row.querySelector('.ac-rank-row__difference'))})) };
+  })()`);
+  const setNotes = async (count: number) => {
+    await evaluate(`(() => { const input = document.querySelector('#invoice-count');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input, '${count}');
+      input.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+    await waitFor(`document.querySelector('#invoice-count').value === '${count}' && document.querySelector('.ac-calc__range').value === '${count}'`);
+  };
+  let calculator = await readCalculator();
+  assert.equal(calculator.count, '30');
+  assert.ok(calculator.truth.includes('R$ 1.992,00'), calculator.truth);
+  assert.equal(await evaluate('document.querySelector(".ac-calc__hero-result").getAttribute("aria-live")'), 'polite');
+  const names = ['Focus NFe Solo', 'Notazz Bronze', 'eNotas Basic', 'NFE.io Base'];
+  const samples: [number, (number | null)[]][] = [
+    [0, [9490, 13390, 13700, 19000]], [10, [9490, 13390, 13700, 19000]],
+    [50, [9490, 13390, 13700, 19000]], [100, [9490, 13390, 16780, 19000]],
+    [150, [10040, null, 20630, 19000]], [122, [9732, null, 18474, 19000]],
+    [500, [13890, null, 47580, null]],
+  ];
+  for (const [count, costs] of samples) {
+    await setNotes(count);
+    for (const multiplier of [1, 12]) {
+      await evaluate(`[...document.querySelectorAll('.ac-calc__period button')].find(b=>b.textContent==='${multiplier === 1 ? 'Por mês' : 'Por ano'}').click()`);
+      calculator = await readCalculator();
+      assert.ok(calculator.result.startsWith(money(count * 80 * multiplier)), JSON.stringify(calculator));
+      for (const [i, cost] of costs.entries()) {
+        const row = calculator.rows.find((row: any) => row.name === names[i]);
+        assert.equal(row.cost, cost === null ? 'Acima do plano — consulte' : money(cost * multiplier));
+        if (cost !== null && cost !== count * 80) {
+          assert.ok(row.difference.includes(money(Math.abs(cost - count * 80) * multiplier)), JSON.stringify(row));
+        }
+      }
+      const expectedOrder = names.map((name, i) => ({name,cost:costs[i]})).sort((a,b)=>(a.cost ?? Infinity)-(b.cost ?? Infinity)).map(row=>row.name);
+      assert.deepEqual(calculator.rows.map((row: any) => row.name), expectedOrder);
+      assert.ok(calculator.truth.includes(count >= 122 ? 'Focus NFe Solo sai mais barato' : 'açaínfe é a opção mais barata'), calculator.truth);
+    }
+    console.log(`PASS calculadora ${count} notas: valores, ordem, diferenças, mês/ano e mensagem honesta.`);
+  }
+  for (const value of [10, 50, 100, 200]) {
+    await evaluate(`[...document.querySelectorAll('.ac-calc__presets button')].find(b=>b.textContent==='${value}').click()`);
+    assert.equal((await readCalculator()).count, String(value));
+    assert.equal((await readCalculator()).slider, String(value));
+  }
+  await evaluate('document.querySelector(".ac-calc__range").focus()');
+  await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
+  await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
+  await waitFor('document.querySelector("#invoice-count").value === "201"');
+  for (const width of [1280, 360]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    await evaluate('document.querySelector("#calculadora").scrollIntoView({behavior:"instant"})');
+    const slider = await evaluate('(() => { const r=document.querySelector(".ac-calc__range").getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}; })()');
+    assert.ok(slider.height >= 40, JSON.stringify(slider));
+    await send('Input.dispatchMouseEvent', { type:'mousePressed',x:slider.x+slider.width*.4,y:slider.y+slider.height/2,button:'left',clickCount:1 });
+    await send('Input.dispatchMouseEvent', { type:'mouseMoved',x:slider.x+slider.width*.8,y:slider.y+slider.height/2,button:'left',buttons:1 });
+    await send('Input.dispatchMouseEvent', { type:'mouseReleased',x:slider.x+slider.width*.8,y:slider.y+slider.height/2,button:'left',clickCount:1 });
+    calculator = await readCalculator();
+    assert.equal(calculator.count, calculator.slider);
+    assert.ok(Number(calculator.count) > 300, JSON.stringify(calculator));
+    await evaluate('document.querySelector(".ac-calc__details").open=true');
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+    if (width === 360) {
+      assert.equal(await evaluate('document.querySelector(".ac-calc__details .ac-tablewrap").scrollWidth > document.querySelector(".ac-calc__details .ac-tablewrap").clientWidth'), true);
+      const lines = await evaluate('[...document.querySelectorAll(".ac-arg p")].map(p=>p.getBoundingClientRect().height/parseFloat(getComputedStyle(p).lineHeight))');
+      assert.ok(lines.every((line: number) => line <= 2.1), JSON.stringify(lines));
+    }
+    const clip = await evaluate('(() => {const r=document.querySelector("#calculadora").getBoundingClientRect(); return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1};})()');
+    const shot = await send('Page.captureScreenshot', {format:'png',captureBeyondViewport:true,clip});
+    await writeFile(join(tmpdir(), `acainfe-calculator-${width}.png`), Buffer.from(shot.data,'base64'));
+    console.log(`PASS calculadora ${width}px: slider arrastável e teclado, controles sincronizados, tabela contida e sem overflow.`);
+  }
+  console.log('PASS landing: preço da API, FAQ preservado, navegação e calculadora mensal.');
   for (const width of [1280, 402, 360]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
     if (width === 1280) {
