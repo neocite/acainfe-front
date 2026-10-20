@@ -6,7 +6,7 @@ runButton = "Project"
 [userenv]
 
 [userenv.shared]
-ACAINFE_API_URL = "https://flowing-rabbit-still.ngrok-free.app"
+ACAINFE_API_URL = "https://api.acainfe.com"
 
 [nix]
 channel = "stable-25_05"
