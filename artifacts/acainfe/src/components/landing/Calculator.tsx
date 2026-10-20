@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { brl, monthlyCost, plans, SOURCES } from '@/config/pricing';
 
-export function Calculator({ price }: { price: number }) {
-  const [notes, setNotes] = useState(30);
+export function Calculator({ price, initialNotes = 30 }: { price: number; initialNotes?: number }) {
+  const [notes, setNotes] = useState(initialNotes);
   const [period, setPeriod] = useState<'month' | 'year'>('month');
   const acaiMonthly = notes * price;
   const rows = useMemo(() => plans

@@ -53,7 +53,7 @@ function send(method: string, params: object = {}, root = false): Promise<any> {
 }
 async function evaluate(expression: string): Promise<any> {
   const result = await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
-  if (result.exceptionDetails) throw new Error(result.exceptionDetails.text);
+  if (result.exceptionDetails) throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
   return result.result.value;
 }
 async function waitFor(expression: string) {
@@ -130,39 +130,88 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   const publicUrl = new URL(appUrl); publicUrl.pathname = '/'; publicUrl.search = ''; publicUrl.hash = '';
   await send('Page.navigate', { url: publicUrl.toString() });
-  await waitFor('document.querySelector(".ac-hero-price__amount")?.textContent.replace(/\\s+/g, " ").includes("R$ 1,23")');
+  await waitFor('document.querySelector(".csr-proofline strong")?.textContent.replace(/\\s+/g, " ").includes("R$ 1,23")');
   const landing = await evaluate(`(() => ({
-    price:document.querySelector('.ac-hero-price__amount').textContent.replace(/\\s+/g,' ').trim(),
-    monthly:document.querySelector('.ac-hero-price__rule').textContent.replace(/\\s+/g,' ').trim(),
-    calculator:document.querySelector('.ac-calc__hero-result')?.textContent.replace(/\\s+/g,' ').trim(),
-    heroLinks:[...document.querySelectorAll('.ac-hero-actions a')].map(a=>({text:a.textContent.trim(),href:a.getAttribute('href')})),
-    mainAction:[...document.querySelectorAll('.ac-nav__right a')].map(a=>a.textContent.trim()),
+    price:document.querySelector('.csr-proofline strong').textContent.replace(/\\s+/g,' ').trim(),
+    monthly:document.querySelector('.csr-result-meta').textContent.replace(/\\s+/g,' ').trim(),
+    calculator:document.querySelector('.csr-result-main strong').textContent.replace(/\\s+/g,' ').trim(),
+    heroLinks:[...document.querySelectorAll('.csr-hero-actions a')].map(a=>({text:a.textContent.replace(/[↗↓]/g,'').trim(),href:a.getAttribute('href')})),
+    login:document.querySelector('.csr-nav-link').getAttribute('href'),
     sectionOrder:[...document.querySelectorAll('main section[id]')].map(el=>el.id),
     text:document.querySelector('main').textContent.replace(/\\s+/g,' ')
   }))()`);
   assert.ok(landing.price.includes('R$ 1,23'), JSON.stringify(landing));
-  assert.ok(landing.monthly.includes('R$ 0,00') && landing.monthly.includes('Sem cobrança mensal'), JSON.stringify(landing));
+  assert.ok(landing.monthly.includes('Sem mensalidade'), JSON.stringify(landing));
   assert.ok(landing.text.includes('R$ 1,23 por nota emitida com sucesso'), JSON.stringify(landing.text));
   assert.ok(!landing.text.includes('R$ 0,80'), JSON.stringify(landing.text));
   await evaluate('document.fonts.ready.then(() => true)');
   // Navegação rápida entre âncoras não deve competir com a animação de scroll no teste.
   await evaluate('document.documentElement.style.scrollBehavior = "auto"');
-  assert.ok(landing.calculator.includes('R$ 36,90') && landing.calculator.includes('R$ 442,80'), landing.calculator);
-  assert.deepEqual(landing.heroLinks.map((link: { text: string }) => link.text), ['Começar agora', 'Como funciona']);
+  assert.ok(landing.calculator.includes('R$ 59,04'), landing.calculator);
+  assert.ok(landing.text.includes('AbacatePay ou na Hotmart'), landing.text);
+  assert.deepEqual(landing.heroLinks.map((link: { text: string }) => link.text), ['Começar agora', 'Ver como funciona']);
   assert.equal(landing.heroLinks[0].href, '/app');
   assert.equal(landing.heroLinks[1].href, '#como-funciona');
-  assert.ok(landing.mainAction.includes('Começar agora'));
+  assert.equal(landing.login, '/app');
   assert.ok(!landing.text.includes('Começar grátis'));
-  assert.deepEqual(landing.sectionOrder, ['so-paga-se-vender', 'como-funciona', 'calculadora', 'compatibilidade', 'faq']);
-  await evaluate('document.querySelector(".ac-hero-actions a[href=\\"#como-funciona\\"]").click()');
-  await waitFor('location.hash === "#como-funciona" && document.querySelector("#como-funciona").getBoundingClientRect().top > 0 && document.querySelector("#como-funciona").getBoundingClientRect().top < 100');
-  for (const id of ['calculadora', 'como-funciona', 'faq']) {
-    await evaluate(`document.querySelector('.ac-nav__links a[href="#${id}"]').click()`);
-    await waitFor(`location.hash === "#${id}" && document.querySelector("#${id}").getBoundingClientRect().top >= 0 && document.querySelector("#${id}").getBoundingClientRect().top < innerHeight / 2`);
+  assert.deepEqual(landing.sectionOrder, ['simulador', 'como-funciona', 'so-paga-se-vender', 'disponibilidade', 'duvidas', 'comece']);
+  await evaluate('document.querySelector(".csr-hero-actions a[href=\\"#como-funciona\\"]").click()');
+  await waitFor('location.hash === "#como-funciona" && document.querySelector("#como-funciona").getBoundingClientRect().top >= 0 && document.querySelector("#como-funciona").getBoundingClientRect().top < 100');
+  for (const id of ['simulador', 'como-funciona', 'disponibilidade', 'duvidas']) {
+    await evaluate(`document.querySelector('.csr-nav nav a[href="#${id}"]').click()`);
+    await waitFor(`location.hash === "#${id}" && document.querySelector("#${id}").getBoundingClientRect().top >= -1 && document.querySelector("#${id}").getBoundingClientRect().top < innerHeight / 2`);
   }
-  assert.equal(await evaluate('document.querySelector(".ac-hero-calc-link").getAttribute("href")'), '#calculadora');
+  await evaluate('document.querySelectorAll(".csr-faq-list summary")[0].click()');
+  assert.equal(await evaluate('document.querySelector(".csr-faq-list details").open'), true);
+  for (const title of ['Termos de uso', 'Política de privacidade', 'Contato']) {
+    await evaluate(`[...document.querySelectorAll('.csr-footer-legal button')].find(b=>b.textContent==='${title}').click()`);
+    await waitFor(`document.querySelector('.ac-modal h3')?.textContent === '${title}'`);
+    await evaluate('[...document.querySelectorAll(".ac-modal button")].find(b=>b.textContent==="Fechar").click()');
+    await waitFor('!document.querySelector(".ac-modal")');
+  }
   publicPrice = 80;
   await send('Page.navigate', { url: publicUrl.toString() });
+  await waitFor('document.querySelector(".csr-result-main strong")?.textContent.replace(/\\s+/g, " ").includes("R$ 38,40")');
+  for (const width of [1280, 360]) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    for (const value of [12, 48, 126]) {
+      await evaluate(`[...document.querySelectorAll('.csr-presets button')].find(b=>b.textContent.includes('${value} notas')).click()`);
+      await waitFor(`document.querySelector('#csr-invoices').value === '${value}'`);
+      assert.ok((await evaluate('document.querySelector(".csr-result-main strong").textContent')).replace(/\s+/g, ' ').includes(
+        new Intl.NumberFormat('pt-BR', {style:'currency',currency:'BRL'}).format(value * .8).replace(/\s+/g,' ')));
+    }
+    await evaluate('document.querySelector("#csr-invoices").focus()');
+    await send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
+    await send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'ArrowRight', code: 'ArrowRight', windowsVirtualKeyCode: 39 });
+    await waitFor('document.querySelector("#csr-invoices").value === "127"');
+    await evaluate(`(() => { const input=document.querySelector('#csr-ticket');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'100.50');
+      input.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+    await waitFor('document.querySelector(".csr-result p").textContent.includes("0,80%")');
+    assert.ok(!(await evaluate('document.querySelector(".csr-meter span").style.width')).includes('NaN'));
+    await evaluate(`(() => { const input=document.querySelector('#csr-invoices');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'0');
+      input.dispatchEvent(new Event('input',{bubbles:true})); })()`);
+    await waitFor('document.querySelector(".csr-result p").textContent.includes("0,00%")');
+    assert.ok((await evaluate('document.querySelector(".csr-result-main strong").textContent')).replace(/\s+/g,' ').includes('R$ 0,00'));
+    await evaluate(`(() => { const input=document.querySelector('#csr-ticket');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'197');
+      input.dispatchEvent(new Event('input',{bubbles:true}));
+      [...document.querySelectorAll('.csr-presets button')].find(b=>b.textContent.includes('48 notas')).click(); })()`);
+    assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
+    const bounds = await evaluate('(() => {const r=document.querySelector(".csr-hero").getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1};})()');
+    const image = await send('Page.captureScreenshot', {format:'png',captureBeyondViewport:true,clip:bounds});
+    await writeFile(join(tmpdir(), `acainfe-studio-${width}.png`), Buffer.from(image.data,'base64'));
+    console.log(`PASS studio ${width}px: preço da API, presets, teclado, ticket decimal, mês sem venda e sem overflow.`);
+  }
+  await evaluate('document.querySelector(".csr-disclosure").click()');
+  await waitFor('!!document.querySelector("#csr-calculation-details")');
+  await evaluate('document.querySelector("#csr-calculation-details button").click()');
+  await waitFor('document.querySelector(".csr-comparison-dialog").open');
+  await send('Input.dispatchKeyEvent', {type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await send('Input.dispatchKeyEvent', {type:'keyUp',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await waitFor('!document.querySelector(".csr-comparison-dialog").open');
+  await evaluate('document.querySelector("#csr-calculation-details button").click()');
   await waitFor('!!document.querySelector("#invoice-count")');
   const money = (cents: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100).replace(/\s+/g, ' ');
   const readCalculator = () => evaluate(`(() => {
@@ -179,7 +228,9 @@ try {
     await waitFor(`document.querySelector('#invoice-count').value === '${count}' && document.querySelector('.ac-calc__range').value === '${count}'`);
   };
   let calculator = await readCalculator();
-  assert.equal(calculator.count, '30');
+  assert.equal(calculator.count, '48');
+  await setNotes(30);
+  calculator = await readCalculator();
   assert.ok(calculator.truth.includes('R$ 1.992,00'), calculator.truth);
   assert.equal(await evaluate('document.querySelector(".ac-calc__hero-result").getAttribute("aria-live")'), 'polite');
   const names = ['Focus NFe Solo', 'Notazz Bronze', 'eNotas Basic', 'NFE.io Base'];
@@ -219,7 +270,7 @@ try {
   await waitFor('document.querySelector("#invoice-count").value === "201"');
   for (const width of [1280, 360]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
-    await evaluate('document.querySelector("#calculadora").scrollIntoView({behavior:"instant"})');
+    await evaluate('document.querySelector("#comparador").scrollIntoView({behavior:"instant"})');
     const slider = await evaluate('(() => { const r=document.querySelector(".ac-calc__range").getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height}; })()');
     assert.ok(slider.height >= 40, JSON.stringify(slider));
     await send('Input.dispatchMouseEvent', { type:'mousePressed',x:slider.x+slider.width*.4,y:slider.y+slider.height/2,button:'left',clickCount:1 });
@@ -232,15 +283,15 @@ try {
     assert.equal(await evaluate('document.documentElement.scrollWidth <= innerWidth'), true);
     if (width === 360) {
       assert.equal(await evaluate('document.querySelector(".ac-calc__details .ac-tablewrap").scrollWidth > document.querySelector(".ac-calc__details .ac-tablewrap").clientWidth'), true);
-      const lines = await evaluate('[...document.querySelectorAll(".ac-arg p")].map(p=>p.getBoundingClientRect().height/parseFloat(getComputedStyle(p).lineHeight))');
-      assert.ok(lines.every((line: number) => line <= 2.1), JSON.stringify(lines));
+      assert.equal(await evaluate('document.querySelector(".csr-comparison-dialog").scrollWidth <= document.querySelector(".csr-comparison-dialog").clientWidth'), true);
     }
-    const clip = await evaluate('(() => {const r=document.querySelector("#calculadora").getBoundingClientRect(); return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1};})()');
+    const clip = await evaluate('(() => {const r=document.querySelector(".csr-comparison-dialog").getBoundingClientRect(); return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1};})()');
     const shot = await send('Page.captureScreenshot', {format:'png',captureBeyondViewport:true,clip});
     await writeFile(join(tmpdir(), `acainfe-calculator-${width}.png`), Buffer.from(shot.data,'base64'));
     console.log(`PASS calculadora ${width}px: slider arrastável e teclado, controles sincronizados, tabela contida e sem overflow.`);
   }
-  console.log('PASS landing: preço da API, FAQ preservado, navegação e calculadora mensal.');
+  await evaluate('document.querySelector(".csr-comparison-dialog").close()');
+  console.log('PASS landing: design graduado, preço da API, FAQ, links legais, navegação, simulador e comparação preservada.');
   for (const width of [1280, 402, 360]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
     if (width === 1280) {
