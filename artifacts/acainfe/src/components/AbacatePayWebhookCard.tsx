@@ -2,6 +2,9 @@ import * as React from 'react';
 import { AlertTriangle, CheckCircle2, ExternalLink, RefreshCw } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import { AbacatePayKeyGuide } from './AbacatePayKeyGuide';
+import { DefaultProductChoice } from './DefaultProductChoice';
+import { getProducts, type Product } from '../lib/products';
+import type { DefaultProductDecision } from '../lib/past-sales';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog';
 
 type Integration = {
@@ -23,6 +26,8 @@ type Props = {
   onReconnect: () => void;
   onUnauthorized: (error: unknown) => void;
   onRefresh: () => Promise<void>;
+  defaultProduct?: DefaultProductDecision;
+  chooseToken?: number;
 };
 
 function dateLabel(value?: string | null) {
@@ -33,7 +38,22 @@ function dateLabel(value?: string | null) {
   }).format(date);
 }
 
-export function AbacatePayWebhookCard({ base, integration, onReconnect, onUnauthorized, onRefresh }: Props) {
+export function AbacatePayWebhookCard({ base, integration, onReconnect, onUnauthorized, onRefresh, defaultProduct, chooseToken }: Props) {
+  const [choiceOpen, setChoiceOpen] = React.useState(false);
+  const [list, setList] = React.useState<Product[] | null>(null);
+  const [listError, setListError] = React.useState('');
+  const isConnected = integration?.connected === true;
+  const loadList = React.useCallback(() => {
+    setListError('');
+    getProducts(`${base}/products`).then(setList).catch(e => {
+      if (e instanceof ApiError && e.status === 401) onUnauthorized(e);
+      setListError(e instanceof Error ? e.message : 'Não foi possível carregar os produtos.');
+    });
+  }, [base]);
+  React.useEffect(() => { if (isConnected) loadList(); }, [isConnected, loadList]);
+  const lastToken = React.useRef(chooseToken);
+  React.useEffect(() => { if (chooseToken !== lastToken.current) { lastToken.current = chooseToken; if (isConnected) setChoiceOpen(true); } }, [chooseToken, isConnected]);
+  const dpName = !defaultProduct ? 'Não informado pela API' : !defaultProduct.decided ? 'Pendente' : defaultProduct.productId === null ? 'Nenhum (esses pagamentos não geram nota)' : list ? (list.find(p => p.id === defaultProduct.productId)?.name ?? 'Produto não encontrado na lista') : listError ? 'Não foi possível consultar o nome' : 'Carregando…';
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [apiKey, setApiKey] = React.useState('');
   const [needsApiKey, setNeedsApiKey] = React.useState(false);
@@ -113,6 +133,12 @@ export function AbacatePayWebhookCard({ base, integration, onReconnect, onUnauth
         <p className="ap-webhook-connected">
           {connectedDate ? `Conectado desde ${connectedDate}` : 'AbacatePay conectado'}
         </p>
+        <div className="ap-webhook-endpoint">
+          <span>Produto padrão:</span>
+          <strong>{dpName}</strong>
+          {listError && <p className="danger-text" role="alert">{listError} <button type="button" className="text-button" onClick={loadList}>Tentar novamente</button></p>}
+          <button type="button" className="app-secondary" disabled={!list} onClick={() => setChoiceOpen(true)}>Alterar</button>
+        </div>
         {integration?.webhookEndpoint && (
           <div className="ap-webhook-endpoint">
             <span>Endereço do webhook</span>
@@ -145,6 +171,16 @@ export function AbacatePayWebhookCard({ base, integration, onReconnect, onUnauth
         </div>
       )}
     </section>
+
+    <Dialog open={choiceOpen} onOpenChange={setChoiceOpen}>
+      <DialogContent className="company-recommendation-dialog default-product-dialog">
+        <DialogTitle>Produto padrão</DialogTitle>
+        <DialogDescription>Escolha o produto usado em pagamentos sem produto.</DialogDescription>
+        {list && <DefaultProductChoice base={base} options={list} decided={defaultProduct?.decided} decidedProductId={defaultProduct?.productId} submitLabel="Salvar"
+          onUnauthorized={onUnauthorized} onCancel={() => setChoiceOpen(false)}
+          onSaved={async () => { await onRefresh(); setChoiceOpen(false); }} />}
+      </DialogContent>
+    </Dialog>
 
     <Dialog open={dialogOpen} onOpenChange={open => { if (!open) closeDialog(); }}>
       <DialogContent className="company-recommendation-dialog ap-webhook-dialog">

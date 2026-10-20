@@ -25,3 +25,12 @@
 .past-sales-panel-card h3{margin-top:0}
 .abacatepay-connection-dialog .abacatepay-key-guide{margin:0}
 @media(max-width:600px){.past-sales-period{padding:16px}.past-sales h2{font-size:27px}.past-sales-actions{gap:10px}.past-sales-actions .app-primary,.past-sales-actions .app-secondary{width:100%;justify-content:center}.past-sales-review{padding:15px}.past-sales-table{min-width:490px}}
+.default-product-choice fieldset{border:0;padding:0;margin:0;min-width:0}
+.default-product-dialog{max-height:calc(100dvh - 32px);overflow-y:auto;overflow-wrap:anywhere}
+.default-product-choice legend{font-weight:700;font-size:16px;margin-bottom:8px;padding:0}
+.dpc-option{display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border:1px solid #4a19422e;border-radius:10px;margin-top:8px;cursor:pointer;font-size:14px;overflow-wrap:anywhere}
+.dpc-option:has(input:checked){border-color:#7b2d6b;background:#f4e8f1}
+.dpc-option input{margin-top:3px;accent-color:#4a1942;flex-shrink:0}
+.ps-ignored-bar{display:flex;flex-wrap:wrap;gap:10px;margin:10px 0}
+.ps-filter{display:flex;gap:8px;align-items:center;margin:12px 0;flex-wrap:wrap}
+.ps-reason{width:100%;min-height:70px;margin-top:8px}

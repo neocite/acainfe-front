@@ -23,9 +23,9 @@ let publicPrice = 123;
 let keyListRequests = 0;
 const company = {
   tenant: { id: 'layout-company', status: 'ACTIVE', taxRegime: 'SIMPLES_NACIONAL', integrations: { abacatepay: true } },
-  abacatepay: { connected: true, connectedAt: '2026-10-01T12:00:00Z', webhookEndpoint: 'https://old.example.test/hooks/abacatepay', webhookUpToDate: false as boolean | null },
+  abacatepay: { connected: true, connectedAt: '2026-10-01T12:00:00Z', webhookEndpoint: 'https://old.example.test/hooks/abacatepay', webhookUpToDate: false as boolean | null, defaultProduct: { decided: false, productId: null as string | null } },
   company: { legalName: 'EMPRESA DE TESTE VISUAL' },
-  availability: { status: 'AVAILABLE' }, readiness: { canIssue: true, missing: [], recommended: [] }, pendingTaxReview: 0,
+  availability: { status: 'AVAILABLE' }, readiness: { canIssue: true, missing: [], recommended: [{field:'defaultProduct',message:'Escolha o produto padrão para pagamentos sem produto.'}] }, pendingTaxReview: 0,
 };
 const fiscal = {
   company: { cnpj: '12345678000195', legalName: 'EMPRESA DE TESTE VISUAL', tradeName: 'Negócio de teste',
@@ -46,6 +46,9 @@ let items: unknown[] = [{
   createdAt: '2026-10-20T12:00:00Z', lastUsedAt: null, createdVia: 'APP', legacy: false,
 }];
 const webhookCalls: { method: string; body: unknown }[] = [];
+const decisionCalls: unknown[] = [];
+const pastPeriod = { period:'2026-10',isCurrentMonth:true,requiresConfirmation:false,available:{count:1,totalCents:10000,withoutItems:0},alreadyIssued:0,imported:0,refunded:0,ignored:0 };
+let pastItem = { id:'sale-test',paidAt:'2026-10-10T12:00:00Z',amountCents:10000,status:'AVAILABLE',ignoredReason:'' };
 
 function send(method: string, params: object = {}, root = false): Promise<any> {
   const id = ++sequence;
@@ -113,7 +116,22 @@ try {
       else if (path === '/api/app/me') data = { user: { name: 'Pessoa de teste' }, companies: [company] };
       else if (path === '/api/app/companies/layout-company') data = company;
       else if (path.endsWith('/billing')) data = { amountDueCents: 0 };
-      else if (path.endsWith('/products')) data = [];
+      else if (path.endsWith('/products')) data = [{id:'product-test',name:'Curso de teste'}];
+      else if (path.endsWith('/abacatepay/default-product')) {
+        const body=JSON.parse(request.postData!); decisionCalls.push(body);
+        company.abacatepay.defaultProduct={decided:true,productId:body.productId};
+        company.readiness.recommended=[];
+        data={defaultProduct:company.abacatepay.defaultProduct};
+      }
+      else if (path.endsWith('/abacatepay')) data={imported:1,pastSales:{periods:[pastPeriod]},defaultProduct:{decided:false,productId:null,suggestedProductId:'product-test',options:[{id:'product-test',name:'Curso de teste'}]}};
+      else if (path.endsWith('/past-sales/items')) data={items:[pastItem]};
+      else if (path.endsWith('/past-sales/ignore')) {
+        const body=JSON.parse(request.postData!);
+        pastItem={...pastItem,status:body.ignored?'IGNORED':'AVAILABLE',ignoredReason:body.reason||''};
+        pastPeriod.ignored=body.ignored?1:0;pastPeriod.available.count=body.ignored?0:1;
+        data={};
+      }
+      else if (path.endsWith('/past-sales')) data={periods:[pastPeriod]};
       else if (path.endsWith('/mcp-keys')) { keyListRequests++; data = { items }; }
       else if (path.endsWith('/fiscal-settings')) data = fiscal;
       else if (path.endsWith('/abacatepay/webhook') && request.method === 'POST') {
@@ -388,6 +406,26 @@ try {
   await evaluate('[...document.querySelectorAll(".app-card button")].find(b => b.textContent === "Atualizar status").click()');
   await waitFor('!!document.querySelector(".app-card .mcp-key-row")');
   assert.ok(keyListRequests > beforePanelRefresh, 'Atualizar status deve recarregar as chaves');
+  await evaluate('[...document.querySelectorAll(".company-recommendations button")].find(b=>b.textContent==="Escolher produto").click()');
+  await waitFor('!!document.querySelector(".default-product-choice")');
+  for(const width of [1280,360]){
+    await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+    await evaluate('Promise.all(document.querySelector("[role=dialog]").getAnimations().map(a=>a.finished)).then(()=>true)');
+    assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
+    const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+    await writeFile(join(tmpdir(),`acainfe-default-product-${width}.png`),Buffer.from(shot.data,'base64'));
+  }
+  await evaluate('document.querySelector(".default-product-choice input[value=product-test]").click()');
+  await evaluate('document.querySelector("form.default-product-choice").requestSubmit()');
+  await waitFor('!document.querySelector("[role=dialog]") && document.querySelector(".ap-webhook-card").textContent.includes("Curso de teste")');
+  assert.deepEqual(decisionCalls,[{productId:'product-test'}]);
+  assert.equal(await evaluate('!!document.querySelector(".company-recommendations")'),false);
+  await evaluate('[...document.querySelectorAll(".ap-webhook-card button")].find(b=>b.textContent==="Alterar").click()');
+  await waitFor('!!document.querySelector(".default-product-choice")');
+  await evaluate('document.querySelector(".default-product-choice input[value=__none__]").click();document.querySelector("form.default-product-choice").requestSubmit()');
+  await waitFor('!document.querySelector("[role=dialog]") && document.querySelector(".ap-webhook-card").textContent.includes("Nenhum")');
+  assert.deepEqual(decisionCalls.at(-1),{productId:null});
+  console.log('PASS produto padrão no painel: pendência abre escolha, salva produto, atualiza nome e permite nenhum.');
   // O webhook usa respostas simuladas no navegador; nenhuma integração real é alterada.
   for (const width of [1280, 360]) {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -417,7 +455,7 @@ try {
     const cardClip = await evaluate('(() => {const r=document.querySelector(".ap-webhook-card").getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1};})()');
     let shot = await send('Page.captureScreenshot', { format:'png',captureBeyondViewport:true,clip:cardClip });
     await writeFile(join(tmpdir(),`acainfe-webhook-card-${width}.png`),Buffer.from(shot.data,'base64'));
-    await evaluate('document.querySelector(".ap-webhook-card button").click()');
+    await evaluate('document.querySelector(".ap-webhook-warning button").click()');
     await waitFor('!!document.querySelector(".ap-webhook-dialog")');
     await evaluate('Promise.all(document.querySelector(".ap-webhook-dialog").getAnimations().map(animation=>animation.finished)).then(()=>true)');
     assert.equal(await evaluate('document.querySelector(".ap-webhook-dialog").scrollWidth <= document.querySelector(".ap-webhook-dialog").clientWidth'), true);
@@ -432,7 +470,7 @@ try {
     console.log(`PASS webhook ${width}px: card e confirmação alinhados, sem overflow e cancelar sem POST.`);
   }
   assert.equal(webhookCalls.length, 0);
-  await evaluate('document.querySelector(".ap-webhook-card button").click()');
+  await evaluate('document.querySelector(".ap-webhook-warning button").click()');
   await waitFor('!!document.querySelector(".ap-webhook-dialog")');
   await evaluate('document.querySelector(".ap-webhook-dialog form").requestSubmit()');
   await waitFor('!!document.querySelector("#abacatepay-webhook-api-key")');
@@ -487,6 +525,42 @@ try {
     console.log(`PASS etapa 3 ${width}px: campos fiscais e prévia sem overflow. ${file}`);
   }
   assert.deepEqual(errors, []);
+  Object.assign(company,{readiness:{canIssue:true,missing:[],recommended:[]}});
+  company.abacatepay.connected=false;
+  await send('Page.navigate',{url:appUrl});
+  await waitFor('!!document.querySelector(".app-tabs")');
+  await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b=>b.textContent.includes("Painel")).click()');
+  await waitFor('!!document.querySelector(".ap-webhook-card")');
+  await evaluate('[...document.querySelectorAll(".ap-webhook-card button")].find(b=>b.textContent==="Conectar AbacatePay").click()');
+  await waitFor('!!document.querySelector(".abacatepay-step input[type=password]")');
+  await evaluate(`(() => {const input=document.querySelector('.abacatepay-step input[type=password]');
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'test-key');
+    input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  await evaluate('document.querySelector(".abacatepay-step form").requestSubmit()');
+  await waitFor('!!document.querySelector(".default-product-choice")');
+  assert.equal(await evaluate('document.querySelector(".default-product-choice input[value=product-test]").checked'),true);
+  assert.equal(await evaluate('!!document.querySelector(".past-sales")'),false);
+  await evaluate('document.querySelector(".default-product-choice").requestSubmit()');
+  await waitFor('!!document.querySelector(".past-sales-period")');
+  await evaluate('[...document.querySelectorAll(".past-sales-period button")].find(b=>b.textContent==="Revisar vendas").click()');
+  await waitFor('!!document.querySelector(".past-sales-review tbody tr")');
+  await evaluate('document.querySelector(".past-sales-review button[aria-label^=\\"Ignorar venda\\"]").click()');
+  await waitFor('!!document.querySelector(".ps-reason")');
+  await evaluate(`(() => {const input=document.querySelector('.ps-reason');
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(input,'pagamento de teste');
+    input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  await evaluate('[...document.querySelectorAll("[role=dialog] button")].find(b=>b.textContent==="Confirmar").click()');
+  await waitFor('document.querySelector(".past-sales-review").textContent.includes("Ignorada: pagamento de teste")');
+  for(const width of [1280,360]){
+    await send('Emulation.setDeviceMetricsOverride',{width,height:900,deviceScaleFactor:1,mobile:false});
+    assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'),true);
+    const clip=await evaluate('(() => {const r=document.querySelector(".past-sales-review").getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1};})()');
+    const shot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip});
+    await writeFile(join(tmpdir(),`acainfe-ignored-sales-${width}.png`),Buffer.from(shot.data,'base64'));
+  }
+  await evaluate('[...document.querySelectorAll(".past-sales-review button")].find(b=>b.textContent==="Desfazer").click()');
+  await waitFor('!document.querySelector(".past-sales-review").textContent.includes("Ignorada: pagamento de teste")');
+  console.log('PASS onboarding produto sugerido e obrigatório; vendas ignoradas com motivo e desfazer em desktop/celular.');
 } finally {
   socket?.close();
   await new Promise<void>(resolve => {

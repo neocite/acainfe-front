@@ -41,6 +41,7 @@ describe('Etapa 4: conexão e busca opcional de vendas', () => {
   beforeEach(() => {
     response = { imported: 2, confirmedByProfile: [{ id: 'p-1', name: 'Curso' }], pendingTaxReview: [{ id: 'p-2', name: 'Software' }],
       skippedTestProducts: ['Produto Teste'], mergedDuplicates: [{ name: 'Kero Avaliar', externalId: 'ext', productId: 'p-1' }], pastSales: { periods: [] } };
+    response.defaultProduct = { decided: true, productId: null, options: [] };
     status = 200; connected = 0; continued = 0; unauthorized = 0; calls = [];
     container = document.createElement('div'); document.body.appendChild(container); root = createRoot(container);
     globalThis.fetch = async (url, init) => {
@@ -50,6 +51,7 @@ describe('Etapa 4: conexão e busca opcional de vendas', () => {
       let data: unknown;
       const resultStatus = path.endsWith('/abacatepay') ? status : 200;
       if (path.endsWith('/abacatepay')) data = status === 200 ? response : { message: 'API key do AbacatePay inválida' };
+      else if (path.endsWith('/abacatepay/default-product')) data = { defaultProduct: { decided: true, productId: body.productId } };
       else if (path.endsWith('/past-sales')) data = response.pastSales;
       else if (path.endsWith('/public/pricing')) data = { pricePerInvoiceCents: 80 };
       else if (path.endsWith('/products')) data = { items: [{ id: 'p-2', name: 'Software', taxStatus: 'PENDING_REVIEW', suggestedTaxProfile: {} }] };
@@ -96,6 +98,37 @@ describe('Etapa 4: conexão e busca opcional de vendas', () => {
     assert.equal(connected, 1);
     await click(button('Continuar')); assert.equal(continued, 1);
     assert.equal(calls.some(call => call.path.endsWith('/issue')), false);
+  });
+  it('pergunta depois da importação, pré-seleciona a sugestão e exige salvar antes de continuar', async () => {
+    response.defaultProduct = { decided: false, productId: null, suggestedProductId: 'p-1', options: [{ id: 'p-1', name: 'Curso' }] };
+    await mount(); await enterKey(); await click(button('Conectar AbacatePay'));
+    assert.ok(container.textContent?.includes('Quando um pagamento chegar sem produto, qual produto vai na nota?'));
+    assert.equal(container.querySelector<HTMLInputElement>('input[value="p-1"]')?.checked, true);
+    assert.equal([...container.querySelectorAll('button')].some(node => node.textContent?.trim() === 'Continuar'), false);
+    assert.ok(container.textContent?.includes('inclusive pagamentos de teste'));
+    await click(button('Salvar produto padrão'));
+    assert.deepEqual(calls.find(call => call.path.endsWith('/default-product')), {
+      path: '/api/app/companies/company/abacatepay/default-product', method: 'PUT', body: { productId: 'p-1' },
+    });
+    await click(button('Continuar'));
+    assert.equal(continued, 1);
+  });
+  it('sem sugestão exige escolha explícita e permite salvar Nenhum com null', async () => {
+    response.defaultProduct = { decided: false, productId: null, options: [{ id: 'p-1', name: 'Curso' }, { id: 'p-2', name: 'Software' }] };
+    await mount(); await enterKey(); await click(button('Conectar AbacatePay'));
+    assert.equal(button('Salvar produto padrão').disabled, true);
+    assert.ok(container.textContent?.includes('metadata.productExternalId'));
+    await click(container.querySelector<HTMLInputElement>('input[value="__none__"]')!);
+    await click(button('Salvar produto padrão'));
+    assert.deepEqual(calls.find(call => call.path.endsWith('/default-product'))?.body, { productId: null });
+    assert.equal(button('Continuar').disabled, false);
+  });
+  it('não inventa decisão ou opções quando a API omite defaultProduct', async () => {
+    delete response.defaultProduct;
+    await mount(); await enterKey(); await click(button('Conectar AbacatePay'));
+    assert.ok(container.textContent?.includes('A API não informou a escolha do produto padrão'));
+    assert.equal(container.querySelector('input[type="radio"]'), null);
+    assert.equal([...container.querySelectorAll('button')].some(node => node.textContent?.trim() === 'Continuar'), false);
   });
   for (const monthsBack of [0, 6, 12]) it(`envia exatamente monthsBack=${monthsBack}`, async () => {
     await mount(); await enterKey();

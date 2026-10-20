@@ -3,6 +3,7 @@ import { AlertCircle, ArrowRight, ExternalLink, Leaf } from 'lucide-react';
 import { api, ApiError } from '../lib/api';
 import type { AbacatePayConnection } from '../lib/past-sales';
 import { AbacatePayImportSummary } from './AbacatePayImportSummary';
+import { DefaultProductChoice } from './DefaultProductChoice';
 import { PastSales } from './PastSales';
 import { Products } from './Products';
 
@@ -23,6 +24,7 @@ export function AbacatePayStep({ base, onConnected, onContinue, onUnauthorized }
   const [connection, setConnection] = React.useState<AbacatePayConnection | null>(null);
   const [editing, setEditing] = React.useState(false);
   const [showProducts, setShowProducts] = React.useState(false);
+  const [defaultSaved, setDefaultSaved] = React.useState(false);
   const busyRef = React.useRef(false);
   const errorId = React.useId();
 
@@ -31,6 +33,9 @@ export function AbacatePayStep({ base, onConnected, onContinue, onUnauthorized }
   const warning = connection?.pastSales?.warning;
   const hasSales = scanned && !warning && periods.some(p => p.available.count > 0);
   const showForm = !connection || editing;
+  const dp = connection?.defaultProduct;
+  const needsDefault = !!connection && !!dp && dp.decided === false && !defaultSaved;
+  const dpMissing = !!connection && (!dp || typeof dp.decided !== 'boolean' || (!dp.decided && (!Array.isArray(dp.options) || !dp.options.every(option => option && typeof option.id === 'string' && typeof option.name === 'string'))));
 
   async function connect() {
     if (busyRef.current) return;
@@ -39,7 +44,7 @@ export function AbacatePayStep({ base, onConnected, onContinue, onUnauthorized }
     try {
       const body = scan ? { apiKey: key, scanPastSales: true, monthsBack: Number(monthsBack) } : { apiKey: key, scanPastSales: false };
       const result = await api<AbacatePayConnection>(`${base}/abacatepay`, 'POST', body);
-      setConnection(result); setScanned(scan); setEditing(false); setApiKey('');
+      setDefaultSaved(false); setConnection(result); setScanned(scan); setEditing(false); setApiKey('');
       onConnected(result);
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) onUnauthorized(e);
@@ -95,7 +100,14 @@ export function AbacatePayStep({ base, onConnected, onContinue, onUnauthorized }
         <div><button type="button" className="app-secondary" onClick={openUpdate}>Atualizar key</button></div>
       </div>}
       {products}
-      {hasSales
+      {dpMissing && <div className="as-warning" role="alert">A API não informou a escolha do produto padrão. Atualize a página e tente novamente.</div>}
+      {needsDefault && !dpMissing && dp && <DefaultProductChoice base={base} options={dp.options} suggestedProductId={dp.suggestedProductId} decidedProductId={dp.productId} submitLabel="Salvar produto padrão" onUnauthorized={onUnauthorized}
+        onSaved={decision => {
+          setDefaultSaved(true);
+          const updated = { ...connection, defaultProduct: { ...dp, ...decision } };
+          setConnection(updated); onConnected(updated);
+        }} />}
+      {needsDefault ? <p className="as-note">Escolha uma opção acima para continuar.</p> : dpMissing ? null : hasSales
         ? <PastSales base={base} initial={connection.pastSales} onUpdateKey={openUpdate} onSkip={onContinue} onUnauthorized={onUnauthorized} />
         : <div className="as-actions">
             {!warning && <p className="as-note" style={{ flexBasis: '100%', margin: 0 }}>

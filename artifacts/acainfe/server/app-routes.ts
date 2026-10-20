@@ -4,6 +4,7 @@ const appRoutes = [
   ['POST', /^\/onboarding\/certificate$/],
   ['GET', /^\/companies\/[a-zA-Z0-9_-]+$/], ['PATCH', /^\/companies\/[a-zA-Z0-9_-]+$/],
   ['PUT', /^\/companies\/[a-zA-Z0-9_-]+\/accountant$/],
+  ['PUT', /^\/companies\/[a-zA-Z0-9_-]+\/abacatepay\/default-product$/],
   ['GET', /^\/companies\/[a-zA-Z0-9_-]+\/fiscal-settings$/],
   ['POST', /^\/companies\/[a-zA-Z0-9_-]+\/fiscal-settings\/send$/],
   ['POST', /^\/companies\/[a-zA-Z0-9_-]+\/(?:abacatepay(?:\/webhook)?|mcp-key|billing\/payments)$/],
@@ -12,7 +13,7 @@ const appRoutes = [
   ['GET', /^\/companies\/[a-zA-Z0-9_-]+\/past-sales\/reconcile$/],
   ['POST', /^\/companies\/[a-zA-Z0-9_-]+\/past-sales\/reconcile\/apply$/],
   ['GET', /^\/companies\/[a-zA-Z0-9_-]+\/(?:products|billing|past-sales|past-sales\/items)$/],
-  ['POST', /^\/companies\/[a-zA-Z0-9_-]+\/past-sales\/(?:scan|mark|issue)$/],
+  ['POST', /^\/companies\/[a-zA-Z0-9_-]+\/past-sales\/(?:scan|mark|issue|ignore)$/],
   ['POST', /^\/companies\/[a-zA-Z0-9_-]+\/products$/],
   ['POST', /^\/companies\/[a-zA-Z0-9_-]+\/products\/[a-zA-Z0-9_-]+\/confirm-tax$/],
 ] as const;

@@ -4,7 +4,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { isAllowedAppRoute } from '../server/app-routes';
 import { ApiError } from '../src/lib/api';
-import { issuePastSales, markPastSales, getPastSalesItems, periodLabel, pastPeriodWarning, sortedPeriods, type PastSalesPeriod } from '../src/lib/past-sales';
+import { ignorePastSales, issuePastSales, markPastSales, getPastSalesItems, periodLabel, pastPeriodWarning, sortedPeriods, type PastSalesPeriod } from '../src/lib/past-sales';
 import { PastSalesPeriodCard } from '../src/components/PastSalesPeriodCard';
 
 const current: PastSalesPeriod = {
@@ -16,7 +16,7 @@ const previous = { ...current, period: '2026-09', isCurrentMonth: false, require
 describe('Vendas passadas: segurança e contrato', () => {
   it('libera somente os métodos e as rotas novos previstos no proxy', () => {
     for (const path of ['/past-sales', '/past-sales/items']) assert.equal(isAllowedAppRoute('GET', `/companies/test${path}`), true);
-    for (const action of ['scan', 'mark', 'issue']) {
+    for (const action of ['scan', 'mark', 'issue', 'ignore']) {
       assert.equal(isAllowedAppRoute('POST', `/companies/test/past-sales/${action}`), true);
       assert.equal(isAllowedAppRoute('GET', `/companies/test/past-sales/${action}`), false);
     }
@@ -24,6 +24,9 @@ describe('Vendas passadas: segurança e contrato', () => {
     assert.equal(isAllowedAppRoute('POST', '/companies/test/past-sales/delete'), false);
     assert.equal(isAllowedAppRoute('GET', '/companies/../past-sales'), false);
     assert.equal(isAllowedAppRoute('POST', '/companies/test/abacatepay'), true);
+    assert.equal(isAllowedAppRoute('PUT', '/companies/test/abacatepay/default-product'), true);
+    assert.equal(isAllowedAppRoute('POST', '/companies/test/abacatepay/default-product'), false);
+    assert.equal(isAllowedAppRoute('PUT', '/companies/test/abacatepay/default-product/extra'), false);
   });
   it('ordena os meses sem modificar a resposta e formata a competência', () => {
     const periods = [previous, current];
@@ -68,17 +71,48 @@ describe('Vendas passadas: segurança e contrato', () => {
       assert.deepEqual(bodies, [{ ids: ['sale-test'], alreadyIssued: true }, { ids: ['sale-test'], alreadyIssued: false }, { period: '2026-10', alreadyIssued: true }]);
     } finally { globalThis.fetch = original; }
   });
-  it('pede somente disponíveis e já emitidas e nunca lista estornos ou contestações', async () => {
+  it('lista disponíveis, já emitidas e ignoradas, nunca estornos ou contestações', async () => {
     const original = globalThis.fetch;
     globalThis.fetch = async url => {
       const parsed = new URL(String(url), 'https://example.test');
-      assert.equal(parsed.searchParams.get('status'), 'AVAILABLE,ALREADY_ISSUED');
+      assert.equal(parsed.searchParams.get('status'), 'AVAILABLE,ALREADY_ISSUED,IGNORED');
       return new Response(JSON.stringify({ items: [
         { id: 'available', status: 'AVAILABLE' }, { id: 'already', status: 'ALREADY_ISSUED' },
+        { id: 'ignored', status: 'IGNORED', ignoredReason: 'pagamento de teste' },
         { id: 'refunded', status: 'REFUNDED' }, { id: 'disputed', status: 'DISPUTED' }, { id: 'pending', status: 'PENDING' },
       ] }), { headers: { 'content-type': 'application/json' } });
     };
-    try { assert.deepEqual((await getPastSalesItems('/app/companies/test', '2026-10')).map(item => item.id), ['available', 'already']); }
+    try { assert.deepEqual((await getPastSalesItems('/app/companies/test', '2026-10')).map(item => item.id), ['available', 'already', 'ignored']); }
+    finally { globalThis.fetch = original; }
+  });
+  it('ignora e desfaz por venda ou mês, sem confundir com nota emitida', async () => {
+    const original = globalThis.fetch;
+    const bodies: unknown[] = [];
+    globalThis.fetch = async (url, init) => {
+      assert.equal(String(url), '/api/app/companies/test/past-sales/ignore');
+      assert.equal(init?.method, 'POST');
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response('{}', { headers: { 'content-type': 'application/json' } });
+    };
+    try {
+      await ignorePastSales('/app/companies/test', { ids: ['sale-1'] }, true, ' pagamento de teste ');
+      await ignorePastSales('/app/companies/test', { period: '2026-10' }, true);
+      await ignorePastSales('/app/companies/test', { ids: ['sale-1'] }, false, 'não reenviar');
+      await ignorePastSales('/app/companies/test', { period: '2026-10' }, false);
+      assert.deepEqual(bodies, [
+        { ids: ['sale-1'], ignored: true, reason: 'pagamento de teste' },
+        { period: '2026-10', ignored: true }, { ids: ['sale-1'], ignored: false },
+        { period: '2026-10', ignored: false },
+      ]);
+    } finally { globalThis.fetch = original; }
+  });
+  it('permite pedir somente ignoradas usando o filtro documentado', async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = async url => {
+      assert.equal(new URL(String(url), 'https://example.test').searchParams.get('status'), 'IGNORED');
+      return new Response('{"items":[]}', { headers: { 'content-type': 'application/json' } });
+    };
+    try { await getPastSalesItems('/app/companies/test', '2026-10', 'IGNORED'); }
     finally { globalThis.fetch = original; }
   });
   it('renderiza quantidades, custo em centavos, exclusões e resultados sem esconder falhas', () => {

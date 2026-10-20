@@ -66,7 +66,20 @@ describe('Vendas sem nota: interações reais dos componentes', () => {
       if (path.pathname.endsWith('/public/pricing')) data = { pricePerInvoiceCents: 80 };
       else if (path.pathname.endsWith('/abacatepay')) data = { imported: 3, pendingTaxReview: [], pastSales: { periods } };
       else if (path.pathname.endsWith('/products')) data = productResponse;
-      else if (path.pathname.endsWith('/past-sales/items')) data = { items };
+      else if (path.pathname.endsWith('/past-sales/items')) {
+        const statuses = path.searchParams.get('status')?.split(',') ?? [];
+        data = { items: items.filter(item => statuses.includes(item.status)) };
+      }
+      else if (path.pathname.endsWith('/past-sales/ignore')) {
+        for (const item of items) if (body.period || body.ids.includes(item.id)) {
+          item.status = body.ignored ? 'IGNORED' : 'AVAILABLE';
+          item.ignoredReason = body.ignored ? body.reason : undefined;
+        }
+        const current = periods.find(period => period.period === '2026-10')!;
+        current.ignored = items.filter(item => item.status === 'IGNORED').length;
+        current.available.count = items.filter(item => item.status === 'AVAILABLE').length;
+        data = {};
+      }
       else if (path.pathname.endsWith('/past-sales/mark')) {
         for (const item of items) if (body.period || body.ids.includes(item.id)) item.status = body.alreadyIssued ? 'ALREADY_ISSUED' : 'AVAILABLE';
         const current = periods.find(period => period.period === '2026-10')!;
@@ -153,6 +166,42 @@ describe('Vendas sem nota: interações reais dos componentes', () => {
     await click(button('Marcar o mês inteiro como já emitido', review));
     assert.deepEqual(calls.filter(call => call.url.endsWith('/mark')).at(-1)?.body, { period: '2026-10', alreadyIssued: true });
     assert.ok(card('outubro/2026').textContent?.includes('0 vendas'));
+  });
+  it('ignora uma venda com motivo, filtra ignoradas e desfaz sem marcar nota externa', async () => {
+    await mount(); await flush();
+    await click(button('Revisar vendas', card('outubro/2026')));
+    await flush();
+    const review = container.querySelector('.past-sales-review')!;
+    await click(button('Ignorar (não é venda)', review));
+    const dialog = document.querySelector('[role="dialog"]')!;
+    const input = dialog.querySelector('textarea')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype, 'value')!.set!.call(input, 'pagamento de teste');
+      input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    });
+    await click(button('Confirmar', dialog));
+    await flush();
+    assert.deepEqual(calls.find(call => call.url.endsWith('/ignore'))?.body, { ids: ['sale-1'], ignored: true, reason: 'pagamento de teste' });
+    assert.ok(review.textContent?.includes('Ignorada: pagamento de teste'));
+    assert.ok(card('outubro/2026').textContent?.includes('1 ignoradas'));
+    const filter = review.querySelector('select')!;
+    await act(async () => { filter.value = 'IGNORED'; filter.dispatchEvent(new dom.window.Event('change', { bubbles: true })); });
+    await flush();
+    assert.ok(calls.some(call => call.url.includes('status=IGNORED')));
+    assert.equal(review.querySelectorAll('tbody tr').length, 1);
+    await click(button('Desfazer', review)); await flush();
+    assert.deepEqual(calls.filter(call => call.url.endsWith('/ignore')).at(-1)?.body, { ids: ['sale-1'], ignored: false });
+    assert.equal(calls.some(call => call.url.endsWith('/mark')), false);
+  });
+  it('ignora e desfaz o mês inteiro, com motivo opcional', async () => {
+    await mount(); await flush();
+    await click(button('Revisar vendas', card('outubro/2026'))); await flush();
+    const review = container.querySelector('.past-sales-review')!;
+    await click(button('Ignorar (não é venda) — mês inteiro', review));
+    await click(button('Confirmar', document.querySelector('[role="dialog"]')!)); await flush();
+    assert.deepEqual(calls.find(call => call.url.endsWith('/ignore'))?.body, { period: '2026-10', ignored: true });
+    await click(button('Desfazer ignorar do mês', review)); await flush();
+    assert.deepEqual(calls.filter(call => call.url.endsWith('/ignore')).at(-1)?.body, { period: '2026-10', ignored: false });
   });
   it('exige um produto para Pix avulso e envia fallbackProductId', async () => {
     periods.find(period => period.period === '2026-10')!.available.withoutItems = 1;

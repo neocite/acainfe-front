@@ -12,6 +12,7 @@ export function PastSalesPeriodCard({
   const available = period.available;
   const excluded = [
     period.alreadyIssued > 0 && `${period.alreadyIssued} já emitidas em outro sistema`,
+    (period.ignored ?? 0) > 0 && `${period.ignored} ignoradas`,
     period.imported > 0 && `${period.imported} já importadas`,
     period.refunded > 0 && `${period.refunded} estornadas (não entram)`,
   ].filter(Boolean);

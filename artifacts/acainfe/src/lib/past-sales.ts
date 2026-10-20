@@ -3,18 +3,24 @@ import { api, ApiError } from './api';
 export type PastSalesPeriod = {
   period: string; isCurrentMonth: boolean; requiresConfirmation: boolean;
   available: { count: number; totalCents: number; withoutItems: number };
-  alreadyIssued: number; imported: number; refunded: number;
+  alreadyIssued: number; imported: number; refunded: number; ignored?: number;
 };
 export type PastSalesPreview = { periods?: PastSalesPeriod[]; warning?: string };
 export type PastSale = {
   id: string; paidAt: string; amountCents: number;
-  customer?: { name?: string } | null; status: 'AVAILABLE' | 'ALREADY_ISSUED';
+  customer?: { name?: string } | null; status: 'AVAILABLE' | 'ALREADY_ISSUED' | 'IGNORED';
+  ignoredReason?: string | null;
 };
 export type PastSalesResult = {
   issued: number; held: number; skippedWithoutProduct: number; failed: { message: string }[];
 };
 export type SaleProduct = { id: string; name: string };
+export type DefaultProductDecision = { decided: boolean; productId: string | null };
+export type DefaultProductOptions = DefaultProductDecision & {
+  suggestedProductId?: string | null; options: SaleProduct[];
+};
 export type AbacatePayConnection = {
+  defaultProduct?: DefaultProductOptions;
   imported: number; pendingTaxReview?: SaleProduct[]; pastSales?: PastSalesPreview;
   confirmedByProfile?: SaleProduct[]; skippedTestProducts?: string[];
   mergedDuplicates?: { name: string; externalId: string; productId: string }[];
@@ -39,12 +45,17 @@ export async function getPastSales(base: string): Promise<PastSalesPreview> {
   if (!Array.isArray(data.periods) && typeof data.warning !== 'string') throw new Error('A API não retornou a lista de vendas passadas.');
   return data;
 }
-export async function getPastSalesItems(base: string, period: string): Promise<PastSale[]> {
+export async function getPastSalesItems(base: string, period: string, status = 'AVAILABLE,ALREADY_ISSUED,IGNORED'): Promise<PastSale[]> {
   periodLabel(period);
-  const data = await api<PastSale[] | { items: PastSale[] }>(`${base}/past-sales/items?${new URLSearchParams({ period, status: 'AVAILABLE,ALREADY_ISSUED' })}`);
+  const data = await api<PastSale[] | { items: PastSale[] }>(`${base}/past-sales/items?${new URLSearchParams({ period, status })}`);
   const items = Array.isArray(data) ? data : data.items;
   if (!Array.isArray(items)) throw new Error('A API não retornou os itens de vendas.');
-  return items.filter(item => item.status === 'AVAILABLE' || item.status === 'ALREADY_ISSUED');
+  return items.filter(item => item.status === 'AVAILABLE' || item.status === 'ALREADY_ISSUED' || item.status === 'IGNORED');
+}
+export function ignorePastSales(base: string, target: { ids: string[] } | { period: string }, ignored: boolean, reason?: string) {
+  if ('period' in target) periodLabel(target.period);
+  const text = reason?.trim();
+  return api(`${base}/past-sales/ignore`, 'POST', { ...target, ignored, ...(ignored && text ? { reason: text } : {}) });
 }
 export function markPastSales(base: string, target: { ids: string[] } | { period: string }, alreadyIssued: boolean) {
   return api(`${base}/past-sales/mark`, 'POST', { ...target, alreadyIssued });

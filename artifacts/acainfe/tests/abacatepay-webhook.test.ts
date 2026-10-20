@@ -63,6 +63,8 @@ describe('AbacatePay: gestão do webhook', () => {
         body: init?.body === undefined ? undefined : String(init.body),
         contentType: (init?.headers as Record<string, string> | undefined)?.['Content-Type'],
       });
+      if (String(url).endsWith('/products')) return new Response('{"items":[{"id":"product-1","name":"Curso"}]}', { headers: { 'content-type': 'application/json' } });
+      if (String(url).endsWith('/default-product') && responseStatus < 400) return new Response(JSON.stringify({ defaultProduct: { decided: true, productId: JSON.parse(String(init?.body)).productId } }), { headers: { 'content-type': 'application/json' } });
       const payload = responseStatus >= 400 ? { message: responseMessage } : responseData;
       return new Response(JSON.stringify(payload), { status: responseStatus, headers: { 'content-type': 'application/json' } });
     };
@@ -80,9 +82,9 @@ describe('AbacatePay: gestão do webhook', () => {
     webhookEndpoint: 'https://hooks.example.test/current',
     webhookUpToDate: false as boolean | null,
   };
-  async function mount(integration: typeof connected | { connected: boolean; connectedAt?: string | null; webhookEndpoint?: string | null; webhookUpToDate?: boolean | null } = connected) {
+  async function mount(integration: typeof connected | { connected: boolean; connectedAt?: string | null; webhookEndpoint?: string | null; webhookUpToDate?: boolean | null } = connected, defaultProduct?: { decided: boolean; productId: string | null }, chooseToken = 0) {
     await act(async () => root.render(createElement(Component, {
-      base, integration, onReconnect: () => { reconnects++; },
+      base, integration, defaultProduct, chooseToken, onReconnect: () => { reconnects++; },
       onUnauthorized: () => { unauthorized++; }, onRefresh: async () => { refreshed++; },
     })));
   }
@@ -145,18 +147,42 @@ describe('AbacatePay: gestão do webhook', () => {
     assert.ok(container.textContent?.includes('AbacatePay não conectado'));
     await click('Conectar AbacatePay', container);
     assert.equal(reconnects, 1);
-    assert.equal(calls.length, 0);
+    assert.equal(calls.filter(call => call.method === 'POST').length, 0);
   });
 
+  it('mostra produto por nome, altera para nenhum e atualiza o painel', async () => {
+    await mount(connected, { decided: true, productId: 'product-1' });
+    assert.ok(container.textContent?.includes('Curso'));
+    await click('Alterar', container);
+    assert.equal(dialog().querySelector<HTMLInputElement>('input[value="product-1"]')?.checked, true);
+    await act(async () => dialog().querySelector<HTMLInputElement>('input[value="__none__"]')!.click());
+    await act(async () => dialog().querySelector('form')!.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true })));
+    assert.deepEqual(calls.find(call => call.method === 'PUT'), {
+      path: `/api${base}/abacatepay/default-product`, method: 'PUT', body: '{"productId":null}', contentType: 'application/json',
+    });
+    assert.equal(refreshed, 1);
+    assert.equal(document.querySelector('[role="dialog"]'), null);
+  });
+  it('pendência abre a mesma escolha e não esconde falha de salvar', async () => {
+    await mount(connected, { decided: false, productId: null }, 0);
+    assert.ok(container.textContent?.includes('Pendente'));
+    await mount(connected, { decided: false, productId: null }, 1);
+    assert.ok(dialog().textContent?.includes('Quando um pagamento chegar sem produto'));
+    responseStatus = 422; responseMessage = 'Produto não pertence à empresa';
+    await act(async () => dialog().querySelector<HTMLInputElement>('input[value="product-1"]')!.click());
+    await act(async () => dialog().querySelector('form')!.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true })));
+    assert.ok(dialog().textContent?.includes('Produto não pertence à empresa'));
+    assert.equal(refreshed, 0);
+  });
   it('pede confirmação antes de enviar POST vazio e avisa qual webhook antigo apagar', async () => {
     await mount();
     await click('Recriar webhook', container);
     assert.ok(dialog().textContent?.includes('Vamos criar um webhook novo no AbacatePay apontando para o endereço atual do açaínfe. O antigo deixa de funcionar.'));
     await click('Cancelar', dialog());
-    assert.equal(calls.length, 0);
+    assert.equal(calls.filter(call => call.method === 'POST').length, 0);
     await click('Recriar webhook', container);
     await click('Confirmar e criar webhook', dialog());
-    assert.deepEqual(calls, [{
+    assert.deepEqual(calls.filter(call => call.method === 'POST'), [{
       path: `/api${base}/abacatepay/webhook`, method: 'POST', body: undefined, contentType: undefined,
     }]);
     assert.equal(refreshed, 1);
@@ -181,8 +207,8 @@ describe('AbacatePay: gestão do webhook', () => {
     await fillApiKey('test-key-do-not-store');
     responseStatus = 200; responseMessage = '';
     await click('Recriar webhook', dialog());
-    assert.deepEqual(calls.map(call => call.body), [undefined, '{"apiKey":"test-key-do-not-store"}']);
-    assert.ok(calls.every(call => call.path === `/api${base}/abacatepay/webhook` && call.method === 'POST'));
+    assert.deepEqual(calls.filter(call => call.method === 'POST').map(call => call.body), [undefined, '{"apiKey":"test-key-do-not-store"}']);
+    assert.ok(calls.filter(call => call.method === 'POST').every(call => call.path === `/api${base}/abacatepay/webhook`));
     assert.equal(container.querySelector('#abacatepay-webhook-api-key'), null);
     assert.equal(refreshed, 1);
     assert.ok(container.textContent?.includes('Webhook novo criado.'));

@@ -34,7 +34,7 @@ import '../mcp-keys.css';
 type User = AuthUser;
 type CompanyStatus = CompanyProfile & {
   tenant: { id: string; cnpj?: string; taxRegime?: string; municipalRegistration?: string | null; simplesNacionalTaxRateBps?: number | null; status?: string; integrations?: { abacatepay?: boolean }; certificateExpiresAt?: string; accountant?: unknown; businessType?: string | null; issRateBps?: number | null; environment?: string; approximateTaxes?: ApproximateTaxes | null };
-  abacatepay?: { connected: boolean; connectedAt?: string | null; webhookEndpoint?: string | null; webhookUpToDate?: boolean | null };
+  abacatepay?: { connected: boolean; connectedAt?: string | null; webhookEndpoint?: string | null; webhookUpToDate?: boolean | null; defaultProduct?: { decided: boolean; productId: string | null } };
   emission?: Emission;
   approximateTaxes?: ApproximateTaxes | null;
   company?: { legalName?: string; tradeName?: string; cityName?: string; uf?: string };
@@ -108,6 +108,7 @@ export default function Onboarding() {
   const [mcpRevision, setMcpRevision] = useState(0);
   const [client, setClient] = useState('code');
   const [billing, setBilling] = useState<Billing | null>(null);
+  const [chooseToken, setChooseToken] = useState(0);
   const [pix, setPix] = useState<Pix | null>(null);
   const id = status?.tenant.id;
   const base = `/app/companies/${encodeURIComponent(id || '')}`;
@@ -277,6 +278,8 @@ export default function Onboarding() {
        <AbacatePayWebhookCard
          base={base}
          integration={status.abacatepay}
+         defaultProduct={status.abacatepay?.defaultProduct}
+         chooseToken={chooseToken}
          onReconnect={() => { setStep(4); setView('wizard'); }}
          onUnauthorized={handleError}
          onRefresh={refreshPanel}
@@ -284,14 +287,16 @@ export default function Onboarding() {
        <McpKeysSection key={base} base={base} variant="panel" refreshToken={mcpRevision} onUnauthorized={handleError}
          onGenerate={prepareMcpKey} onRevoked={handleMcpRevoked} />
        {status.readiness.missing.length > 0 && <div className="app-notice"><h3>O que falta para emitir</h3><ul>{status.readiness.missing.map(m => <li key={m.field}>{m.message}</li>)}</ul><button className="app-secondary" onClick={() => { setStep(3); setView('wizard'); }}>Completar dados</button></div>}
-       {recommended.length > 0 && <section className="company-recommendations" aria-labelledby="recommendations-title"><h3 id="recommendations-title">Complete quando puder</h3><p>Esses dados são recomendados e não impedem a emissão.</p><ul>{recommended.map(item => <li key={item.field}><span>{item.message}</span>{isOptionalCompanyField(item.field) ? <button className="app-secondary" type="button" disabled={busy} onClick={() => setEditingRecommendation({ ...item, field: item.field as OptionalCompanyField })}>Informar<span className="sr-only"> {item.field === 'municipalRegistration' ? 'CCM' : 'alíquota do Simples'}</span></button> : item.field === 'approximateTaxes' ? <button type="button" className="app-secondary" onClick={() => setView('fiscal')}>Conferir tributos</button> : null}</li>)}</ul></section>}
+       {recommended.length > 0 && <section className="company-recommendations" aria-labelledby="recommendations-title"><h3 id="recommendations-title">Complete quando puder</h3><p>Esses dados são recomendados e não impedem a emissão.</p><ul>{recommended.map(item => <li key={item.field}><span>{item.message}</span>{isOptionalCompanyField(item.field) ? <button className="app-secondary" type="button" disabled={busy} onClick={() => setEditingRecommendation({ ...item, field: item.field as OptionalCompanyField })}>Informar<span className="sr-only"> {item.field === 'municipalRegistration' ? 'CCM' : 'alíquota do Simples'}</span></button> : item.field === 'defaultProduct' ? <button type="button" className="app-secondary" onClick={() => setChooseToken(t => t + 1)}>Escolher produto</button> : item.field === 'approximateTaxes' ? <button type="button" className="app-secondary" onClick={() => setView('fiscal')}>Conferir tributos</button> : null}</li>)}</ul></section>}
       {(accountantSkipped || !status.tenant.accountant) && <div className="app-notice"><h3>Seu contador já está por aqui?</h3><p>Cadastre um contato para receber os PDFs, XMLs e a planilha automaticamente todo dia 1.</p><button className="app-secondary" onClick={() => { setStep(3.1); setView('wizard'); }}>Adicionar contador</button></div>}<button className="app-secondary" onClick={refreshPanel} disabled={busy}>Atualizar status</button></>}</section>
       : <div className="wizard-layout"><aside className="wizard-aside"><span className="app-eyebrow">SÓ PRECISA CONFIGURAR UMA VEZ</span><h1>Vamos deixar<br />tudo <em>prontinho.</em></h1><p>Alguns passos agora.<br />Menos trabalho em cada venda.</p><ol>{steps.map((label, i) => <li key={label} className={Math.floor(step) === i + 1 ? 'current' : step > i + 1 ? 'complete' : ''}><span>{step > i + 1 ? <Check size={16} /> : String(i + 1).padStart(2, '0')}</span>{label}</li>)}</ol><div className="aside-secure"><ShieldCheck size={20} /><span>Seus dados protegidos.<br />Sua empresa no controle.</span></div></aside>
       <section className="app-card wizard-card"><div className="progress-label"><span>ETAPA {Math.floor(step)} DE 5</span><span>{Math.round(Math.floor(step) / 5 * 100)}%</span></div><div className="app-progress"><span style={{ width: `${Math.floor(step) * 20}%` }} /></div>
       {errorBox}
       {step === 4 ? <AbacatePayStep key={base} base={base} onConnected={connection => {
         setProducts(connection.pendingTaxReview || []);
-        setStatus(current => current ? { ...current, tenant: { ...current.tenant, integrations: { ...current.tenant.integrations, abacatepay: true } } } : current);
+        setStatus(current => current ? { ...current,
+          abacatepay: { ...current.abacatepay, connected: true, defaultProduct: connection.defaultProduct },
+          tenant: { ...current.tenant, integrations: { ...current.tenant.integrations, abacatepay: true } } } : current);
       }} onContinue={() => setStep(5)} onUnauthorized={handleError} /> : <ValidationContext.Provider value={fieldErrors}><form onSubmit={submit}>
         {step === 1 && <><div className="step-icon"><Leaf /></div><h2>Primeiro, você.</h2><p>Como podemos te chamar? Vamos usar seu WhatsApp para avisos importantes sobre suas notas.</p><Field label="E-mail da sua conta"><input type="email" value={user.email} readOnly className="readonly" /></Field><Field label="Seu nome"><input value={name} onChange={e => setName(e.target.value)} autoComplete="name" required placeholder="Como você gosta de ser chamado?" /></Field><Field label="WhatsApp com DDD"><input value={phone} onChange={e => setPhone(phoneMask(e.target.value))} inputMode="tel" autoComplete="tel" required placeholder="(11) 99999-9999" /></Field></>}
         {step === 2 && <><div className="step-icon"><FileKey /></div><h2>Seu certificado A1.</h2><p>É o mesmo certificado que você usa para emitir notas ou acessar o e-CAC. Ele fica guardado criptografado e serve para assinar suas notas.</p><Field label="Arquivo do certificado" help="Formatos .pfx ou .p12, até 10 MB."><div className="upload-box"><FileKey size={28} /><strong>{file ? file.name : 'Selecione seu certificado'}</strong><input type="file" accept=".pfx,.p12" required onChange={e => { const f = e.target.files?.[0]; if (f && f.size > 10 * 1024 * 1024) { setError('O certificado deve ter até 10 MB.'); e.target.value = ''; setFile(null); } else setFile(f || null); }} /></div></Field><Field label="Senha do certificado"><input type="password" autoComplete="off" value={password} onChange={e => setPassword(e.target.value)} required placeholder="A senha do seu arquivo A1" /></Field><div className="secure-note"><ShieldCheck size={17} /> Enviado com segurança. Nunca fica salvo no navegador.</div></>}
