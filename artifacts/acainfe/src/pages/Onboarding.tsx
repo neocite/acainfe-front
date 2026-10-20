@@ -1,14 +1,16 @@
 import * as React from 'react';
 import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'wouter';
-import { ArrowRight, ArrowLeft, Check, ShieldCheck, FileKey, Sparkles, Copy, CheckCheck, LogOut, Loader2, Wallet, Building2, AlertTriangle, Leaf, Mail } from 'lucide-react';
+import { ArrowRight, ArrowLeft, Check, ShieldCheck, FileKey, Sparkles, Bot, LogOut, Loader2, Wallet, Building2, AlertTriangle, Leaf, Mail } from 'lucide-react';
 import { api, ApiError, phoneMask } from '../lib/api';
 import { isOptionalCompanyField, onboardingCompanyPatch, simplesRateInput, municipalRegistrationHelp, type ReadinessItem, type OptionalCompanyField } from '../lib/company-details';
 import { CompanyRecommendationDialog } from '../components/CompanyRecommendationDialog';
 import { AbacatePayStep } from '../components/AbacatePayStep';
 import { AbacatePayWebhookCard } from '../components/AbacatePayWebhookCard';
 import { FiscalCompanyFields } from '../components/FiscalCompanyFields';
-import { McpKeysSection } from '../components/McpKeysSection';
+import { AiAgents } from '../components/AiAgents';
+import { OnboardingAssistant } from '../components/OnboardingAssistant';
+import { CopyButton } from '../components/CopyButton';
 import { CompanyCard, TestEnvironmentNotice } from '../components/CompanyCard';
 import { ApproximateTaxesFields } from '../components/ApproximateTaxesFields';
 import { FiscalSettings } from '../components/FiscalSettings';
@@ -16,8 +18,6 @@ import { approximateTaxInputs, approximateTaxPatch, isTestEnvironment, type Appr
 import { mergeCompanyProfile, companyStatusLabel, certificateExpiryLabel, type CompanyProfile } from '../lib/company-profile';
 import { fiscalCompanyPatch } from '../lib/fiscal-profiles';
 import { bpsToPercent } from '../lib/numbers';
-import { hermesMcpCommand } from '../lib/hermes-mcp';
-import { createMcpKey, type GeneratedMcpKey } from '../lib/mcp-keys';
 import { isAuthUser, type AuthUser } from '../lib/auth';
 import { onboardingEntry } from '../lib/onboarding-entry';
 import { brl } from '../config/pricing';
@@ -55,20 +55,6 @@ const fieldNames: Record<string, string> = {
   'Regime da empresa': 'taxRegime', 'Sua API key do AbacatePay': 'apiKey',
 };
 function Brand() { return <Link href="/" className="app-brand">açaínfe<span className="brand-dot" /></Link>; }
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  const [error, setError] = useState(false);
-  const resetTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (resetTimer.current !== null) clearTimeout(resetTimer.current); }, []);
-  return <button className="copy-button" type="button" onClick={async () => {
-    try {
-      await navigator.clipboard.writeText(text); setCopied(true); setError(false);
-      if (resetTimer.current !== null) clearTimeout(resetTimer.current);
-      resetTimer.current = setTimeout(() => setCopied(false), 2000);
-    }
-    catch { setError(true); }
-  }}>{copied ? <CheckCheck size={16} /> : <Copy size={16} />}{error ? 'Selecione e copie' : copied ? 'Copiado!' : 'Copiar'}</button>;
-}
 function Field({ label, help, children }: { label: string; help?: string; children: ReactNode }) {
   const errors = useContext(ValidationContext);
   const error = errors[fieldNames[label] || label];
@@ -84,7 +70,7 @@ export default function Onboarding() {
   const [editingRecommendation, setEditingRecommendation] = useState<(ReadinessItem & { field: OptionalCompanyField }) | null>(null);
   const [status, setStatus] = useState<CompanyStatus | null>(null);
   const [step, setStep] = useState(1);
-  const [view, setView] = useState<'wizard' | 'panel' | 'billing' | 'fiscal'>('wizard');
+  const [view, setView] = useState<'wizard' | 'panel' | 'billing' | 'fiscal' | 'agents'>('wizard');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [file, setFile] = useState<File | null>(null);
@@ -103,32 +89,12 @@ export default function Onboarding() {
   const [accountant, setAccountant] = useState({ name: '', email: '', whatsapp: '' });
   const [accountantSkipped, setAccountantSkipped] = useState(false);
   const [products, setProducts] = useState<{ id: string; name: string }[]>([]);
-  const [mcp, setMcp] = useState<GeneratedMcpKey | null>(null);
-  const [mcpLabel, setMcpLabel] = useState('');
-  const [mcpRevision, setMcpRevision] = useState(0);
-  const [client, setClient] = useState('code');
   const [billing, setBilling] = useState<Billing | null>(null);
   const [chooseToken, setChooseToken] = useState(0);
   const [pix, setPix] = useState<Pix | null>(null);
   const id = status?.tenant.id;
   const base = `/app/companies/${encodeURIComponent(id || '')}`;
 
-  useEffect(() => { setMcp(null); setMcpLabel(''); }, [id]);
-  useEffect(() => { if (view !== 'wizard' || step !== 5) setMcp(null); }, [view, step]);
-  function prepareMcpKey() {
-    setMcp(null); setMcpLabel(''); setStep(5); setView('wizard');
-  }
-  function handleMcpRevoked(ids?: string[]) {
-    setMcp(current => current && (!ids || !current.key || ids.includes(current.key.id)) ? null : current);
-  }
-  async function generateMcpKey() {
-    await run(async () => {
-      const generated = await createMcpKey(base, mcpLabel);
-      setMcp(generated);
-      setMcpLabel('');
-      setMcpRevision(revision => revision + 1);
-    });
-  }
   function applyStatus(s: CompanyStatus) {
     setStatus(previous => mergeCompanyProfile(previous, s));
     setRegime(s.tenant.taxRegime || 'SIMPLES_NACIONAL');
@@ -211,7 +177,6 @@ export default function Onboarding() {
   }, [id, step]);
 
   async function refreshPanel() {
-    setMcpRevision(revision => revision + 1);
     await run(async () => { const s = await api<CompanyStatus>(base); applyStatus(s); });
   }
   async function submit(event: FormEvent) {
@@ -264,12 +229,20 @@ export default function Onboarding() {
         <small>Login seguro via Replit Auth. Escolha Google na próxima tela.</small><div className="login-divider" /><div className="login-check"><Check size={16} /> Sem cartão de crédito</div><div className="login-check"><Check size={16} /> Seu certificado protegido</div><div className="login-check"><Check size={16} /> Você só paga por nota emitida</div>
       </section></main><div className="login-footer">açaínfe — seu negócio vende. a gente cuida da nota.</div></div>;
 
-  return <div className="onboarding-page"><header className="app-header"><Brand /><div className="app-account"><span>{user.name || user.email}</span><button title="Sair" onClick={() => run(async () => { await api('/logout', 'POST'); setMcp(null); setUser(null); setStatus(null); })}><LogOut size={18} /></button></div></header>
+  return <div className="onboarding-page"><header className="app-header"><Brand /><div className="app-account"><span>{user.name || user.email}</span><button title="Sair" onClick={() => run(async () => { await api('/logout', 'POST'); setUser(null); setStatus(null); })}><LogOut size={18} /></button></div></header>
     {billing?.status === 'BLOCKED' && <div className="blocked-banner" role="alert">Emissão pausada por saldo em aberto. A emissão de nota fiscal é obrigatória: enquanto estiver pausada, você pode ficar em desacordo com a legislação. Suas vendas continuam registradas e as notas saem automaticamente assim que o pagamento for confirmado. <button onClick={() => setView('billing')}>Pagar saldo</button></div>}
     <div className="app-body">
-      {id && !isWaitlist && <nav className="app-tabs" aria-label="Área da empresa"><button className={view === 'wizard' ? 'active' : ''} onClick={() => setView('wizard')}><Sparkles size={16} /> Configuração</button><button className={view === 'panel' ? 'active' : ''} onClick={() => { setView('panel'); void refreshPanel(); }}><Building2 size={16} /> Painel</button><button className={view === 'fiscal' ? 'active' : ''} onClick={() => setView('fiscal')}><FileKey size={16} /> Dados fiscais</button><button className={view === 'billing' ? 'active' : ''} onClick={() => { setView('billing'); void run(async () => setBilling(await api(`${base}/billing`))); }}><Wallet size={16} /> Saldo</button></nav>}
+      {id && !isWaitlist && <nav className="app-tabs" aria-label="Área da empresa"><button className={view === 'wizard' ? 'active' : ''} title="Certificado, dados da empresa e revisão de vendas passadas" onClick={() => setView('wizard')}><Sparkles size={16} /> Configuração</button><button className={view === 'panel' ? 'active' : ''} onClick={() => { setView('panel'); void refreshPanel(); }}><Building2 size={16} /> Painel</button><button className={view === 'fiscal' ? 'active' : ''} onClick={() => setView('fiscal')}><FileKey size={16} /> Dados fiscais</button><button className={view === 'billing' ? 'active' : ''} onClick={() => { setView('billing'); void run(async () => setBilling(await api(`${base}/billing`))); }}><Wallet size={16} /> Saldo</button><button className={view === 'agents' ? 'active' : ''} onClick={() => setView('agents')}><Bot size={16} /> Agentes de IA</button></nav>}
+      {id && !isWaitlist && view === 'wizard' && <p className="app-tabs-note">Configuração é onde ficam o envio do certificado, a edição dos dados da empresa e a revisão de vendas passadas.</p>}
+      {id && !isWaitlist && view === 'wizard' && status && onboardingEntry(status).view === 'panel' && <label className="app-field configuration-review">Revisar configuração
+        <select value={step} disabled={busy} onChange={event => setStep(Number(event.target.value))}>
+          <option value={1}>Seus dados</option><option value={2}>Certificado A1</option><option value={3}>Sua empresa</option>
+          <option value={3.1}>Contador</option><option value={4}>AbacatePay e vendas antigas</option><option value={5}>Primeira chave do assistente</option>
+        </select>
+      </label>}
       {isTestEnvironment(status?.emission, status?.tenant.environment) && <TestEnvironmentNotice environment="HOMOLOGATION" />}
       {isWaitlist ? <section className="app-card waitlist"><div className="login-icon"><Mail size={30} /></div><span className="app-eyebrow">VOCÊ JÁ ESTÁ NA LISTA</span><h1>Sua cidade é o<br />nosso próximo passo.</h1><CompanyCard status={status!} /><p>{status?.availability.reason || 'Sua cidade ainda não está liberada. Vamos te avisar por e-mail e WhatsApp assim que estiver tudo pronto.'}</p><p>Por enquanto, atendemos São Bernardo do Campo/SP, para Simples Nacional e MEI.</p>{errorBox}<button className="app-secondary" onClick={refreshPanel} disabled={busy}>Verificar disponibilidade</button></section>
+      : view === 'agents' ? <AiAgents key={base} base={base} onUnauthorized={handleError} />
       : view === 'fiscal' ? <FiscalSettings key={base} base={base} onUnauthorized={handleError} onChanged={() => { void refreshPanel(); }} />
       : view === 'billing' ? <section className="app-card"><span className="app-eyebrow">SEM MENSALIDADE. SEM SURPRESA.</span><h1>Seu saldo.</h1>{errorBox}{billing ? <><div className="balance-value">{brl(billing.amountDueCents)}</div><p>Você tem <strong>{brl(billing.openCents)}</strong> em aberto ({billing.openCharges} notas).{billing.blocksAt && <> Pague até <strong>{new Date(billing.blocksAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</strong> para manter a emissão ativa.</>}</p>{billing.overdue && <p className="danger-text">O pagamento está atrasado.</p>}{billing.creditCents > 0 && <div className="app-success">Você tem {brl(billing.creditCents)} de crédito para as próximas notas.</div>}<p className="app-muted">Cada nota custa {brl(billing.pricePerInvoiceCents)}. O saldo é avisado todo dia por e-mail e WhatsApp. Pix mínimo de R$ 1,00; a sobra vira crédito.</p>
       <button className="app-primary" disabled={busy || billing.amountDueCents <= 0} onClick={() => run(async () => setPix(await api(`${base}/billing/payments`, 'POST')))}>{busy ? <Loader2 className="spin" size={17} /> : <Wallet size={17} />} {billing.amountDueCents > 0 ? 'Pagar com Pix' : 'Tudo em dia'}</button>
@@ -284,8 +257,6 @@ export default function Onboarding() {
          onUnauthorized={handleError}
          onRefresh={refreshPanel}
        />
-       <McpKeysSection key={base} base={base} variant="panel" refreshToken={mcpRevision} onUnauthorized={handleError}
-         onGenerate={prepareMcpKey} onRevoked={handleMcpRevoked} />
        {status.readiness.missing.length > 0 && <div className="app-notice"><h3>O que falta para emitir</h3><ul>{status.readiness.missing.map(m => <li key={m.field}>{m.message}</li>)}</ul><button className="app-secondary" onClick={() => { setStep(3); setView('wizard'); }}>Completar dados</button></div>}
        {recommended.length > 0 && <section className="company-recommendations" aria-labelledby="recommendations-title"><h3 id="recommendations-title">Complete quando puder</h3><p>Esses dados são recomendados e não impedem a emissão.</p><ul>{recommended.map(item => <li key={item.field}><span>{item.message}</span>{isOptionalCompanyField(item.field) ? <button className="app-secondary" type="button" disabled={busy} onClick={() => setEditingRecommendation({ ...item, field: item.field as OptionalCompanyField })}>Informar<span className="sr-only"> {item.field === 'municipalRegistration' ? 'CCM' : 'alíquota do Simples'}</span></button> : item.field === 'defaultProduct' ? <button type="button" className="app-secondary" onClick={() => setChooseToken(t => t + 1)}>Escolher produto</button> : item.field === 'approximateTaxes' ? <button type="button" className="app-secondary" onClick={() => setView('fiscal')}>Conferir tributos</button> : null}</li>)}</ul></section>}
       {(accountantSkipped || !status.tenant.accountant) && <div className="app-notice"><h3>Seu contador já está por aqui?</h3><p>Cadastre um contato para receber os PDFs, XMLs e a planilha automaticamente todo dia 1.</p><button className="app-secondary" onClick={() => { setStep(3.1); setView('wizard'); }}>Adicionar contador</button></div>}<button className="app-secondary" onClick={refreshPanel} disabled={busy}>Atualizar status</button></>}</section>
@@ -312,26 +283,9 @@ export default function Onboarding() {
           {status?.readiness.missing.filter(m => !['numbering', 'businessType', 'issRateBps', 'municipalRegistration', 'approximateTaxes', 'simplesNacionalTaxRateBps'].includes(m.field)).map(m => <p className="app-notice" key={m.field}>{m.message}</p>)}
         </>}
         {step === 3.1 && <><div className="step-icon"><Mail /></div><span className="app-eyebrow">UM EXTRA QUE FACILITA A VIDA</span><h2>Quem é seu contador?</h2><p>Todo mês o seu contador precisa das notas emitidas. A gente manda <strong>automaticamente, todo dia 1</strong>, por e-mail e WhatsApp: os PDFs, os XMLs e a planilha no formato necessário para ele. Você não precisa lembrar de nada.</p><Field label="Nome do contador ou escritório (opcional)"><input value={accountant.name} onChange={e => setAccountant({ ...accountant, name: e.target.value })} /></Field><Field label="E-mail do contador"><input type="email" value={accountant.email} onChange={e => setAccountant({ ...accountant, email: e.target.value })} /></Field><Field label="WhatsApp do contador" help="Precisamos de pelo menos um dos dois contatos."><input inputMode="tel" value={accountant.whatsapp} placeholder="(11) 99999-9999" onChange={e => setAccountant({ ...accountant, whatsapp: phoneMask(e.target.value) })} /></Field><button type="button" className="text-button" disabled={busy} onClick={() => { setAccountantSkipped(true); setStep(status?.tenant.integrations?.abacatepay ? 5 : 4); }}>Não tenho contador agora</button></>}
-        {step === 5 && <><div className="step-icon"><Sparkles /></div><h2>Seu assistente<br />assume daqui.</h2><p>Emita, consulte, reenvie e cancele notas conversando. Conecte o açaínfe ao Claude ou a outro cliente MCP.</p>{products.length > 0 && <div className="app-notice">{products.length} produtos aguardam a definição do código de serviço. O assistente te ajuda no próximo passo.</div>}
-          {!mcp ? <><Field label="Nome da chave (opcional)" help="Até 60 caracteres. Exemplo: Claude Code do notebook."><input value={mcpLabel} maxLength={60} disabled={busy} onChange={event => setMcpLabel(event.target.value)} /></Field><button type="button" className="app-primary" disabled={busy} onClick={() => void generateMcpKey()}>{busy ? <Loader2 className="spin" size={18} /> : <Sparkles size={18} />}Gerar minha chave</button></> : <><div className="app-notice"><strong>Guarde esta chave: ela é exibida uma única vez e não será exibida de novo.</strong><p>Não compartilhe sua chave nem capturas desta tela. Ela não será salva no navegador.</p></div><Field label="Sua chave MCP"><div className="copy-field"><code>{mcp.apiKey}</code><CopyButton text={mcp.apiKey} /></div></Field><Field label="URL do servidor MCP"><div className="copy-field"><code>{mcp.mcpUrl}</code><CopyButton text={mcp.mcpUrl} /></div></Field>
-            <div className="mcp-tabs" style={{ flexWrap: 'wrap' }}><button type="button" aria-pressed={client === 'code'} className={client === 'code' ? 'active' : ''} onClick={() => setClient('code')}>Claude Code</button><button type="button" aria-pressed={client === 'hermes'} className={client === 'hermes' ? 'active' : ''} onClick={() => setClient('hermes')}>Hermes (CLI)</button><button type="button" aria-pressed={client === 'desktop'} className={client === 'desktop' ? 'active' : ''} onClick={() => setClient('desktop')}>Claude Desktop / outros</button></div>
-            {client === 'code' ? <><p>Cole este comando no terminal:</p><div className="copy-field command"><code>{mcp.claudeCodeCommand}</code><CopyButton text={mcp.claudeCodeCommand} /></div></> : client === 'hermes' ? <section aria-label="Conectar ao Hermes via CLI">
-              <h3>Adicione o açaínfe ao Hermes</h3>
-              <p>Com o Hermes Agent instalado, abra o terminal do seu computador (Bash ou Zsh, no macOS/Linux).</p>
-              <ol>
-                <li><p>Adicione o servidor com autenticação por chave:</p><div className="copy-field command"><code>{hermesMcpCommand(mcp.mcpUrl)}</code><CopyButton text={hermesMcpCommand(mcp.mcpUrl)} /></div></li>
-                <li><p>Quando aparecer <code>API key / Bearer token</code>, cole somente sua chave MCP, sem escrever <code>Bearer</code>, e pressione Enter. A entrada fica oculta no terminal. Use o botão “Copiar” do campo “Sua chave MCP” acima.</p><p>Se já houver uma chave salva para esse servidor, o Hermes poderá reutilizá-la. Confirme a seleção das ferramentas que deseja habilitar.</p></li>
-                <li><p>Teste a conexão:</p><div className="copy-field command"><code>hermes mcp test acainfe</code><CopyButton text="hermes mcp test acainfe" /></div><p>Depois, abra uma nova sessão do Hermes para usar as ferramentas do açaínfe.</p></li>
-              </ol>
-              <p>O comando não inclui sua chave, para não deixá-la no histórico do terminal. O Hermes salva a credencial no perfil local dele; proteja esse arquivo e não o compartilhe.</p>
-              <a href="https://hermes-agent.nousresearch.com/docs/reference/cli-commands" target="_blank" rel="noopener noreferrer">Documentação oficial do Hermes</a>
-            </section> : <><p>Adicione um servidor MCP remoto com transporte <strong>Streamable HTTP</strong>, a URL acima e este header:</p><div className="copy-field"><code>Authorization: Bearer {mcp.apiKey}</code><CopyButton text={`Authorization: Bearer ${mcp.apiKey}`} /></div></>}
-            <div className="first-prompt"><Sparkles size={19} /><div><strong>Sua primeira conversa</strong><p>Use o prompt <code>configurar_empresa</code> ou diga: “quero definir a tributação dos meus produtos”.</p><CopyButton text="quero definir a tributação dos meus produtos" /></div></div><button type="button" disabled={busy} className="text-button" onClick={() => { if (confirm('Preparar uma nova chave? As anteriores continuam válidas. Copie sua chave atual antes de continuar.')) prepareMcpKey(); }}>Gerar outra chave (as anteriores continuam válidas)</button><button type="button" className="app-primary" onClick={() => { setMcp(null); setView('panel'); void refreshPanel(); }}>Ir para meu painel <ArrowRight size={18} /></button></>}
-        </>}
+        {step === 5 && id && <OnboardingAssistant key={base} base={base} products={products.length} onUnauthorized={handleError} onManage={() => setView('agents')} onDone={() => { setView('panel'); void refreshPanel(); }} />}
         {step !== 5 && <div className="form-actions">{step === 2 && <button type="button" className="app-secondary" onClick={() => setStep(1)} disabled={busy}><ArrowLeft size={16} /> Voltar</button>}<button className="app-primary" type="submit" disabled={busy || (!!error && error.includes('ACAINFE_APP_KEY'))}>{busy ? <><Loader2 className="spin" size={17} /> Salvando…</> : <>{step === 2 ? 'Enviar certificado' : step === 3 ? 'Continuar' : 'Salvar e continuar'}<ArrowRight size={17} /></>}</button></div>}
       </form></ValidationContext.Provider>}
-      {id && step === 5 && <McpKeysSection key={base} base={base} variant="onboarding"
-        refreshToken={mcpRevision} onUnauthorized={handleError} onGenerate={prepareMcpKey} onRevoked={handleMcpRevoked} />}
       </section></div>}
       <p className="app-bottom-note"><ShieldCheck size={14} /> Sem mensalidade. Não vendeu, não pagou.</p>
       {editingRecommendation && <CompanyRecommendationDialog base={base} item={editingRecommendation} onSaved={applyStatus} onClose={() => setEditingRecommendation(null)} onUnauthorized={handleError} />}

@@ -13,8 +13,26 @@ export type GeneratedMcpKey = {
   apiKey: string;
   mcpUrl: string;
   claudeCodeCommand: string;
+  jsonConfig?: string | Record<string, unknown>;
   key?: McpKeyItem;
 };
+export type McpConnection = {
+  mcpUrl: string;
+  keyPlaceholder: string;
+  authorizationHeader: string;
+  claudeCodeCommand: string;
+  jsonConfig: string | Record<string, unknown>;
+};
+
+export async function getMcpConnection(base: string): Promise<McpConnection> {
+  const result = await api<McpConnection>(`${base}/mcp-connection`);
+  if (!result || ['mcpUrl', 'keyPlaceholder', 'authorizationHeader', 'claudeCodeCommand'].some(field =>
+    typeof result[field as keyof McpConnection] !== 'string' || !result[field as keyof McpConnection]
+  ) || !(typeof result.jsonConfig === 'string' || (result.jsonConfig && typeof result.jsonConfig === 'object' && !Array.isArray(result.jsonConfig)))) {
+    throw new Error('A API não retornou as instruções de conexão MCP completas.');
+  }
+  return result;
+}
 
 export async function listMcpKeys(base: string): Promise<McpKeyItem[]> {
   const result = await api<{ items: McpKeyItem[] }>(`${base}/mcp-keys`);

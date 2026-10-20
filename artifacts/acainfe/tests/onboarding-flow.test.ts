@@ -71,6 +71,12 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
         ];
       } else if (path.endsWith('/billing')) data = { amountDueCents: 0 };
       else if (path.endsWith('/products?pendingTaxReview=true')) data = [];
+      else if (path.endsWith('/mcp-connection')) data = {
+        mcpUrl: 'https://example.test/mcp', keyPlaceholder: '<SUA_CHAVE>',
+        authorizationHeader: 'Authorization: Bearer <SUA_CHAVE>',
+        claudeCodeCommand: 'claude mcp add acainfe -H "Authorization: Bearer <SUA_CHAVE>"',
+        jsonConfig: { mcpServers: { acainfe: { url: 'https://example.test/mcp', headers: { Authorization: 'Bearer <SUA_CHAVE>' } } } },
+      };
       else if (path === '/api/app/companies/test-company/mcp-keys' && method === 'GET') {
         keyGets++; data = { items: keys };
       }
@@ -88,7 +94,8 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
         const key = { id: `key-${mcpRequests}`, label: body.label, last4: 'abcd', createdAt: '2026-10-19T12:00:00Z', createdVia: 'APP', legacy: false };
         keys = [key, ...keys];
         data = { apiKey: 'test-only-mcp-key', mcpUrl: 'https://example.test/mcp',
-          claudeCodeCommand: 'claude mcp add acainfe --transport http https://example.test/mcp', key };
+          claudeCodeCommand: 'claude mcp add acainfe --transport http https://example.test/mcp',
+          jsonConfig: {mcpServers:{acainfe:{url:'https://example.test/mcp',headers:{Authorization:'Bearer test-only-mcp-key'}}}}, key };
       }
       else if (path === '/api/app/companies/test-company/fiscal-settings' && method === 'GET') {
         fiscalRequests++;
@@ -305,7 +312,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
       await click(button('Claude Code'));
       assert.ok(container.textContent?.includes('claude mcp add acainfe'));
       assert.equal(container.querySelector('section[aria-label="Conectar ao Hermes via CLI"]'), null);
-      await click(button('Claude Desktop / outros'));
+      await click(button('Outro cliente MCP'));
       assert.ok(container.textContent?.includes('Authorization: Bearer test-only-mcp-key'));
       assert.equal(mcpRequests, 1);
     } finally {
@@ -317,10 +324,11 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     readyPanel();
     keys = [{ id: 'existing-key', label: 'Integração existente', last4: '1234', createdAt: '2026-10-19T12:00:00Z', createdVia: 'APP', legacy: false }];
     await mount();
-    assert.ok(container.textContent?.includes('Chaves do MCP'));
+    assert.equal(container.querySelector('.mcp-keys'), null);
+    await click(button('Agentes de IA'));
+    assert.ok(container.textContent?.includes('Chaves ativas'));
     assert.ok(container.textContent?.includes('Integração existente'));
     assert.equal(mcpRequests, 0);
-    await click(button('Gerar nova chave'));
     const label = [...container.querySelectorAll('label')].find(node => node.textContent?.includes('Nome da chave (opcional)'))!;
     const input = label.querySelector('input')!;
     assert.equal(input.maxLength, 60);
@@ -329,20 +337,20 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
       input.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
     });
     const beforeGets = keyGets;
-    await click(button('Gerar minha chave'));
+    await click(button('Gerar chave'));
     assert.deepEqual(generatedLabels, [{ label: 'Claude Code do notebook' }]);
     assert.ok(keyGets > beforeGets);
     const list = container.querySelector('.mcp-keys')!;
-    assert.ok(list.classList.contains('mcp-keys--onboarding'));
-    assert.ok(container.querySelector('.wizard-card')?.contains(list));
-    assert.ok(container.querySelector('.wizard-layout')?.contains(list));
+    assert.ok(list.classList.contains('mcp-keys--agents'));
+    assert.ok(container.querySelector('.ai-agents')?.contains(list));
+    assert.equal(container.querySelector('.wizard-layout'), null);
     assert.equal(list.querySelector('h3')?.textContent, 'Chaves ativas');
     assert.equal(list.textContent?.includes('Gerar nova chave'), false);
     assert.equal(list.closest('form'), null);
     assert.ok(list.textContent?.includes('Claude Code do notebook'));
     assert.ok(list.textContent?.includes('Integração existente'));
     assert.equal(list.textContent?.includes('test-only-mcp-key'), false);
-    assert.ok(container.textContent?.includes('não será exibida de novo'));
+    assert.ok(container.textContent?.includes('Guarde agora: ela não aparece de novo'));
     assert.equal(keyDeletes.length, 0);
     await click(button('Painel'));
     await click(button('Configuração'));
@@ -351,36 +359,61 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   });
   it('409 mantém a lista disponível e orienta revogar uma chave antiga', async () => {
     readyPanel(); generationError = true;
-    await mount(); await click(button('Gerar nova chave')); await click(button('Gerar minha chave'));
+    await mount(); await click(button('Agentes de IA')); await click(button('Gerar chave'));
     assert.ok(container.textContent?.includes('Limite de 10 chaves ativas.'));
     assert.ok(container.textContent?.includes('Revogue uma chave antiga'));
     assert.ok(container.querySelector('.mcp-keys'));
     assert.equal(container.textContent?.includes('test-only-mcp-key'), false);
   });
-  it('etapa 5 vazia usa o gerador acima e o painel mantém seus botões de geração', async () => {
+  it('etapa 5 vazia mostra só o gerador da primeira chave e Concluir abre o painel', async () => {
     readyPanel(); await mount();
-    const panelList = container.querySelector('.mcp-keys')!;
-    assert.equal(panelList.classList.contains('mcp-keys--onboarding'), false);
-    assert.equal(panelList.querySelector('h3')?.textContent, 'Chaves do MCP');
-    assert.equal([...panelList.querySelectorAll('button')].filter(node => node.textContent === 'Gerar nova chave').length, 2);
+    assert.equal(container.querySelector('.mcp-keys'), null);
     await click(button('Configuração'));
-    const list = container.querySelector('.mcp-keys')!;
     const card = container.querySelector('.wizard-card')!;
-    assert.ok(card.contains(list));
-    assert.equal(container.querySelectorAll('.mcp-keys').length, 1);
+    assert.equal(container.querySelector('.mcp-keys'), null);
     assert.ok(card.querySelector('form'));
-    assert.ok(list.textContent?.includes('Nenhuma chave ativa'));
-    assert.ok(list.textContent?.includes('Gere uma acima para conectar o assistente.'));
-    assert.equal(list.textContent?.includes('Gerar nova chave'), false);
     assert.ok(container.textContent?.includes('Gerar minha chave'));
     assert.ok(container.querySelector('.wizard-aside'));
-    await click(button('Painel'));
-    assert.ok(container.querySelector('.mcp-keys-generate'));
+    assert.equal(container.textContent?.includes('Revogar todas'), false);
+    await click(button('Concluir'));
+    assert.ok(container.textContent?.includes('Seu negócio, por aqui.'));
+    assert.equal(container.querySelector('.mcp-keys-generate'), null);
     assert.equal(container.querySelector('.mcp-keys--onboarding'), null);
     assert.equal(mcpRequests, 0);
   });
+  it('etapa 5 com chave existente não oferece gerar e leva ao gerenciamento', async () => {
+    readyPanel(); keys = [{id:'legacy-key',legacy:true}];
+    await mount(); await click(button('Configuração'));
+    assert.ok(container.textContent?.includes('Você já tem uma chave.'));
+    assert.equal(container.textContent?.includes('Gerar minha chave'),false);
+    assert.equal(container.querySelector('.mcp-keys'),null);
+    await click(button('Agentes de IA'));
+    assert.ok(container.querySelector('.ai-agents .mcp-keys'));
+    assert.equal(mcpRequests,0);
+  });
+  it('preenche e copia comandos localmente, sem gerar ou enviar a chave colada e sem guardá-la ao sair', async () => {
+    readyPanel(); await mount(); await click(button('Agentes de IA'));
+    assert.equal(mcpRequests,0);
+    const input = container.querySelector<HTMLInputElement>('.mcp-guide-paste input')!;
+    const secret = 'private-"key\\\\value';
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value')!.set!.call(input,secret);
+      input.dispatchEvent(new dom.window.Event('input',{bubbles:true}));
+    });
+    assert.ok(container.querySelector('.mcp-guide code')?.textContent?.includes(secret));
+    await click(button('Arquivo de configuração (JSON)'));
+    const json = JSON.parse(container.querySelector('.mcp-guide pre')!.textContent!);
+    assert.equal(json.mcpServers.acainfe.headers.Authorization,`Bearer ${secret}`);
+    assert.equal(dom.window.localStorage.length,0);
+    assert.equal(dom.window.sessionStorage.length,0);
+    assert.equal(mcpRequests,0);
+    await click(button('Painel')); await click(button('Agentes de IA'));
+    assert.equal(container.querySelector<HTMLInputElement>('.mcp-guide-paste input')!.value,'');
+    assert.equal(container.textContent?.includes(secret),false);
+    assert.equal(mcpRequests,0);
+  });
   it('revogar a chave recém-gerada remove também seu segredo e as instruções da tela', async () => {
-    readyPanel(); await mount(); await click(button('Gerar nova chave')); await click(button('Gerar minha chave'));
+    readyPanel(); await mount(); await click(button('Agentes de IA')); await click(button('Gerar chave'));
     assert.ok(container.textContent?.includes('test-only-mcp-key'));
     await click(container.querySelector('.mcp-key-revoke')!);
     const dialog = document.querySelector('[role="dialog"]')!;
@@ -389,6 +422,6 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     assert.equal(container.textContent?.includes('test-only-mcp-key'), false);
     assert.equal(container.textContent?.includes('URL do servidor MCP'), false);
     assert.ok(container.textContent?.includes('Chave revogada'));
-    assert.ok(container.textContent?.includes('Gerar minha chave'));
+    assert.ok(container.textContent?.includes('Gerar chave'));
   });
 });

@@ -2,17 +2,17 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { isAllowedAppRoute } from '../server/app-routes';
 import { appUpstreamPath, appJsonBody } from '../server/app-proxy-request';
-import { listMcpKeys, createMcpKey, revokeMcpKey, revokeAllMcpKeys } from '../src/lib/mcp-keys';
+import { getMcpConnection, listMcpKeys, createMcpKey, revokeMcpKey, revokeAllMcpKeys } from '../src/lib/mcp-keys';
 
 describe('Chaves MCP: contrato e proxy', () => {
   it('libera apenas os métodos e caminhos previstos para chaves e conciliação', () => {
     const prefix = '/companies/test-company';
     for (const [method, path] of [
-      ['GET', '/mcp-keys'], ['DELETE', '/mcp-keys/key-1'], ['DELETE', '/mcp-keys'],
+      ['GET', '/mcp-keys'], ['GET', '/mcp-connection'], ['DELETE', '/mcp-keys/key-1'], ['DELETE', '/mcp-keys'],
       ['GET', '/past-sales/reconcile'], ['POST', '/past-sales/reconcile/apply'],
     ]) assert.equal(isAllowedAppRoute(method, prefix + path), true, `${method} ${path}`);
     for (const [method, path] of [
-      ['POST', '/mcp-keys'], ['PATCH', '/mcp-keys/key-1'], ['GET', '/mcp-keys/key-1'],
+      ['POST', '/mcp-keys'], ['POST', '/mcp-connection'], ['GET', '/mcp-connection/extra'], ['PATCH', '/mcp-keys/key-1'], ['GET', '/mcp-keys/key-1'],
       ['DELETE', '/mcp-key'], ['DELETE', '/mcp-keys/key-1/extra'],
       ['POST', '/past-sales/reconcile'], ['DELETE', '/past-sales/reconcile'],
       ['GET', '/past-sales/reconcile/apply'], ['DELETE', '/products'],
@@ -69,6 +69,23 @@ describe('Chaves MCP: contrato e proxy', () => {
         globalThis.fetch = async () => new Response(JSON.stringify(invalid), { headers: { 'content-type': 'application/json' } });
         await assert.rejects(listMcpKeys('/app/companies/test'), /lista de chaves/);
       }
+    } finally { globalThis.fetch = original; }
+  });
+  it('carrega instruções pelo proxy sem gerar chave, sem corpo e sem inventar campos ausentes', async () => {
+    const original = globalThis.fetch;
+    const connection = { mcpUrl: 'https://example.test/mcp', keyPlaceholder: '<SUA_CHAVE>',
+      authorizationHeader: 'Authorization: Bearer <SUA_CHAVE>', claudeCodeCommand: 'connect <SUA_CHAVE>',
+      jsonConfig: { mcpServers: { acainfe: { url: 'https://example.test/mcp', headers: { Authorization: 'Bearer <SUA_CHAVE>' } } } } };
+    globalThis.fetch = async (url, init) => {
+      assert.equal(String(url), '/api/app/companies/test/mcp-connection');
+      assert.equal(init?.method, 'GET'); assert.equal(init?.body, undefined);
+      return new Response(JSON.stringify(connection), { headers: { 'content-type': 'application/json' } });
+    };
+    try {
+      assert.deepEqual(await getMcpConnection('/app/companies/test'), connection);
+      assert.equal(appUpstreamPath('/api/app/companies/test/mcp-connection'), '/v1/app/companies/test/mcp-connection');
+      globalThis.fetch = async () => new Response('{}', { headers: { 'content-type': 'application/json' } });
+      await assert.rejects(getMcpConnection('/app/companies/test'), /instruções de conexão MCP completas/);
     } finally { globalThis.fetch = original; }
   });
 });

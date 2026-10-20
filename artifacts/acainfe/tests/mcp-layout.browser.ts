@@ -116,6 +116,7 @@ try {
       else if (path === '/api/app/me') data = { user: { name: 'Pessoa de teste' }, companies: [company] };
       else if (path === '/api/app/companies/layout-company') data = company;
       else if (path.endsWith('/billing')) data = { amountDueCents: 0 };
+      else if (path.endsWith('/mcp-connection')) data = {mcpUrl:'https://example.test/mcp',keyPlaceholder:'<SUA_CHAVE>',authorizationHeader:'Authorization: Bearer <SUA_CHAVE>',claudeCodeCommand:'claude mcp add acainfe -H "Authorization: Bearer <SUA_CHAVE>"',jsonConfig:{mcpServers:{acainfe:{url:'https://example.test/mcp',headers:{Authorization:'Bearer <SUA_CHAVE>'}}}}};
       else if (path.endsWith('/products')) data = [{id:'product-test',name:'Curso de teste'}];
       else if (path.endsWith('/abacatepay/default-product')) {
         const body=JSON.parse(request.postData!); decisionCalls.push(body);
@@ -360,16 +361,17 @@ try {
     await send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
     if (width === 1280) {
       await send('Page.navigate', { url: appUrl });
+      await waitFor('!!document.querySelector(".company-summary")');
+      assert.equal(await evaluate('!!document.querySelector(".mcp-keys")'),false);
+      await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b=>b.textContent.includes("Agentes de IA")).click()');
       await waitFor('!!document.querySelector(".mcp-key-row")');
-      await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b => b.textContent.includes("Configuração")).click()');
     }
-    await waitFor('!!document.querySelector(".wizard-card .mcp-keys--onboarding .mcp-key-row")');
+    await waitFor('!!document.querySelector(".ai-agents .mcp-key-row")');
     const layout = await evaluate(`(() => {
-      const card = document.querySelector('.wizard-card');
-      const form = card.querySelector('form');
-      const keys = card.querySelector('.mcp-keys--onboarding');
+      const card = document.querySelector('.ai-agents');
+      const keys = card.querySelector('.mcp-keys');
       const rect = el => { const r = el.getBoundingClientRect(); return { left:r.left, right:r.right, top:r.top, bottom:r.bottom, width:r.width }; };
-      return { card:rect(card), form:rect(form), keys:rect(keys),
+      return { card:rect(card), keys:rect(keys),
         viewport:innerWidth, scrollWidth:document.documentElement.scrollWidth,
         generateButtons:[...keys.querySelectorAll('button')].filter(b => b.textContent.includes('Gerar nova chave')).length,
         title:keys.querySelector('h3').textContent, count:document.querySelectorAll('.mcp-keys').length };
@@ -377,9 +379,7 @@ try {
     assert.equal(layout.count, 1);
     assert.equal(layout.title, 'Chaves ativas');
     assert.equal(layout.generateButtons, 0);
-    assert.ok(Math.abs(layout.form.left - layout.keys.left) <= 1, JSON.stringify(layout));
-    assert.ok(Math.abs(layout.form.right - layout.keys.right) <= 1, JSON.stringify(layout));
-    assert.ok(layout.keys.top >= layout.form.bottom, JSON.stringify(layout));
+    assert.ok(layout.keys.left >= layout.card.left, JSON.stringify(layout));
     assert.ok(layout.keys.right <= layout.card.right, JSON.stringify(layout));
     assert.ok(layout.scrollWidth <= layout.viewport, JSON.stringify(layout));
     const metrics = await send('Page.getLayoutMetrics');
@@ -387,25 +387,24 @@ try {
       format: 'png', captureBeyondViewport: true,
       clip: { ...metrics.cssContentSize, scale: 1 },
     });
-    const file = join(tmpdir(), `acainfe-mcp-layout-${width}.png`);
+    const file = join(tmpdir(), `acainfe-ai-agents-${width}.png`);
     await writeFile(file, Buffer.from(screenshot.data, 'base64'));
-    console.log(`PASS ${width}px: lista dentro do card, bordas internas alinhadas, sem overflow e sem geração duplicada. ${file}`);
+    console.log(`PASS Agentes de IA ${width}px: instruções, lista e gerador separados, sem overflow. ${file}`);
   }
   items = [];
   await evaluate('[...document.querySelectorAll(".mcp-keys button")].find(b => b.textContent === "Atualizar").click()');
   await waitFor('!!document.querySelector(".mcp-keys-empty")');
   assert.equal(await evaluate('document.querySelector(".mcp-keys").textContent.includes("Gerar nova chave")'), false);
-  assert.ok(await evaluate('document.querySelector(".mcp-keys-empty").textContent.includes("Gere uma acima para conectar o assistente.")'));
+  assert.ok(await evaluate('document.querySelector(".mcp-keys-empty").textContent.includes("Gere uma chave abaixo para conectar o agente.")'));
   assert.deepEqual(errors, []);
-  console.log('PASS estado vazio: orientação para o gerador acima, sem botão duplicado.');
+  await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b=>b.textContent.includes("Configuração")).click()');
+  await waitFor('[...document.querySelectorAll("button")].some(b=>b.textContent.includes("Gerar minha chave"))');
+  assert.equal(await evaluate('!!document.querySelector(".mcp-keys")'),false);
+  await evaluate('[...document.querySelectorAll("button")].find(b=>b.textContent.trim()==="Concluir").click()');
   await evaluate('[...document.querySelectorAll(".app-tabs button")].find(b => b.textContent.includes("Painel")).click()');
   await waitFor('!!document.querySelector(".company-summary .text-button")');
-  await waitFor('!!document.querySelector(".app-card .mcp-keys-empty")');
+  assert.equal(await evaluate('!!document.querySelector(".mcp-keys")'),false);
   items = [{ id:'panel-key',label:'Assistente do painel',last4:'abcd',legacy:false,createdVia:'APP',createdAt:'2026-10-19T12:00:00Z' }];
-  const beforePanelRefresh = keyListRequests;
-  await evaluate('[...document.querySelectorAll(".app-card button")].find(b => b.textContent === "Atualizar status").click()');
-  await waitFor('!!document.querySelector(".app-card .mcp-key-row")');
-  assert.ok(keyListRequests > beforePanelRefresh, 'Atualizar status deve recarregar as chaves');
   await evaluate('[...document.querySelectorAll(".company-recommendations button")].find(b=>b.textContent==="Escolher produto").click()');
   await waitFor('!!document.querySelector(".default-product-choice")');
   for(const width of [1280,360]){
@@ -437,21 +436,7 @@ try {
     })()`);
     assert.ok(layout.text.includes('Conectado desde 01/10/2026') && layout.text.includes('As vendas novas não estão virando nota.'));
     assert.ok(layout.scroll <= layout.viewport && layout.left >= 0 && layout.right <= width, JSON.stringify(layout));
-    const keysLayout = await evaluate(`(() => {
-      const webhook=document.querySelector('.ap-webhook-card'),keys=document.querySelector('.mcp-keys');
-      const w=webhook.getBoundingClientRect(),k=keys.getBoundingClientRect();
-      const ws=getComputedStyle(webhook),ks=getComputedStyle(keys);
-      return {sameParent:webhook.parentElement===keys.parentElement,adjacent:webhook.nextElementSibling===keys,
-        leftDelta:Math.abs(w.left-k.left),rightDelta:Math.abs(w.right-k.right),
-        stylesMatch:['padding','borderRadius','border','backgroundColor','marginTop','marginBottom'].every(p=>ws[p]===ks[p]),
-        hasEyebrow:keys.textContent.includes('ASSISTENTE DE IA'),
-        hasRefresh:[...keys.querySelectorAll('button')].some(b=>b.textContent==='Atualizar')};
-    })()`);
-    assert.ok(keysLayout.sameParent && keysLayout.adjacent && keysLayout.stylesMatch && keysLayout.hasEyebrow && !keysLayout.hasRefresh, JSON.stringify(keysLayout));
-    assert.ok(keysLayout.leftDelta < 1 && keysLayout.rightDelta < 1, JSON.stringify(keysLayout));
-    const keysClip=await evaluate('(() => {const r=document.querySelector(".mcp-keys").getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1};})()');
-    const keysShot=await send('Page.captureScreenshot',{format:'png',captureBeyondViewport:true,clip:keysClip});
-    await writeFile(join(tmpdir(),`acainfe-panel-keys-${width}.png`),Buffer.from(keysShot.data,'base64'));
+    assert.equal(await evaluate('!!document.querySelector(".mcp-keys")'),false);
     const cardClip = await evaluate('(() => {const r=document.querySelector(".ap-webhook-card").getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height,scale:1};})()');
     let shot = await send('Page.captureScreenshot', { format:'png',captureBeyondViewport:true,clip:cardClip });
     await writeFile(join(tmpdir(),`acainfe-webhook-card-${width}.png`),Buffer.from(shot.data,'base64'));

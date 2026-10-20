@@ -1,0 +1,13 @@
+.ai-agents .ai-block{margin-top:28px;padding-top:24px;border-top:1px solid #4a19421c;min-width:0}
+.ai-agents .ai-block:first-of-type{border-top:0}
+.ai-agents .ai-block h2{font:700 20px 'Bricolage Grotesque',sans-serif;color:#4a1942;margin:0 0 8px}
+.ai-agents .ai-block>p{font-size:13px;line-height:1.7;color:#6b5f70}
+.ai-agents .mcp-keys{margin:0;padding:0;border:0;background:transparent}
+.mcp-guide{display:grid;gap:12px;min-width:0}
+.mcp-guide .mcp-tabs{display:flex;flex-wrap:wrap;gap:8px}
+.mcp-guide .copy-field code{min-width:0;overflow-wrap:anywhere;white-space:pre-wrap}
+.mcp-guide .copy-field pre{margin:0;font:inherit;white-space:pre-wrap;overflow-wrap:anywhere}
+.mcp-guide-paste input{width:100%;box-sizing:border-box}
+.generated-key{display:grid;gap:14px;margin-top:20px;min-width:0}
+.app-tabs-note{font-size:12px;color:#6b5f70;margin:0 0 14px;line-height:1.6}
+.configuration-review{max-width:440px;margin:0 0 24px}

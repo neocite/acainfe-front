@@ -7,13 +7,13 @@ O usuário deve conseguir consultar e revogar chaves existentes sem gerar outra 
 
 **Why:** O usuário relatou que precisava gerar uma chave nova toda vez que entrava e pediu um caminho independente para invalidar credenciais vazadas.
 
-**How to apply:** Preservar o acesso ao gerenciamento tanto pelo painel quanto pelo onboarding; não condicionar a lista à geração de um segredo novo.
+**How to apply:** Oferecer o gerenciamento no menu “Agentes de IA”, independente do onboarding; não condicionar a lista à geração de um segredo novo.
 
-No onboarding, manter um único ponto de geração: o campo de nome e o botão do card “Seu assistente”. O gerenciamento deve ficar visualmente junto desse card, sem repetir os botões de gerar chave. No painel, a seção continua autônoma e pode oferecer geração.
+O onboarding serve apenas à primeira chave. Se já existe uma chave ativa, orientar para “Agentes de IA”, sem apresentar outro gerador nessa etapa. Listagem, revogação e geração adicional pertencem ao menu próprio.
 
-**Why:** O usuário relatou desalinhamento e duplicação de ações quando a lista ficou fora da coluna do assistente; pediu contextos distintos para onboarding e painel.
+**Why:** O usuário relatou que misturar boas-vindas, instruções e gestão fazia quem esqueceu como conectar gerar chaves desnecessárias. Pediu a separação explícita entre primeira conexão e manutenção.
 
-**How to apply:** Ao reorganizar a etapa, preservar os passos à esquerda, conferir margens no celular e não aplicar a remoção das ações de geração à seção do painel.
+**How to apply:** Manter instruções reutilizáveis sem gerar credenciais. Chaves coladas para preencher comandos ficam só na memória do navegador, nunca em requisições ou armazenamento persistente. Não ocultar “Configuração” se isso impedir acesso a funções que ainda dependem do fluxo.
 
 Gerar uma nova chave não revoga as anteriores. A revogação deve ser uma ação explícita e confirmada, pois interrompe imediatamente os agentes e integrações que dependem da chave.
 

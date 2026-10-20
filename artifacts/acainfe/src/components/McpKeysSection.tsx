@@ -6,7 +6,7 @@ import { listMcpKeys, revokeMcpKey, revokeAllMcpKeys, type McpKeyItem } from '..
 
 type Props = {
   base: string;
-  variant?: 'panel' | 'onboarding';
+  variant?: 'panel' | 'onboarding' | 'agents';
   refreshToken?: number;
   onUnauthorized: (error: ApiError) => void;
   onGenerate: () => void;
@@ -27,6 +27,7 @@ const labelOf = (k: McpKeyItem) => k.label?.trim() || (k.last4 ? `…${k.last4}`
 
 export function McpKeysSection({ base, variant = 'panel', refreshToken, onUnauthorized, onGenerate, onRevoked }: Props) {
   const embedded = variant === 'onboarding';
+  const agents = variant === 'agents';
   const [items, setItems] = useState<McpKeyItem[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [loadError, setLoadError] = useState('');
@@ -115,16 +116,16 @@ export function McpKeysSection({ base, variant = 'panel', refreshToken, onUnauth
     void load(true);
   }
 
-  return <section className={`mcp-keys${embedded ? ' mcp-keys--onboarding' : ''}`} aria-labelledby="mcp-keys-title">
+  return <section className={`mcp-keys${embedded ? ' mcp-keys--onboarding' : agents ? ' mcp-keys--agents' : ''}`} aria-labelledby="mcp-keys-title">
     <div className="mcp-keys-head">
       <div>
-        {!embedded && <span className="mcp-keys-eyebrow">ASSISTENTE DE IA</span>}
-        <h3 id="mcp-keys-title">{embedded ? 'Chaves ativas' : 'Chaves do MCP'}</h3>
+        {!embedded && !agents && <span className="mcp-keys-eyebrow">ASSISTENTE DE IA</span>}
+        <h3 id="mcp-keys-title">{embedded || agents ? 'Chaves ativas' : 'Chaves do MCP'}</h3>
         <p>A lista nunca mostra a chave completa, apenas os últimos 4 caracteres. A chave inteira aparece uma única vez, quando é gerada.</p>
       </div>
       <div className="mcp-keys-actions">
-        {embedded && <button type="button" className="app-secondary" disabled={busy || status === 'loading'} onClick={() => void load(false)}>Atualizar</button>}
-        {!embedded && <button type="button" className="app-secondary mcp-keys-generate" disabled={busy} onClick={onGenerate}>Gerar nova chave</button>}
+        {(embedded || agents) && <button type="button" className="app-secondary" disabled={busy || status === 'loading'} onClick={() => void load(false)}>Atualizar</button>}
+        {!embedded && !agents && <button type="button" className="app-secondary mcp-keys-generate" disabled={busy} onClick={onGenerate}>Gerar nova chave</button>}
       </div>
     </div>
 
@@ -140,8 +141,8 @@ export function McpKeysSection({ base, variant = 'panel', refreshToken, onUnauth
     </div>}
     {status === 'ready' && items.length === 0 && <div className="mcp-keys-empty">
       <strong>Nenhuma chave ativa</strong>
-      <p>{embedded ? 'Gere uma acima para conectar o assistente.' : 'Nenhum agente de IA consegue usar o MCP agora. Gere uma chave para conectar.'}</p>
-      {!embedded && <button type="button" className="app-primary" onClick={onGenerate}>Gerar nova chave</button>}
+      <p>{agents ? 'Gere uma chave abaixo para conectar o agente.' : embedded ? 'Gere uma acima para conectar o assistente.' : 'Nenhum agente de IA consegue usar o MCP agora. Gere uma chave para conectar.'}</p>
+      {!embedded && !agents && <button type="button" className="app-primary" onClick={onGenerate}>Gerar nova chave</button>}
     </div>}
     {status === 'ready' && items.length > 0 && <>
       <ul className="mcp-keys-list">
@@ -173,7 +174,7 @@ export function McpKeysSection({ base, variant = 'panel', refreshToken, onUnauth
           </li>;
         })}
       </ul>
-      <p className="mcp-keys-help">Para descobrir qual chave antiga está em uso, use o MCP uma vez e clique em {embedded ? 'Atualizar' : 'Atualizar status'}: a chave usada passa a mostrar o final e o último uso.</p>
+      <p className="mcp-keys-help">Para descobrir qual chave antiga está em uso, use o MCP uma vez e clique em {embedded || agents ? 'Atualizar' : 'Atualizar status'}: a chave usada passa a mostrar o final e o último uso.</p>
       <button type="button" className="app-secondary mcp-keys-revoke-all" disabled={busy}
         onClick={() => { setMessage(''); setDialogError(''); setConfirmText(''); setAllOpen(true); }}>Revogar todas as chaves</button>
     </>}
