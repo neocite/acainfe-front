@@ -64,6 +64,14 @@ catalogs:
       specifier: ^3.24.0
       version: 3.25.76
 
+overrides:
+  '@tailwindcss/typography>postcss-selector-parser': 7.1.7
+
+patchedDependencies:
+  braces@3.0.3:
+    hash: 75c54574eee51074b2ae73b9df70e2a82121c8e74c838000627c0cce2607fedd
+    path: patches/braces@3.0.3.patch
+
 importers:
 
   .: {}
@@ -2856,8 +2864,8 @@ packages:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
 
-  postcss-selector-parser@6.0.10:
-    resolution: {integrity: sha512-IQ7TZdoaqbT+LCpShg46jnZVlhWD2w6iQYAcYXfHARZ7X1t/UGhhceQDs5X0cGqKvYlHNOuv7Oa1xmb0oQuA3w==}
+  postcss-selector-parser@7.1.7:
+    resolution: {integrity: sha512-wWBro/7hJ40ye6TPiXkUQoXKCw23xSsjriUvqd7Uls9Sso3oLiON1flc18cCdnjgCRXw4fBVqUJJeOdDTh3P3g==}
     engines: {node: '>=4'}
 
   postcss@8.5.31:
@@ -5344,7 +5352,7 @@ snapshots:
 
   '@tailwindcss/typography@0.5.20(tailwindcss@4.3.3)':
     dependencies:
-      postcss-selector-parser: 6.0.10
+      postcss-selector-parser: 7.1.7
       tailwindcss: 4.3.3
 
   '@tailwindcss/vite@4.3.3(vite@7.3.7(@types/node@22.20.5)(jiti@2.7.0)(lightningcss@1.32.0)(tsx@4.23.15))':
@@ -5595,7 +5603,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  braces@3.0.3:
+  braces@3.0.3(patch_hash=75c54574eee51074b2ae73b9df70e2a82121c8e74c838000627c0cce2607fedd):
     dependencies:
       fill-range: 7.1.1
 
@@ -6161,7 +6169,7 @@ snapshots:
 
   micromatch@4.0.8:
     dependencies:
-      braces: 3.0.3
+      braces: 3.0.3(patch_hash=75c54574eee51074b2ae73b9df70e2a82121c8e74c838000627c0cce2607fedd)
       picomatch: 2.3.2
 
   mime-db@1.52.0: {}
@@ -6271,7 +6279,7 @@ snapshots:
 
   picomatch@4.0.7: {}
 
-  postcss-selector-parser@6.0.10:
+  postcss-selector-parser@7.1.7:
     dependencies:
       cssesc: 3.0.0
       util-deprecate: 1.0.2

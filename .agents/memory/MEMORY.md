@@ -9,3 +9,4 @@
 - [Produto padrão AbacatePay](abacatepay-default-product.md) — decisão explícita para Pix sem produto; o padrão inclui testes, que devem poder ser ignorados sem fingir emissão.
 - [Navegação da empresa](company-navigation.md) — “Minha empresa” reúne os dados fiscais; gateways ficam separados, sem resumo na área da empresa.
 - [WebSocket da prévia](preview-websockets.md) — Vite em modo middleware deve usar o mesmo servidor HTTP do artefato para evitar erros de HMR.
+- [Correções sem release upstream](dependency-security.md) — preservar o proxy de autenticação com patch rastreável; nunca ocultar alertas por versão.
