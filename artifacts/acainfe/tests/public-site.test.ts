@@ -8,7 +8,8 @@ import { createServer, type ViteDevServer } from 'vite';
 import { createPublicSiteRouter, fillPublicHtml, landingMarkdown, NOT_FOUND_MARKDOWN, safeJson, structuredData } from '../server/public-site';
 import { FALLBACK_COVERAGE } from '../src/lib/coverage';
 import { HOME_TITLE, homeDescription, type PublicSiteData } from '../src/lib/public-site-content';
-import { SITE_ROUTES, isValidPage } from '../src/lib/site-routes';
+import { SITE_ROUTES, PUBLIC_PAGE_ALIASES, isValidPage, publicCanonicalUrl } from '../src/lib/site-routes';
+import { setPublicCanonical } from '../src/lib/public-metadata';
 import { INSTITUTIONAL_PAGES, institutionalPage, institutionalMarkdown } from '../src/lib/institutional-content';
 
 const data: PublicSiteData = { pricing: { pricePerInvoiceCents: 80, monthlyFeeCents: 0 }, coverage: FALLBACK_COVERAGE };
@@ -109,7 +110,7 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
   });
 
   it('mantém 200 para rotas válidas, callbacks de login e futuras páginas públicas', async () => {
-    for (const path of ['/', '/sign-in', '/sign-up', '/sign-in/sso-callback', '/sign-up/verify-email-address', '/onboarding', '/app', '/app/conta', '/sobre', '/contato', '/privacidade', '/llms.txt', '/robots.txt', '/favicon.svg', '/api/example']) {
+    for (const path of ['/', '/sign-in', '/sign-up', '/sign-in/sso-callback', '/sign-up/verify-email-address', '/onboarding', '/app', '/app/conta', '/sobre', '/contato', '/privacidade', '/developers', '/about', '/contact', '/privacy', '/llms.txt', '/robots.txt', '/favicon.svg', '/api/example']) {
       const response = await fetch(base + path);
       assert.equal(response.status, 200, path);
     }
@@ -144,8 +145,8 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     assert.equal(response.headers.get('content-type'), 'application/xml; charset=utf-8');
     const dom = new JSDOM(await response.text(), { contentType: 'text/xml' });
     assert.equal(dom.window.document.documentElement.namespaceURI, 'http://www.sitemaps.org/schemas/sitemap/0.9');
-    assert.deepEqual([...dom.window.document.querySelectorAll('loc')].map(n => n.textContent), ['https://acainfe.com/', 'https://acainfe.com/sobre', 'https://acainfe.com/contato', 'https://acainfe.com/privacidade', 'https://acainfe.com/llms.txt']);
-    assert.deepEqual([...dom.window.document.querySelectorAll('lastmod')].map(n => n.textContent), Array(5).fill(publishedAt));
+    assert.deepEqual([...dom.window.document.querySelectorAll('loc')].map(n => n.textContent), ['https://acainfe.com/', 'https://acainfe.com/sobre', 'https://acainfe.com/contato', 'https://acainfe.com/privacidade', 'https://acainfe.com/developers', 'https://acainfe.com/llms.txt']);
+    assert.deepEqual([...dom.window.document.querySelectorAll('lastmod')].map(n => n.textContent), Array(6).fill(publishedAt));
     dom.window.close();
   });
 
@@ -196,7 +197,7 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
         assert.ok(doc.querySelector('main')!.textContent!.includes(section.title));
         for (const text of section.paragraphs) assert.ok(doc.querySelector('main')!.textContent!.includes(text));
       }
-      for (const path of ['/sobre', '/contato', '/privacidade']) assert.ok(doc.querySelector(`footer a[href="${path}"]`));
+      for (const path of ['/sobre', '/contato', '/privacidade', '/developers']) assert.ok(doc.querySelector(`footer a[href="${path}"]`));
       assert.ok(doc.querySelector('a[href="mailto:contato@extractify.com.br"]'));
       assert.equal(doc.querySelectorAll('script[type="application/ld+json"]').length, 0);
       dom.window.close();
@@ -212,6 +213,106 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
       for (const section of page.sections) for (const paragraph of section.paragraphs) assert.ok(text.includes(paragraph));
     });
   }
+
+  it('landing liga a documentação no menu, no rodapé e no Markdown; llms.txt inclui o novo item', async () => {
+    const response = await fetch(base);
+    const dom = new JSDOM(await response.text());
+    assert.equal(dom.window.document.querySelector('header nav a[href="/developers"]')?.textContent, 'API');
+    assert.ok(dom.window.document.querySelector('footer a[href="/developers"]'));
+    assert.ok(landingMarkdown(data).includes('https://acainfe.com/developers'));
+    const llms = await (await fetch(base + '/llms.txt')).text();
+    assert.ok(llms.includes('- [API e agentes](https://acainfe.com/developers): autenticação, rotas e exemplos'));
+    dom.window.close();
+  });
+
+  it('developers documenta somente as rotas e o exemplo aprovados, em HTML e Markdown', async () => {
+    const page = institutionalPage('/developers')!;
+    const dom = new JSDOM(await (await fetch(base + page.path)).text());
+    const doc = dom.window.document;
+    assert.equal(doc.querySelector('h1')!.textContent, 'API e agentes de IA');
+    const command = `curl -X POST https://api.acainfe.com/v1/sales -H "x-api-key: <chave>" -H "Content-Type: application/json" -d '{"externalId":"pedido-123","customer":{"name":"Ana Souza","taxId":"52998224725","email":"ana@exemplo.com"},"items":[{"productExternalId":"prod_abc","totalCents":9700}]}'`;
+    assert.equal(doc.querySelector('pre code')!.textContent, command);
+    const markdown = await (await fetch(base + page.path, { headers: { accept: 'text/markdown' } })).text();
+    assert.ok(markdown.includes(`\`\`\`bash\n${command}\n\`\`\``));
+    for (const text of ['x-api-key', 'Authorization: Bearer <chave>', 'POST /v1/sales', 'GET /v1/invoices', 'GET /v1/invoices/{id}', 'POST /v1/invoices/{id}/cancel', 'GET /v1/products', 'POST /v1/products', 'GET /v1/public/pricing', 'GET /v1/public/coverage', 'assíncrona', 'R$ 82,20 = 8220', '2,01% = 201', 'HTTP streamable']) {
+      assert.ok(doc.querySelector('main')!.textContent!.includes(text), text);
+      assert.ok(markdown.includes(text), text);
+    }
+    for (const href of ['/llms.txt', 'https://api.acainfe.com/docs']) assert.ok(doc.querySelector(`main a[href="${href}"]`));
+    for (const forbidden of ['/v1/app', '/v1/admin', 'x-app-key', 'ACAINFE_APP_KEY', 'CLERK_SECRET_KEY']) {
+      assert.ok(!doc.documentElement.textContent!.includes(forbidden));
+      assert.ok(!markdown.includes(forbidden));
+    }
+    dom.window.close();
+  });
+
+  it('/docs redireciona permanentemente para /developers, inclusive quando o cliente pede Markdown', async () => {
+    for (const accept of ['text/html', 'text/markdown']) {
+      const response = await fetch(base + '/docs', { redirect: 'manual', headers: { accept } });
+      assert.equal(response.status, 301);
+      assert.equal(response.headers.get('location'), '/developers');
+    }
+    assert.match((await fetch(base + '/api/example')).headers.get('content-type')!, /^application\/json/);
+  });
+
+  for (const path of ['/', '/sobre', '/contato', '/privacidade', '/developers', ...Object.keys(PUBLIC_PAGE_ALIASES)]) {
+    it(`${path}: canonical, og:url, idioma e imagem saem no HTML do servidor`, async () => {
+      const response = await fetch(base + path, { headers: { accept: 'text/html' } });
+      const dom = new JSDOM(await response.text());
+      const doc = dom.window.document, canonical = publicCanonicalUrl(path);
+      assert.equal(doc.documentElement.lang, 'pt-BR');
+      assert.equal(doc.querySelectorAll('link[rel="canonical"]').length, 1);
+      assert.equal(doc.querySelector('link[rel="canonical"]')?.getAttribute('href'), canonical);
+      assert.equal(doc.querySelector('meta[property="og:url"]')?.getAttribute('content'), canonical);
+      assert.equal(doc.querySelector('meta[property="og:type"]')?.getAttribute('content'), 'website');
+      assert.equal(doc.querySelector('meta[property="og:image"]')?.getAttribute('content'), 'https://acainfe.com/api/og.png');
+      assert.equal(response.headers.get('link'), `<${canonical}>; rel="canonical"`);
+      dom.window.close();
+    });
+  }
+
+  for (const [alias, original] of Object.entries(PUBLIC_PAGE_ALIASES)) {
+    it(`${alias}: 200 sem redirect, mesmo conteúdo da versão portuguesa e Markdown`, async () => {
+      assert.equal(isValidPage(alias), true);
+      const response = await fetch(base + alias, { redirect: 'manual' });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('location'), null);
+      assert.equal(response.headers.get('content-type'), 'text/html; charset=utf-8');
+      assert.match(response.headers.get('vary')!, /Accept/);
+      const dom = new JSDOM(await response.text());
+      const originalDom = new JSDOM(await (await fetch(base + original)).text());
+      const text = dom.window.document.querySelector('main')!.textContent!;
+      assert.equal(text, originalDom.window.document.querySelector('main')!.textContent);
+      assert.ok(text.length >= 500);
+      const markdown = await fetch(base + alias, { headers: { accept: 'text/markdown' }, redirect: 'manual' });
+      assert.equal(markdown.status, 200);
+      assert.equal(markdown.headers.get('content-type'), 'text/markdown; charset=utf-8');
+      assert.match(markdown.headers.get('vary')!, /Accept/);
+      assert.equal(markdown.headers.get('link'), `<https://acainfe.com${original}>; rel="canonical"`);
+      assert.equal(await markdown.text(), institutionalMarkdown(institutionalPage(original)!));
+      assert.equal(institutionalPage(alias + '/'), institutionalPage(original));
+      dom.window.close(); originalDom.window.close();
+    });
+  }
+
+  it('mantém canonical e og:url corretos nas transições do app, sem duplicar tags', () => {
+    const dom = new JSDOM('<!doctype html><html><head></head><body></body></html>');
+    const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'document');
+    Object.defineProperty(globalThis, 'document', { value: dom.window.document, configurable: true });
+    try {
+      for (const path of ['/developers', '/about', '/privacy', '/contact', '/']) {
+        setPublicCanonical(path);
+        assert.equal(dom.window.document.querySelector('link[rel="canonical"]')?.getAttribute('href'), publicCanonicalUrl(path));
+        assert.equal(dom.window.document.querySelector('meta[property="og:url"]')?.getAttribute('content'), publicCanonicalUrl(path));
+        assert.equal(dom.window.document.querySelectorAll('link[rel="canonical"]').length, 1);
+        assert.equal(dom.window.document.querySelectorAll('meta[property="og:url"]').length, 1);
+      }
+    } finally {
+      if (descriptor) Object.defineProperty(globalThis, 'document', descriptor);
+      else Reflect.deleteProperty(globalThis, 'document');
+      dom.window.close();
+    }
+  });
 
   it('privacidade contém só os 12 tópicos aprovados e a versão e aviso no topo', async () => {
     const privacy = institutionalPage('/privacidade')!;

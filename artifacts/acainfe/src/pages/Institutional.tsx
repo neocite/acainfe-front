@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'wouter';
 import { institutionalPage } from '../lib/institutional-content';
+import { setPublicCanonical } from '../lib/public-metadata';
 import { SiteFooter } from '../components/landing/SiteFooter';
 import { LegalModal } from '../components/landing/Legal';
 import './landing-studio.css';
@@ -16,6 +17,7 @@ export default function Institutional({ path }: { path: string }) {
   const page = institutionalPage(path)!;
   const [terms, setTerms] = useState(false);
   useEffect(() => {
+    setPublicCanonical(page.path);
     document.title = `${page.title} — açaínfe`;
     for (const selector of ['meta[name="description"]', 'meta[property="og:description"]', 'meta[name="twitter:description"]']) {
       document.head.querySelector(selector)?.setAttribute('content', page.description);
@@ -30,7 +32,7 @@ export default function Institutional({ path }: { path: string }) {
     <header className="csr-nav">
       <Link href="/" className="csr-logo" aria-label="açaínfe, início">aça<span>í</span>nfe<i /></Link>
       <nav aria-label="Navegação principal">
-        <Link href="/">Início</Link><Link href="/sobre">Sobre</Link><Link href="/contato">Contato</Link><Link href="/privacidade">Privacidade</Link>
+        <Link href="/">Início</Link><Link href="/sobre">Sobre</Link><Link href="/contato">Contato</Link><Link href="/privacidade">Privacidade</Link><Link href="/developers">API</Link>
       </nav>
       <Link className="csr-nav-link" href="/sign-in">Entrar <span aria-hidden="true">↗</span></Link>
     </header>
@@ -41,6 +43,8 @@ export default function Institutional({ path }: { path: string }) {
       {page.sections.map(section => <section key={section.title}>
         <h2>{section.title}</h2>
         {section.paragraphs.map(text => <p key={text}>{contactLinks(text)}</p>)}
+        {section.code && <pre className="institutional-code"><code>{section.code}</code></pre>}
+        {section.links?.map(link => <p key={link.href}><a href={link.href}>{link.label}</a></p>)}
       </section>)}
     </main>
     <SiteFooter onTerms={() => setTerms(true)} />

@@ -10,7 +10,7 @@ import { SignInPage, SignUpPage } from './pages/Auth';
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
 import { clerkAppearance } from './lib/clerk-appearance';
-import { INSTITUTIONAL_ROUTES, SITE_ROUTES } from './lib/site-routes';
+import { INSTITUTIONAL_ROUTES, PUBLIC_PAGE_ALIASES, SITE_ROUTES } from './lib/site-routes';
 import Institutional from './pages/Institutional';
 
 const clerkPubKey = publishableKeyFromHost(
@@ -75,7 +75,7 @@ function ClerkProviderWithRoutes() {
         <Route path={SITE_ROUTES.app}><PrivatePage><Onboarding /></PrivatePage></Route>
         <Route path={SITE_ROUTES.account}><PrivatePage><Account /></PrivatePage></Route>
         <Route path={SITE_ROUTES.onboarding}><PrivatePage><Onboarding /></PrivatePage></Route>
-        {Object.values(INSTITUTIONAL_ROUTES).map(path => <Route key={path} path={path}><Institutional path={path} /></Route>)}
+        {[...Object.values(INSTITUTIONAL_ROUTES), ...Object.keys(PUBLIC_PAGE_ALIASES)].map(path => <Route key={path} path={path}><Institutional path={path} /></Route>)}
         <Route><main style={{ padding: 60 }}><h1>Essa página não está por aqui.</h1><a href={basePath || '/'}>Voltar ao início</a></main></Route>
       </Switch>
     </QueryClientProvider>

@@ -10,6 +10,7 @@ import { Calculator } from '@/components/landing/Calculator';
 import { StudioCalculator } from '@/components/landing/StudioCalculator';
 import { LegalModal, type LegalKind } from '@/components/landing/Legal';
 import { SiteFooter } from '@/components/landing/SiteFooter';
+import { setPublicCanonical } from '@/lib/public-metadata';
 import './landing-studio.css';
 
 const NAV = [
@@ -33,6 +34,7 @@ export default function Landing() {
   const P = brl(price);
 
   useEffect(() => {
+    setPublicCanonical('/');
     const title = HOME_TITLE;
     const desc = homeDescription({ pricePerInvoiceCents: price, monthlyFeeCents: fee });
     const origin = window.location.origin;
@@ -61,7 +63,7 @@ export default function Landing() {
     <div className="csr-page" id="inicio">
       <header className="csr-nav">
         <a href="#inicio" className="csr-logo" aria-label="açaínfe, início">aça<span>í</span>nfe<i /></a>
-        <nav aria-label="Navegação principal">{NAV.map(([href, label]) => <a key={href} href={href}>{label}</a>)}</nav>
+        <nav aria-label="Navegação principal">{NAV.map(([href, label]) => <a key={href} href={href}>{label}</a>)}<Link href="/developers">API</Link></nav>
         <Link className="csr-nav-link" href="/sign-in">Entrar <span aria-hidden="true">↗</span></Link>
       </header>
       <main>

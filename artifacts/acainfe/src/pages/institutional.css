@@ -5,6 +5,7 @@
 .institutional-main h2{font:700 21px/1.35 'Manrope',sans-serif;letter-spacing:-.035em;margin:0 0 12px}
 .institutional-main p{font-size:14px;color:#6b5f70;margin:10px 0;overflow-wrap:anywhere}
 .institutional-main p a{color:var(--berry);text-decoration:underline;text-underline-offset:3px}
+.institutional-code{max-width:100%;white-space:pre-wrap;overflow-wrap:anywhere;background:#f3eee6;border:1px solid #e5d9cb;border-radius:8px;padding:20px;font:12px/1.8 'DM Mono',monospace}
 .institutional-version{border-bottom:1px solid #e5d9cb;padding-bottom:20px;margin-bottom:32px}
 .institutional-version p{margin:0}.institutional-version small{font-size:12px;color:#81747c}
 .csr-footer-legal>a:hover{text-decoration:underline}

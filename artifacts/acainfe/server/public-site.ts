@@ -1,6 +1,6 @@
 import express, { type Request, type Response } from 'express';
 import { readFile } from 'node:fs/promises';
-import { isValidPage, SITEMAP_PATHS } from '../src/lib/site-routes';
+import { isValidPage, publicCanonicalUrl, SITEMAP_PATHS } from '../src/lib/site-routes';
 import { AGENT_COPY, HOME_TITLE, LANDING_STEPS, homeDescription, landingFaq, type PublicSiteData } from '../src/lib/public-site-content';
 import { structuredData } from '../src/lib/public-site-schema';
 export { structuredData } from '../src/lib/public-site-schema';
@@ -17,8 +17,9 @@ export const safeJson = (data: unknown) => JSON.stringify(data).replaceAll('<', 
 const markdownText = (text: string) => text.replace(/([\\`*_[\]<>#])/g, '\\$1').replace(/[\r\n]+/g, ' ');
 
 /** Reusable content negotiation for the public pages added in the next part. */
-export function sendPublicPage(req: Request, res: Response, page: { html: string; markdown: string; status?: number }) {
+export function sendPublicPage(req: Request, res: Response, page: { html: string; markdown: string; status?: number; canonical?: string }) {
   res.vary('Accept');
+  if (page.canonical) res.set('Link', `<${page.canonical}>; rel="canonical"`);
   const markdown = req.accepts(['text/html', 'text/markdown']) === 'text/markdown';
   return res.status(page.status ?? 200).type(markdown ? 'text/markdown; charset=utf-8' : 'text/html; charset=utf-8')
     .send(markdown ? page.markdown : page.html);
@@ -53,6 +54,8 @@ ${AGENT_COPY}
 
 [Informações para agentes de IA](${CANONICAL}/llms.txt).
 
+[API e agentes: autenticação, rotas e exemplos](${CANONICAL}/developers).
+
 ## Dúvidas
 
 ${landingFaq(data.pricing.pricePerInvoiceCents, data.coverage).map(f => `### ${f.q}\n\n${markdownText(f.a)}`).join('\n\n')}
@@ -70,11 +73,13 @@ export function fillPublicHtml(template: string, appOrigin: string, data: Public
   const prerendered = home || !!page;
   const scripts = prerendered ? `<script id="public-site-data" type="application/json">${safeJson(data)}</script>${home ? `<script type="application/ld+json">${safeJson(structuredData(data))}</script>` : ''}` : '';
   const title = page ? `${page.title} — açaínfe` : HOME_TITLE;
+  const canonical = prerendered ? publicCanonicalUrl(pagePath) : undefined;
   return template.replaceAll('__SEO_TITLE__', escapeHtml(title))
     .replaceAll('Não vendeu? Não pagou. — açaínfe', escapeHtml(title))
     .replace('name="twitter:title" content="açaínfe"', `name="twitter:title" content="${escapeHtml(title)}"`)
     .replaceAll('__SEO_DESCRIPTION__', escapeHtml(page?.description ?? homeDescription(data.pricing)))
     .replaceAll('__APP_ORIGIN__', escapeHtml(appOrigin))
+    .replace('</head>', `${canonical ? `<link rel="canonical" href="${canonical}" />\n<meta property="og:url" content="${canonical}" />\n` : ''}</head>`)
     .replace('<div id="root"></div>', () => `<div id="root"${prerendered ? ' data-prerendered="true"' : ''}>${body}</div>${scripts}`);
 }
 
@@ -84,6 +89,7 @@ export function createPublicSiteRouter(options: {
   publishedAt: string;
 }) {
   const router = express.Router();
+  router.get('/docs', (_req, res) => res.redirect(301, '/developers'));
   router.get('/sitemap.xml', (_req, res) => res.type('application/xml').send(
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${SITEMAP_PATHS.map(p => `<url><loc>${CANONICAL}${p}</loc><lastmod>${options.publishedAt}</lastmod></url>`).join('')}</urlset>`,
   ));
@@ -91,16 +97,17 @@ export function createPublicSiteRouter(options: {
   router.get('/{*splat}', async (req, res) => {
     const home = req.path === '/';
     const page = institutionalPage(req.path);
+    const canonical = home || page ? publicCanonicalUrl(req.path) : undefined;
     const notFound = !isValidPage(req.path);
     const data = await options.data();
     const markdown = page ? institutionalMarkdown(page) : home ? landingMarkdown(data) : NOT_FOUND_MARKDOWN;
     // No render cost is needed for agents requesting Markdown.
     const wantsMarkdown = req.accepts(['text/html', 'text/markdown']) === 'text/markdown';
     if ((home || page || notFound) && wantsMarkdown) {
-      return sendPublicPage(req, res, { html: '', markdown, status: notFound ? 404 : 200 });
+      return sendPublicPage(req, res, { html: '', markdown, status: notFound ? 404 : 200, canonical });
     }
     const html = await options.html(req, data, home, notFound);
-    if (home || page || notFound) return sendPublicPage(req, res, { html, markdown, status: notFound ? 404 : 200 });
+    if (home || page || notFound) return sendPublicPage(req, res, { html, markdown, status: notFound ? 404 : 200, canonical });
     return res.type('html').send(html);
   });
   return router;
