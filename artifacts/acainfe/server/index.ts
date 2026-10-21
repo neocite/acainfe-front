@@ -1,4 +1,5 @@
 import express from 'express';
+import multer from 'multer';
 import { clerkMiddleware } from '@clerk/express';
 import { publishableKeyFromHost } from '@clerk/shared/keys';
 import { CLERK_PROXY_PATH, clerkProxyMiddleware, getClerkProxyHost } from './middlewares/clerkProxyMiddleware';
@@ -93,17 +94,32 @@ async function proxyApi(req: express.Request, res: express.Response) {
       'x-user-id': auth.id, 'x-user-email': auth.email,
       'x-user-name': encodeURIComponent(auth.name), 'ngrok-skip-browser-warning': '1',
     };
-    const body = appJsonBody(req.method, req.body);
-    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    let body: string | FormData | undefined;
+    if (req.file) {
+      const form = new FormData();
+      form.append('file', new Blob([new Uint8Array(req.file.buffer)]), req.file.originalname);
+      form.append('password', req.body.password);
+      body = form;
+    } else {
+      body = appJsonBody(req.method, req.body);
+      if (body !== undefined) headers['Content-Type'] = 'application/json';
+    }
     const upstreamPath = appUpstreamPath(req.originalUrl);
     const response = await fetch(`${apiBase()}${upstreamPath}`, { method: req.method, headers, body, redirect: 'error', signal: AbortSignal.timeout(45000) });
     const data = await response.json();
     res.status(response.status).json(data);
   } catch {
     res.status(502).json({ error: 'UPSTREAM_UNAVAILABLE', message: 'Não conseguimos falar com o açaínfe agora. Tente novamente em instantes.' });
+  } finally {
+    req.file?.buffer.fill(0);
+    if (req.body?.password) delete req.body.password;
   }
 }
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err instanceof multer.MulterError) {
+    res.status(422).json({ error: 'VALIDATION', message: 'Arquivo inválido. Envie apenas um certificado de até 10 MB.' });
+    return;
+  }
   res.status(500).json({ error: 'INTERNAL', message: 'Não foi possível concluir. Tente novamente.' });
 });
 const root = path.resolve(import.meta.dirname, '..');

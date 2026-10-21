@@ -1,11 +1,8 @@
 import { Router, type RequestHandler } from 'express';
+import multer from 'multer';
 import { isAllowedAppRoute } from './app-routes';
 
-/**
- * Mounted after authentication. Never send certificate claims to the legacy
- * upstream: it can add owners and replace signing material before responding.
- * A check after proxying (or a user's /me preflight) cannot protect other tenants.
- */
+/** Mounted after authentication. Certificate trust and ownership are enforced upstream. */
 export function createAppApi(proxy: RequestHandler) {
   const router = Router();
   router.use((req, res, next) => {
@@ -15,11 +12,15 @@ export function createAppApi(proxy: RequestHandler) {
     }
     next();
   });
-  router.post('/onboarding/certificate', (_req, res) => {
-    res.status(503).json({
-      error: 'CERTIFICATE_ONBOARDING_UNAVAILABLE',
-      message: 'O envio de certificados está temporariamente indisponível por segurança. Nenhuma empresa ou certificado foi alterado.',
-    });
+  const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 1 } });
+  router.post('/onboarding/certificate', upload.single('file'), (req, res, next) => {
+    if (!req.file || !/\.(pfx|p12)$/i.test(req.file.originalname) || typeof req.body?.password !== 'string' || !req.body.password) {
+      req.file?.buffer.fill(0);
+      if (req.body?.password) delete req.body.password;
+      res.status(422).json({ error: 'VALIDATION', message: 'Envie um certificado .pfx ou .p12 e sua senha.' });
+      return;
+    }
+    next();
   });
   router.use(proxy);
   return router;

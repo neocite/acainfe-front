@@ -13,6 +13,8 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   let company: any, details: any, patches: any[], profilesRequested: number, detailRequests: number, mcpRequests: number, fiscalRequests: number;
   let keys: any[], keyGets: number, keyDeletes: string[], generatedLabels: any[], generationError: boolean;
   let gatewayCalls: any[], gatewayFailure: boolean;
+  let certificateResponse: { status: number; code: string; message: string } | null;
+  let certificateUploads: number;
   const descriptors = new Map<string, PropertyDescriptor | undefined>();
   const originalFetch = globalThis.fetch;
   before(async () => {
@@ -51,6 +53,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     patches = []; profilesRequested = 0; details = undefined; detailRequests = 0; mcpRequests = 0; fiscalRequests = 0;
     keys = []; keyGets = 0; keyDeletes = []; generatedLabels = []; generationError = false;
     gatewayCalls = []; gatewayFailure = false;
+    certificateResponse = null; certificateUploads = 0;
     company = {
       tenant: { id: 'test-company', taxRegime: 'SIMPLES_NACIONAL', municipalRegistration: '123', integrations: {} },
       company: { legalName: 'EMPRESA DE TESTE' }, availability: { status: 'AVAILABLE' },
@@ -63,7 +66,17 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     globalThis.fetch = async (url, init) => {
       const path = String(url), method = init?.method || 'GET';
       let data: unknown;
-      if (path === '/api/app/me') data = { user: { name: 'Pessoa de teste', whatsapp: '' }, companies: [company] };
+      if (path === '/api/app/onboarding/certificate') {
+        certificateUploads++;
+        assert.equal(method, 'POST');
+        assert.ok(init?.body instanceof FormData);
+        assert.equal((init.body as FormData).get('password'), 'fixture-password');
+        if (certificateResponse) return new Response(JSON.stringify(certificateResponse), {
+          status: certificateResponse.status, headers: { 'content-type': 'application/json' },
+        });
+        data = company;
+      }
+      else if (path === '/api/app/me') data = { user: { name: 'Pessoa de teste', whatsapp: '' }, companies: [company] };
       else if (path === '/api/app/fiscal-profiles') {
         profilesRequested++;
         data = [
@@ -142,6 +155,74 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     const radio = container.querySelector<HTMLInputElement>(`input[name="businessType"][value="${businessType}"]`);
     assert.ok(radio, 'A tela real precisa conter o seletor de atividade'); await click(radio);
   }
+  async function openCertificate() {
+    company.readiness = { canIssue: true, missing: [], recommended: [] };
+    company.tenant.integrations = { abacatepay: true };
+    company.tenant.cnpj = '99000001000101';
+    await mount();
+    await click(button('Início'));
+    const select = container.querySelector<HTMLSelectElement>('.configuration-review select')!;
+    await act(async () => {
+      select.value = '2';
+      select.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+    });
+    assert.ok(container.textContent?.includes('Seu certificado A1.'));
+  }
+  async function fillCertificate(filename = '99000001000101.pfx', password = 'fixture-password') {
+    const input = container.querySelector<HTMLInputElement>('input[type=file]')!;
+    await act(async () => {
+      Object.defineProperty(input, 'files', { configurable: true, value: [new File(['fixture-only'], filename)] });
+      input.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+      const secret = container.querySelector<HTMLInputElement>('input[type=password]')!;
+      Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value')!.set!.call(secret, password);
+      secret.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    });
+  }
+  it('certificado 409 mantém mensagem da API, orienta pedir acesso e não oferece nova tentativa', async () => {
+    await openCertificate();
+    certificateResponse = { status: 409, code: 'CONFLICT', message: 'Esta empresa já está cadastrada no açaínfe por outra pessoa. Peça a quem administra a empresa para liberar o seu acesso.' };
+    await fillCertificate();
+    await submit();
+    const alert = container.querySelector('[role=alert]')!;
+    assert.ok(alert.textContent?.includes(certificateResponse.message));
+    assert.ok(alert.textContent?.includes('Se você faz parte da empresa, peça a quem administra o açaínfe para liberar seu acesso.'));
+    assert.equal(alert.querySelector('button'), null);
+    assert.equal([...container.querySelectorAll('button')].some(node => node.textContent?.includes('Enviar certificado')), false);
+    assert.equal(certificateUploads, 1);
+    await fillCertificate('99000001000101.p12');
+    assert.ok(button('Enviar certificado'));
+  });
+  it('certificado 422 mostra mensagem original e orientação sobre e-CNPJ credenciado', async () => {
+    await openCertificate();
+    certificateResponse = { status: 422, code: 'CERTIFICATE_INVALID', message: 'Este certificado não é um e-CNPJ válido da ICP-Brasil. Cadeia inválida.' };
+    await fillCertificate();
+    await submit();
+    const alert = container.querySelector('[role=alert]')!;
+    assert.ok(alert.textContent?.includes(certificateResponse.message));
+    assert.ok(alert.textContent?.includes('Use o certificado A1 (e-CNPJ) emitido por uma autoridade certificadora credenciada (ex.: Soluti, Certisign, Serasa, Valid).'));
+    assert.ok(button('Enviar certificado'));
+    assert.equal(certificateUploads, 1);
+  });
+  it('certificado mantém arquivo/senha obrigatórios e extensão validada antes do envio', async () => {
+    await openCertificate();
+    assert.equal(container.querySelector<HTMLInputElement>('input[type=file]')?.required, true);
+    assert.equal(container.querySelector<HTMLInputElement>('input[type=password]')?.required, true);
+    await fillCertificate('invalid.txt');
+    await submit();
+    assert.equal(certificateUploads, 0);
+    await fillCertificate('99000001000101.pfx', '');
+    await submit();
+    assert.ok(container.textContent?.includes('Informe a senha do certificado.'));
+    assert.equal(certificateUploads, 0);
+  });
+  it('certificado aceito avança e remove a senha da tela', async () => {
+    await openCertificate();
+    await fillCertificate();
+    await submit();
+    assert.equal(certificateUploads, 1);
+    assert.ok(container.textContent?.includes('Só mais alguns detalhes.'));
+    assert.equal(container.querySelector('input[type=password]'), null);
+  });
   for (const businessType of ['INFOPRODUCER', 'MICROSAAS']) it(`salva ${businessType} com numeração e mantém a nova etapa 4`, async () => {
     await mount();
     assert.ok(container.textContent?.includes('Infoprodutor'));

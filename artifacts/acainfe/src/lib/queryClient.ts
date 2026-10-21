@@ -1,7 +1,7 @@
 import { QueryClient } from '@tanstack/react-query';
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string, public details?: unknown) { super(message); }
+  constructor(public status: number, message: string, public details?: unknown, public code?: string) { super(message); }
 }
 
 /** Canonical web API path: same-origin Clerk cookies, never bearer tokens. */
@@ -21,7 +21,7 @@ export async function apiRequest<T = any>(path: string, method = 'GET', body?: u
   if (data === null || typeof data !== 'object') {
     throw new ApiError(502, 'O servidor retornou uma resposta inválida. Tente novamente em instantes.');
   }
-  if (!response.ok) throw new ApiError(response.status, data.message || 'Não foi possível concluir. Tente novamente.', data.details);
+  if (!response.ok) throw new ApiError(response.status, data.message || 'Não foi possível concluir. Tente novamente.', data.details, data.code ?? data.error);
   return data;
 }
 

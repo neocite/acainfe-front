@@ -72,6 +72,7 @@ export default function Onboarding() {
   const [meLoaded, setMeLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [certificateError, setCertificateError] = useState<'invalid' | 'conflict' | null>(null);
   const [unauthorized, setUnauthorized] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [editingRecommendation, setEditingRecommendation] = useState<(ReadinessItem & { field: OptionalCompanyField }) | null>(null);
@@ -113,6 +114,10 @@ export default function Onboarding() {
   }
   function handleError(e: unknown) {
     setError(e instanceof Error ? e.message : 'Não foi possível concluir.');
+    if (step === 2 && e instanceof ApiError) {
+      if (e.status === 409 && e.code === 'CONFLICT') { setCertificateError('conflict'); return; }
+      if (e.status === 422 && e.code === 'CERTIFICATE_INVALID') { setCertificateError('invalid'); return; }
+    }
     setUnauthorized(e instanceof ApiError && (e.status === 401 || e.status === 403));
     if (e instanceof ApiError && e.status === 422) {
       const errors: Record<string, string> = {};
@@ -130,7 +135,7 @@ export default function Onboarding() {
     }
   }
   async function run(action: () => Promise<void>) {
-    setError(''); setFieldErrors({}); setBusy(true);
+    setError(''); setCertificateError(null); setFieldErrors({}); setBusy(true);
     try { await action(); } catch (e) { handleError(e); } finally { setBusy(false); }
   }
   async function loadMe() {
@@ -184,6 +189,8 @@ export default function Onboarding() {
         await api('/app/me', 'PUT', { name, whatsapp: phone }); setStep(2);
       } else if (step === 2) {
         if (!file) throw new Error('Escolha seu certificado digital.');
+        if (!/\.(pfx|p12)$/i.test(file.name)) throw new Error('Envie um certificado .pfx ou .p12.');
+        if (!password) throw new Error('Informe a senha do certificado.');
         const form = new FormData(); form.append('file', file); form.append('password', password);
         const s = await api<CompanyStatus>('/app/onboarding/certificate', 'POST', form);
         applyStatus(s); setPassword(''); setFile(null);
@@ -216,7 +223,8 @@ export default function Onboarding() {
   const companyRecommendations = recommended.filter(item => item.field !== 'defaultProduct');
   const needsNumbering = missing.includes('numbering');
   const isWaitlist = status?.availability.status === 'WAITLIST';
-  const errorBox = error && <div className="app-alert" role="alert"><AlertTriangle size={18} /><div>{error}{unauthorized && <p>Não foi possível acessar seus dados. Tente novamente ou saia para usar outra conta.</p>}<button type="button" onClick={() => run(loadMe)}>Tentar novamente</button></div></div>;
+  const certificateIssue = step === 2 ? certificateError : null;
+  const errorBox = error && <div className="app-alert" role="alert"><AlertTriangle size={18} /><div>{error}{certificateIssue === 'invalid' && <p>Use o certificado A1 (e-CNPJ) emitido por uma autoridade certificadora credenciada (ex.: Soluti, Certisign, Serasa, Valid).</p>}{certificateIssue === 'conflict' && <p>Se você faz parte da empresa, peça a quem administra o açaínfe para liberar seu acesso.</p>}{unauthorized && <p>Não foi possível acessar seus dados. Tente novamente ou saia para usar outra conta.</p>}{!certificateIssue && <button type="button" onClick={() => run(loadMe)}>Tentar novamente</button>}</div></div>;
   if (loading) return <div className="app-loading"><Loader2 className="spin" size={28} /><p>Preparando seu espaço…</p></div>;
   if (!isAuthUser(user) || !meLoaded) return <main className="onboarding-page min-h-screen p-8"><Brand /><section className="app-card mx-auto mt-10 max-w-xl"><h1>Não foi possível carregar sua conta</h1>{errorBox || <p>Entre com uma conta com e-mail válido para continuar.</p>}<button className="app-secondary" onClick={() => signOut({ redirectUrl: import.meta.env.BASE_URL })}>Sair</button></section></main>;
 
@@ -259,7 +267,14 @@ export default function Onboarding() {
           tenant: { ...current.tenant, integrations: { ...current.tenant.integrations, abacatepay: true } } } : current);
       }} onContinue={() => setStep(5)} onUnauthorized={handleError} /> : <ValidationContext.Provider value={fieldErrors}><form onSubmit={submit}>
         {step === 1 && <><div className="step-icon"><Leaf /></div><h2>Primeiro, você.</h2><p>Como podemos te chamar? Vamos usar seu WhatsApp para avisos importantes sobre suas notas.</p><Field label="E-mail da sua conta"><input type="email" value={user.email} readOnly className="readonly" /></Field><Field label="Seu nome"><input value={name} onChange={e => setName(e.target.value)} autoComplete="name" required placeholder="Como você gosta de ser chamado?" /></Field><Field label="WhatsApp com DDD"><input value={phone} onChange={e => setPhone(phoneMask(e.target.value))} inputMode="tel" autoComplete="tel" required placeholder="(11) 99999-9999" /></Field></>}
-        {step === 2 && <><div className="step-icon"><FileKey /></div><h2>Seu certificado A1.</h2><p>É o mesmo certificado que você usa para emitir notas ou acessar o e-CAC. Ele fica guardado criptografado e serve para assinar suas notas.</p><Field label="Arquivo do certificado" help="Formatos .pfx ou .p12, até 10 MB."><div className="upload-box"><FileKey size={28} /><strong>{file ? file.name : 'Selecione seu certificado'}</strong><input type="file" accept=".pfx,.p12" required onChange={e => { const f = e.target.files?.[0]; if (f && f.size > 10 * 1024 * 1024) { setError('O certificado deve ter até 10 MB.'); e.target.value = ''; setFile(null); } else setFile(f || null); }} /></div></Field><Field label="Senha do certificado"><input type="password" autoComplete="off" value={password} onChange={e => setPassword(e.target.value)} required placeholder="A senha do seu arquivo A1" /></Field><div className="secure-note"><ShieldCheck size={17} /> Enviado com segurança. Nunca fica salvo no navegador.</div></>}
+        {step === 2 && <><div className="step-icon"><FileKey /></div><h2>Seu certificado A1.</h2><p>É o mesmo certificado que você usa para emitir notas ou acessar o e-CAC. Ele fica guardado criptografado e serve para assinar suas notas.</p><Field label="Arquivo do certificado" help="Formatos .pfx ou .p12, até 10 MB."><div className="upload-box"><FileKey size={28} /><strong>{file ? file.name : 'Selecione seu certificado'}</strong><input type="file" accept=".pfx,.p12" required onChange={e => {
+          setCertificateError(null); setError(''); setFieldErrors({});
+          const f = e.target.files?.[0];
+          if (f && (!/\.(pfx|p12)$/i.test(f.name) || f.size > 10 * 1024 * 1024)) {
+            setError(f.size > 10 * 1024 * 1024 ? 'O certificado deve ter até 10 MB.' : 'Envie um certificado .pfx ou .p12.');
+            e.target.value = ''; setFile(null);
+          } else setFile(f || null);
+        }} /></div></Field><Field label="Senha do certificado"><input type="password" autoComplete="off" value={password} onChange={e => setPassword(e.target.value)} required placeholder="A senha do seu arquivo A1" /></Field><div className="secure-note"><ShieldCheck size={17} /> Enviado com segurança. Nunca fica salvo no navegador.</div></>}
         {step === 3 && <><div className="step-icon"><Building2 /></div><h2>Só mais alguns detalhes.</h2><p>A Receita já contou quase tudo. Agora faltam as informações abaixo.</p>{status && <><CompanyCard status={status} /><div className="app-success"><Check size={17} /> Sua cidade já está liberada!</div></>}
           <Field label="Inscrição municipal (CCM)" help={status?.readiness.missing.find(item => item.field === 'municipalRegistration')?.message || recommended.find(item => item.field === 'municipalRegistration')?.message || `Opcional quando a prefeitura não exigir. ${municipalRegistrationHelp}`}><input value={municipal} onChange={e => setMunicipal(e.target.value)} required={missing.includes('municipalRegistration')} aria-required={missing.includes('municipalRegistration')} /></Field>
           {(regime === 'SIMPLES_NACIONAL' || missing.includes('simplesNacionalTaxRateBps') || recommended.some(item => item.field === 'simplesNacionalTaxRateBps')) && <Field label="Alíquota efetiva do Simples (%)" help="Valor padrão: 6%. Ajuste com seu contador. Não é o percentual dos tributos aproximados da Lei 12.741."><input value={rate} onChange={e => setRate(e.target.value)} inputMode="decimal" /></Field>}
@@ -273,7 +288,7 @@ export default function Onboarding() {
         </>}
         {step === 3.1 && <><div className="step-icon"><Mail /></div><span className="app-eyebrow">UM EXTRA QUE FACILITA A VIDA</span><h2>Quem é seu contador?</h2><p>Todo mês o seu contador precisa das notas emitidas. A gente manda <strong>automaticamente, todo dia 1</strong>, por e-mail e WhatsApp: os PDFs, os XMLs e a planilha no formato necessário para ele. Você não precisa lembrar de nada.</p><Field label="Nome do contador ou escritório (opcional)"><input value={accountant.name} onChange={e => setAccountant({ ...accountant, name: e.target.value })} /></Field><Field label="E-mail do contador"><input type="email" value={accountant.email} onChange={e => setAccountant({ ...accountant, email: e.target.value })} /></Field><Field label="WhatsApp do contador" help="Precisamos de pelo menos um dos dois contatos."><input inputMode="tel" value={accountant.whatsapp} placeholder="(11) 99999-9999" onChange={e => setAccountant({ ...accountant, whatsapp: phoneMask(e.target.value) })} /></Field><button type="button" className="text-button" disabled={busy} onClick={() => { setAccountantSkipped(true); setStep(status?.tenant.integrations?.abacatepay ? 5 : 4); }}>Não tenho contador agora</button></>}
         {step === 5 && id && <OnboardingAssistant key={base} base={base} products={products.length} onUnauthorized={handleError} onManage={() => setView('agents')} onDone={() => { setView('panel'); void refreshPanel(); }} />}
-        {step !== 5 && <div className="form-actions">{step === 2 && <button type="button" className="app-secondary" onClick={() => setStep(1)} disabled={busy}><ArrowLeft size={16} /> Voltar</button>}<button className="app-primary" type="submit" disabled={busy || (!!error && error.includes('ACAINFE_APP_KEY'))}>{busy ? <><Loader2 className="spin" size={17} /> Salvando…</> : <>{step === 2 ? 'Enviar certificado' : step === 3 ? 'Continuar' : 'Salvar e continuar'}<ArrowRight size={17} /></>}</button></div>}
+        {step !== 5 && <div className="form-actions">{step === 2 && <button type="button" className="app-secondary" onClick={() => setStep(1)} disabled={busy}><ArrowLeft size={16} /> Voltar</button>}{certificateIssue !== 'conflict' && <button className="app-primary" type="submit" disabled={busy || (!!error && error.includes('ACAINFE_APP_KEY'))}>{busy ? <><Loader2 className="spin" size={17} /> Salvando…</> : <>{step === 2 ? 'Enviar certificado' : step === 3 ? 'Continuar' : 'Salvar e continuar'}<ArrowRight size={17} /></>}</button>}</div>}
       </form></ValidationContext.Provider>}
       </section></div>}
       <p className="app-bottom-note"><ShieldCheck size={14} /> Sem mensalidade. Não vendeu, não pagou.</p>

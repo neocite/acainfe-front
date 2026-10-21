@@ -1,118 +1,79 @@
 import { after, before, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import express from 'express';
+import multer from 'multer';
 import type { Server } from 'node:http';
 import { createAppApi } from '../server/app-api';
 
-describe('Contenção de tomada de empresa por certificado', () => {
+// Local HTTP harness only: no real API, accounts, companies, or certificates.
+describe('Envio de certificado após correção da API externa', () => {
   let server: Server;
   let base: string;
   let forwarded: string[];
-  // This is an isolated authenticated-router harness, not an auth bypass in the
-  // application. No real upstream, users, certificates, or tenant data are used.
-  const tenant = { ownerUserIds: ['original-owner'], certificate: 'original-certificate' };
+  let upstreamStatus: number;
+  let upstreamBody: Record<string, unknown>;
   before(async () => {
     const app = express();
     app.use('/api/app', (req, res, next) => {
-      if (!req.get('x-test-user')) {
-        res.status(401).json({ error: 'UNAUTHORIZED' });
-        return;
-      }
+      if (!req.get('x-test-user')) { res.status(401).json({ error: 'UNAUTHORIZED' }); return; }
       next();
     });
     app.use('/api/app', createAppApi((req, res) => {
       forwarded.push(`${req.method} ${req.originalUrl}`);
-      // Model the unsafe external service. Any certificate request reaching
-      // this handler would mutate state, even if its response were discarded.
-      if (req.originalUrl.includes('/onboarding/certificate')) {
-        tenant.ownerUserIds.push(req.get('x-test-user')!);
-        tenant.certificate = 'attacker-certificate';
+      if (req.path === '/onboarding/certificate') {
+        assert.equal(req.file?.originalname, '99000001000101.pfx');
+        assert.equal(req.body.password, 'test-only');
       }
-      res.json({ ok: true });
+      res.status(upstreamStatus).json(upstreamBody);
+      req.file?.buffer.fill(0);
+      if (req.body?.password) delete req.body.password;
     }));
+    app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+      res.status(err instanceof multer.MulterError ? 422 : 500).json({ error: 'VALIDATION' });
+    });
     server = app.listen(0, '127.0.0.1');
     await new Promise<void>(resolve => server.once('listening', resolve));
     const address = server.address();
     assert.ok(address && typeof address !== 'string');
     base = `http://127.0.0.1:${address.port}`;
   });
-  beforeEach(() => { forwarded = []; });
-  after(async () => {
-    await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  beforeEach(() => { forwarded = []; upstreamStatus = 201; upstreamBody = { tenant: { id: 'test-tenant', cnpj: '99000001000101' } }; });
+  after(async () => { await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve())); });
+  function upload(filename = '99000001000101.pfx', password: string | null = 'test-only', size = 20) {
+    const form = new FormData();
+    form.append('file', new Blob([new Uint8Array(size)]), filename);
+    if (password !== null) form.append('password', password);
+    return fetch(`${base}/api/app/onboarding/certificate`, { method: 'POST', headers: { 'x-test-user': 'synthetic-owner' }, body: form });
+  }
+  it('reabre o multipart para o proxy, inclusive para renovação pelo dono', async () => {
+    const response = await upload();
+    assert.equal(response.status, 201);
+    assert.deepEqual(await response.json(), upstreamBody);
+    assert.deepEqual(forwarded, ['POST /api/app/onboarding/certificate']);
   });
-
-  it('bloqueia multipart antes de ler ou encaminhar certificado e senha, inclusive de um proprietário', async () => {
-    for (const user of ['unrelated-user', 'original-owner']) {
-      const form = new FormData();
-      form.append('file', new Blob(['self-signed-pkcs12-test']), 'attacker.pfx');
-      form.append('password', 'test-only');
-      const response = await fetch(`${base}/api/app/onboarding/certificate`, {
-        method: 'POST', headers: { 'x-test-user': user }, body: form,
-      });
-      assert.equal(response.status, 503);
-      const data = await response.json();
-      assert.equal(data.error, 'CERTIFICATE_ONBOARDING_UNAVAILABLE');
-      assert.match(data.message, /Nenhuma empresa ou certificado foi alterado/);
-      assert.doesNotMatch(JSON.stringify(data), /test-only|self-signed-pkcs12-test/);
-    }
-    assert.deepEqual(forwarded, []);
-    assert.deepEqual(tenant, { ownerUserIds: ['original-owner'], certificate: 'original-certificate' });
-  });
-
-  it('não permite contornar o bloqueio usando JSON, query, barra, caixa ou caminhos codificados', async () => {
-    for (const route of [
-      '/onboarding/certificate', '/onboarding/certificate?replace=true',
-      '/onboarding/certificate/', '/onboarding/Certificate',
-      '/onboarding/%63ertificate', '/onboarding//certificate',
-      '/companies/victim/certificate', '/onboarding/certificate/extra',
-    ]) {
-      const response = await fetch(`${base}/api/app${route}`, {
-        method: 'POST', headers: { 'x-test-user': 'unrelated-user', 'content-type': 'application/json' },
-        body: JSON.stringify({ pfxBase64: 'test-only', password: 'test-only' }),
-      });
-      assert.ok([404, 503].includes(response.status), `${route}: ${response.status}`);
-    }
+  for (const [status, code] of [[409, 'CONFLICT'], [422, 'CERTIFICATE_INVALID']] as const) {
+    it(`preserva ${status}, código e mensagem da API`, async () => {
+      upstreamStatus = status;
+      upstreamBody = { code, message: `Mensagem original ${code}` };
+      const response = await upload();
+      assert.equal(response.status, status);
+      assert.deepEqual(await response.json(), upstreamBody);
+      assert.equal(forwarded.length, 1);
+    });
+  }
+  for (const [name, password] of [['invalid.txt', 'test-only'], ['99000001000101.pfx', ''], ['99000001000101.pfx', null]] as const) {
+    it(`rejeita arquivo/senha inválidos sem encaminhar: ${name}, senha ${password === null ? 'ausente' : password ? 'preenchida' : 'vazia'}`, async () => {
+      assert.equal((await upload(name, password)).status, 422);
+      assert.deepEqual(forwarded, []);
+    });
+  }
+  it('mantém limite de tamanho do arquivo', async () => {
+    assert.equal((await upload('99000001000101.pfx', 'test-only', 10 * 1024 * 1024 + 1)).status, 422);
     assert.deepEqual(forwarded, []);
   });
-
-  it('continua exigindo autenticação antes do bloqueio', async () => {
-    const response = await fetch(`${base}/api/app/onboarding/certificate`, { method: 'POST' });
-    assert.equal(response.status, 401);
+  it('mantém autenticação e allowlist', async () => {
+    assert.equal((await fetch(`${base}/api/app/onboarding/certificate`, { method: 'POST' })).status, 401);
+    assert.equal((await fetch(`${base}/api/app/unknown`, { headers: { 'x-test-user': 'synthetic-owner' } })).status, 404);
     assert.deepEqual(forwarded, []);
-  });
-
-  it('rejeita reivindicações simultâneas sem criar vínculo nem trocar o certificado', async () => {
-    const responses = await Promise.all(Array.from({ length: 10 }, (_, index) =>
-      fetch(`${base}/api/app/onboarding/certificate`, {
-        method: 'POST',
-        headers: { 'x-test-user': `unrelated-user-${index}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ pfxBase64: 'test-only', password: 'test-only' }),
-      }),
-    ));
-    for (const response of responses) {
-      assert.equal(response.status, 503);
-      await response.arrayBuffer();
-    }
-    assert.deepEqual(forwarded, []);
-    assert.deepEqual(tenant, { ownerUserIds: ['original-owner'], certificate: 'original-certificate' });
-  });
-
-  it('mantém as rotas existentes e suas queries sem encaminhar verbos não permitidos', async () => {
-    for (const [method, route] of [
-      ['GET', '/me'], ['PUT', '/me'],
-      ['GET', '/companies/original-company/fiscal-settings'],
-      ['GET', '/companies/original-company/products?pendingTaxReview=true'],
-      ['PATCH', '/companies/original-company'],
-    ]) {
-      const response = await fetch(`${base}/api/app${route}`, { method, headers: { 'x-test-user': 'original-owner' } });
-      assert.equal(response.status, 200);
-    }
-    assert.equal(forwarded.length, 5);
-    assert.ok(forwarded.includes('GET /api/app/companies/original-company/products?pendingTaxReview=true'));
-    for (const method of ['PUT', 'PATCH', 'DELETE', 'GET', 'HEAD']) {
-      const response = await fetch(`${base}/api/app/onboarding/certificate`, { method, headers: { 'x-test-user': 'unrelated-user' } });
-      assert.equal(response.status, 404);
-    }
-    assert.equal(forwarded.length, 5);
   });
 });
