@@ -37,7 +37,7 @@ describe('Servidor e login na publicação', () => {
     assert.doesNotMatch(manifest, /\[\[services\.production\.rewrites\]\]/);
   });
   it('serve a landing e a rota do app em modo produção', async () => {
-    for (const route of ['/', '/app']) {
+    for (const route of ['/', '/app', '/app/conta', '/sign-in', '/sign-up', '/sign-in/sso-callback', '/sign-up/verify-email-address']) {
       const response = await fetch(`${base}${route}`);
       assert.equal(response.status, 200);
       assert.match(response.headers.get('content-type') || '', /text\/html/);
@@ -47,7 +47,7 @@ describe('Servidor e login na publicação', () => {
     }
   });
   it('não libera usuário ou empresas sem sessão', async () => {
-    for (const route of ['/api/auth/user', '/api/app/me', '/api/app/fiscal-profiles', '/api/app/companies/company/products', '/api/app/companies/company/mcp-keys', '/api/app/companies/company/past-sales/reconcile?period=2026-10', '/api/app/companies/company/fiscal-settings']) {
+    for (const route of ['/api/app/me', '/api/app/fiscal-profiles', '/api/app/companies/company/products', '/api/app/companies/company/mcp-keys', '/api/app/companies/company/past-sales/reconcile?period=2026-10', '/api/app/companies/company/fiscal-settings']) {
       const response = await fetch(`${base}${route}`);
       assert.equal(response.status, 401);
       assert.match(response.headers.get('content-type') || '', /application\/json/);
@@ -76,18 +76,42 @@ describe('Servidor e login na publicação', () => {
       assert.equal((await response.json()).error, 'UNAUTHORIZED');
     }
   });
-  it('encaminha o login ao provedor com e-mail, PKCE e solicitação de login', async () => {
-    const response = await fetch(`${base}/api/login`, { redirect: 'manual' });
-    assert.equal(response.status, 302);
-    const location = new URL(response.headers.get('location')!);
-    assert.equal(location.protocol, 'https:');
-    assert.equal(location.hostname, 'replit.com');
-    assert.match(location.searchParams.get('scope') || '', /\bemail\b/);
-    assert.equal(location.searchParams.get('prompt'), 'login');
-    assert.equal(location.searchParams.get('code_challenge_method'), 'S256');
-    assert.ok(location.searchParams.get('state'));
-    assert.ok(location.searchParams.get('nonce'));
-    assert.ok(response.headers.get('set-cookie'));
+  it('remove as rotas de sessão legadas; login e logout pertencem ao Clerk', async () => {
+    for (const route of ['/api/login', '/api/callback', '/api/logout', '/api/auth/user']) {
+      const response = await fetch(`${base}${route}`, { redirect: 'manual' });
+      assert.equal(response.status, 404);
+      assert.equal(response.headers.get('set-cookie'), null);
+    }
+  });
+  it('não aceita cabeçalhos de identidade nem cookie legado como autenticação', async () => {
+    const response = await fetch(`${base}/api/app/me`, { headers: {
+      'x-user-id': 'forged-user', 'x-user-email': 'forged@example.test',
+      cookie: 'connect.sid=forged',
+    } });
+    assert.equal(response.status, 401);
+  });
+  it('preserva a proteção de origem nas alterações de dados', async () => {
+    const response = await fetch(`${base}/api/app/me`, {
+      method: 'PUT', headers: { origin: 'https://other.example.test', 'content-type': 'application/json' }, body: '{}',
+    });
+    assert.equal(response.status, 403);
+  });
+  it('não autoriza leitura credenciada das APIs privadas por outra origem', async () => {
+    for (const route of ['/api/app/me', '/api/app/companies/company/mcp-keys']) {
+      const response = await fetch(`${base}${route}`, { headers: {
+        origin: 'https://malicious.example.test',
+        cookie: '__session=invalid-test-session',
+      } });
+      assert.equal(response.status, 401);
+      assert.equal(response.headers.get('access-control-allow-origin'), null);
+      assert.equal(response.headers.get('access-control-allow-credentials'), null);
+    }
+    const preflight = await fetch(`${base}/api/app/me`, { method: 'OPTIONS', headers: {
+      origin: 'https://malicious.example.test',
+      'access-control-request-method': 'GET',
+    } });
+    assert.equal(preflight.headers.get('access-control-allow-origin'), null);
+    assert.equal(preflight.headers.get('access-control-allow-credentials'), null);
   });
   it('retorna JSON 404 para API inexistente, nunca o HTML do app', async () => {
     const response = await fetch(`${base}/api/rota-inexistente`);

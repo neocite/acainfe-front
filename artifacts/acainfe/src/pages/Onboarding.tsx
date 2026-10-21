@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'wouter';
+import { useUser, useClerk } from '@clerk/react';
 import { ArrowRight, ArrowLeft, Check, ShieldCheck, FileKey, Sparkles, Bot, LogOut, Loader2, Wallet, Building2, AlertTriangle, Leaf, Mail } from 'lucide-react';
 import { api, ApiError, phoneMask } from '../lib/api';
 import { isOptionalCompanyField, onboardingCompanyPatch, simplesRateInput, municipalRegistrationHelp, type ReadinessItem, type OptionalCompanyField } from '../lib/company-details';
@@ -31,7 +32,6 @@ import '../products.css';
 import '../fiscal-company.css';
 import '../mcp-keys.css';
 
-type User = AuthUser;
 type CompanyStatus = CompanyProfile & {
   tenant: { id: string; cnpj?: string; taxRegime?: string; municipalRegistration?: string | null; simplesNacionalTaxRateBps?: number | null; status?: string; integrations?: { abacatepay?: boolean }; certificateExpiresAt?: string; accountant?: unknown; businessType?: string | null; issRateBps?: number | null; environment?: string; approximateTaxes?: ApproximateTaxes | null };
   abacatepay?: { connected: boolean; connectedAt?: string | null; webhookEndpoint?: string | null; webhookUpToDate?: boolean | null; defaultProduct?: { decided: boolean; productId: string | null } };
@@ -61,8 +61,15 @@ function Field({ label, help, children }: { label: string; help?: string; childr
   return <label className="app-field"><span>{label}</span>{children}{help && <small>{help}</small>}{error && <small className="danger-text" role="alert">{error}</small>}</label>;
 }
 export default function Onboarding() {
-  const [user, setUser] = useState<User | null>(null);
+  const { user: clerkUser } = useUser();
+  const { signOut } = useClerk();
+  const user: AuthUser | null = clerkUser ? {
+    id: clerkUser.externalId ?? clerkUser.id,
+    email: clerkUser.primaryEmailAddress?.emailAddress || '',
+    name: clerkUser.fullName || '',
+  } : null;
   const [loading, setLoading] = useState(true);
+  const [meLoaded, setMeLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [unauthorized, setUnauthorized] = useState(false);
@@ -107,11 +114,7 @@ export default function Onboarding() {
   }
   function handleError(e: unknown) {
     setError(e instanceof Error ? e.message : 'Não foi possível concluir.');
-    setUnauthorized(e instanceof ApiError && e.status === 401);
-    if (e instanceof ApiError && e.status === 401) {
-      setUser(null);
-      if (!new URLSearchParams(location.search).has('error')) window.location.replace('/api/login');
-    }
+    setUnauthorized(e instanceof ApiError && (e.status === 401 || e.status === 403));
     if (e instanceof ApiError && e.status === 422) {
       const errors: Record<string, string> = {};
       const details = e.details as any;
@@ -148,22 +151,13 @@ export default function Onboarding() {
       setStep(detailedEntry.step);
       setView(detailedEntry.view);
     }
+    setMeLoaded(true);
   }
   useEffect(() => {
     let mounted = true;
-    api<unknown>('/auth/user').then(async u => {
-      if (!mounted) return;
-      if (!isAuthUser(u)) throw new ApiError(401, 'Entre com uma conta com e-mail válido para continuar.');
-      setUser(u); setName(u.name);
-      try { await loadMe(); } catch (e) { if (mounted) handleError(e); }
-    }).catch(e => {
-      if (!mounted) return;
-      if (e instanceof ApiError && e.status === 401 && !new URLSearchParams(location.search).has('error')) {
-        window.location.replace('/api/login');
-        return;
-      }
-      handleError(e);
-    })
+    // PrivatePage mounts us only once Clerk has validated its cookie session.
+    setName(user?.name || '');
+    loadMe().catch(e => { if (mounted) handleError(e); })
       .finally(() => { if (mounted) setLoading(false); });
     return () => { mounted = false; };
   }, []);
@@ -222,18 +216,11 @@ export default function Onboarding() {
   const recommended = status?.readiness.recommended || [];
   const needsNumbering = missing.includes('numbering');
   const isWaitlist = status?.availability.status === 'WAITLIST';
-  const errorBox = error && <div className="app-alert" role="alert"><AlertTriangle size={18} /><div>{error}{unauthorized && <a href="/api/login">Entrar novamente <ArrowRight size={14} /></a>}{!unauthorized && <button type="button" onClick={() => run(loadMe)}>Tentar novamente</button>}</div></div>;
+  const errorBox = error && <div className="app-alert" role="alert"><AlertTriangle size={18} /><div>{error}{unauthorized && <p>Não foi possível acessar seus dados. Tente novamente ou saia para usar outra conta.</p>}<button type="button" onClick={() => run(loadMe)}>Tentar novamente</button></div></div>;
   if (loading) return <div className="app-loading"><Loader2 className="spin" size={28} /><p>Preparando seu espaço…</p></div>;
-  if (!isAuthUser(user)) return <div className="login-page">
-    <div className="login-nav"><Brand /><Link href="/">Voltar para o site <ArrowLeft size={16} /></Link></div>
-    <main className="login-layout"><section className="login-story"><span className="app-eyebrow"><Leaf size={16} /> MENOS BUROCRACIA. MAIS VENDAS.</span><h1>Seu próximo passo.<br /><em>Não sua próxima<br />dor de cabeça.</em></h1><p>Deixe a nota fiscal com a gente.<br />Seu negócio tem coisa melhor pra fazer.</p><div className="login-note"><ShieldCheck size={22} /><span>Sem mensalidade.<br /><strong>Não vendeu, não pagou.</strong></span></div></section>
-      <section className="login-card"><div className="login-icon"><Sparkles size={28} /></div><span className="app-eyebrow">BORA COMEÇAR?</span><h2>Seu negócio,<br />no automático.</h2><p>Entre na sua conta para configurar a empresa. É rápido e sem complicação.</p>
-        {(error || new URLSearchParams(location.search).has('error')) && <div className="app-alert" role="alert">{error || 'Não foi possível entrar. Tente novamente em uma nova janela.'}</div>}
-        <a className="app-primary google-login" href="/api/login"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M21.6 12.2c0-.7-.1-1.4-.2-2.1H12v4h5.4a4.7 4.7 0 0 1-2 3v2.5h3.2c1.9-1.8 3-4.3 3-7.4ZM12 22c2.7 0 5-.9 6.6-2.4l-3.2-2.5c-.9.6-2 .9-3.4.9a6 6 0 0 1-5.6-4.1H3.1v2.6A10 10 0 0 0 12 22ZM6.4 13.9A6 6 0 0 1 6.1 12c0-.7.1-1.3.3-1.9V7.5H3.1A10 10 0 0 0 2 12c0 1.6.4 3.1 1.1 4.5l3.3-2.6ZM12 6c1.5 0 2.8.5 3.8 1.5l2.8-2.8A9.6 9.6 0 0 0 12 2a10 10 0 0 0-8.9 5.5l3.3 2.6A6 6 0 0 1 12 6Z"/></svg>Continuar com Google <ArrowRight size={18} /></a>
-        <small>Login seguro via Replit Auth. Escolha Google na próxima tela.</small><div className="login-divider" /><div className="login-check"><Check size={16} /> Sem cartão de crédito</div><div className="login-check"><Check size={16} /> Seu certificado protegido</div><div className="login-check"><Check size={16} /> Você só paga por nota emitida</div>
-      </section></main><div className="login-footer">açaínfe — seu negócio vende. a gente cuida da nota.</div></div>;
+  if (!isAuthUser(user) || !meLoaded) return <main className="onboarding-page min-h-screen p-8"><Brand /><section className="app-card mx-auto mt-10 max-w-xl"><h1>Não foi possível carregar sua conta</h1>{errorBox || <p>Entre com uma conta com e-mail válido para continuar.</p>}<button className="app-secondary" onClick={() => signOut({ redirectUrl: import.meta.env.BASE_URL })}>Sair</button></section></main>;
 
-  return <div className="onboarding-page"><header className="app-header"><Brand /><div className="app-account"><span>{user.name || user.email}</span><button title="Sair" onClick={() => run(async () => { await api('/logout', 'POST'); setUser(null); setStatus(null); })}><LogOut size={18} /></button></div></header>
+  return <div className="onboarding-page" data-testid="app-data-loaded"><header className="app-header"><Brand /><div className="app-account"><Link href="/app/conta">{user.name || user.email}</Link><button title="Sair" onClick={() => signOut({ redirectUrl: import.meta.env.BASE_URL })}><LogOut size={18} /></button></div></header>
     {billing?.status === 'BLOCKED' && <div className="blocked-banner" role="alert">Emissão pausada por saldo em aberto. A emissão de nota fiscal é obrigatória: enquanto estiver pausada, você pode ficar em desacordo com a legislação. Suas vendas continuam registradas e as notas saem automaticamente assim que o pagamento for confirmado. <button onClick={() => setView('billing')}>Pagar saldo</button></div>}
     <div className="app-body">
       {id && !isWaitlist && <nav className="app-tabs" aria-label="Área da empresa"><button className={view === 'wizard' ? 'active' : ''} title="Certificado, dados pessoais e configuração inicial da empresa" onClick={() => setView('wizard')}><Sparkles size={16} /> Configuração</button><button className={view === 'panel' ? 'active' : ''} onClick={() => { setView('panel'); void refreshPanel(); }}><Building2 size={16} /> Painel</button><button className={view === 'gateways' ? 'active' : ''} onClick={() => { setView('gateways'); void refreshPanel(); }}><Leaf size={16} /> Gateways de pagamento</button><button className={view === 'fiscal' ? 'active' : ''} onClick={() => setView('fiscal')}><FileKey size={16} /> Dados fiscais</button><button className={view === 'billing' ? 'active' : ''} onClick={() => { setView('billing'); void run(async () => setBilling(await api(`${base}/billing`))); }}><Wallet size={16} /> Saldo</button><button className={view === 'agents' ? 'active' : ''} onClick={() => setView('agents')}><Bot size={16} /> Agentes de IA</button></nav>}

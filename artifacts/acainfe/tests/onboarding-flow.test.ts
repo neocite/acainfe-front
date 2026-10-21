@@ -35,7 +35,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     // Vite loads the real page and its styles; middleware mode opens no HTTP port.
     const { createServer } = await import('vite');
     modules = await createServer({ configFile: false, envFile: false, root: process.cwd(), appType: 'custom',
-      resolve: { alias: { '@': `${process.cwd()}/src` }, dedupe: ['react', 'react-dom'] },
+      resolve: { alias: { '@': `${process.cwd()}/src`, '@clerk/react': `${process.cwd()}/tests/fixtures/clerk.ts` }, dedupe: ['react', 'react-dom'] },
       server: { middlewareMode: true, hmr: false, ws: false, watch: null }, optimizeDeps: { noDiscovery: true } });
     ({ default: Onboarding } = await modules.ssrLoadModule('/src/pages/Onboarding.tsx'));
   });
@@ -63,8 +63,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     globalThis.fetch = async (url, init) => {
       const path = String(url), method = init?.method || 'GET';
       let data: unknown;
-      if (path === '/api/auth/user') data = { id: 'test-user', email: 'user@example.test', name: 'Pessoa de teste' };
-      else if (path === '/api/app/me') data = { user: { name: 'Pessoa de teste', whatsapp: '' }, companies: [company] };
+      if (path === '/api/app/me') data = { user: { name: 'Pessoa de teste', whatsapp: '' }, companies: [company] };
       else if (path === '/api/app/fiscal-profiles') {
         profilesRequested++;
         data = [

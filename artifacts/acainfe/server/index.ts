@@ -1,26 +1,21 @@
 import express from 'express';
-import session from 'express-session';
-import pgSession from 'connect-pg-simple';
-import pg from 'pg';
+import { clerkMiddleware } from '@clerk/express';
+import { publishableKeyFromHost } from '@clerk/shared/keys';
+import { CLERK_PROXY_PATH, clerkProxyMiddleware, getClerkProxyHost } from './middlewares/clerkProxyMiddleware';
+import { requireAuth } from './middlewares/requireAuth';
 import multer from 'multer';
 import rateLimit from 'express-rate-limit';
-import * as oidc from 'openid-client';
 import { createServer } from 'vite';
 import { readFile } from 'node:fs/promises';
+import { createServer as createHttpServer } from 'node:http';
 import path from 'node:path';
 import sharp from 'sharp';
 import { PRICE_PER_INVOICE_CENTS, brl } from '../src/config/pricing';
 import { isAllowedAppRoute } from './app-routes';
 import { appUpstreamPath, appJsonBody } from './app-proxy-request';
 
-declare module 'express-session' {
-  interface SessionData {
-    auth?: { sub: string; email: string; name: string; expiresAt: number; refreshToken?: string };
-    login?: { state: string; verifier: string; nonce: string };
-  }
-}
-
 const app = express();
+const httpServer = createHttpServer(app);
 app.set('trust proxy', 1);
 app.disable('x-powered-by');
 app.use((_req, res, next) => {
@@ -28,17 +23,21 @@ app.use((_req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   next();
 });
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL });
-if (!process.env.SESSION_SECRET) throw new Error('Configure SESSION_SECRET.');
-app.use(session({
-  secret: process.env.SESSION_SECRET,
-  store: new (pgSession(session))({ pool, tableName: 'app_sessions', createTableIfMissing: false }),
-  resave: false, saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: 'lax', secure: 'auto', maxAge: 7 * 86400000 },
-}));
+app.use(CLERK_PROXY_PATH, clerkProxyMiddleware());
+// Browser APIs are same-origin. Never reflect arbitrary origins with credentials:
+// that would let a sibling origin read private data using Clerk session cookies.
 app.use('/api', (_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
 app.use('/api', rateLimit({ windowMs: 60000, limit: 90, standardHeaders: true, legacyHeaders: false, message: { message: 'Muitas tentativas. Aguarde um minuto.' } }));
 app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true }));
+app.use(
+  clerkMiddleware((req) => ({
+    publishableKey: publishableKeyFromHost(
+      getClerkProxyHost(req) ?? "",
+      process.env.CLERK_PUBLISHABLE_KEY,
+    ),
+  })),
+);
 app.use('/api', (req, res, next) => {
   if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
     const origin = req.get('origin');
@@ -49,71 +48,7 @@ app.use('/api', (req, res, next) => {
   next();
 });
 
-let oidcConfig: Promise<oidc.Configuration> | undefined;
-function getOidc() {
-  return oidcConfig ??= oidc.discovery(new URL(process.env.ISSUER_URL || 'https://replit.com/oidc'), process.env.REPL_ID!, undefined, oidc.None());
-}
 function origin(req: express.Request) { return `${req.protocol}://${req.get('host')}`; }
-app.get('/api/login', async (req, res) => {
-  try {
-    const config = await getOidc();
-    const verifier = oidc.randomPKCECodeVerifier();
-    const state = oidc.randomState();
-    const nonce = oidc.randomNonce();
-    req.session.login = { verifier, state, nonce };
-    const url = oidc.buildAuthorizationUrl(config, {
-      redirect_uri: `${origin(req)}/api/callback`, scope: 'openid email profile offline_access',
-      code_challenge: await oidc.calculatePKCECodeChallenge(verifier), code_challenge_method: 'S256',
-      state, nonce, prompt: 'login',
-    });
-    req.session.save(err => err ? res.redirect('/app?error=session') : res.redirect(url.href));
-  } catch { res.redirect('/app?error=auth'); }
-});
-app.get('/api/callback', async (req, res) => {
-  try {
-    const login = req.session.login;
-    if (!login) throw new Error('Missing login');
-    const tokens = await oidc.authorizationCodeGrant(await getOidc(), new URL(req.originalUrl, origin(req)), {
-      pkceCodeVerifier: login.verifier, expectedState: login.state, expectedNonce: login.nonce,
-    });
-    const claims = tokens.claims();
-    if (!claims?.sub || typeof claims.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(claims.email)) throw new Error('Missing identity');
-    const auth = {
-      sub: claims.sub, email: claims.email,
-      name: String(claims.name || [claims.first_name, claims.last_name].filter(Boolean).join(' ') || ''),
-      expiresAt: Math.floor(Date.now() / 1000) + (tokens.expires_in ?? 3600),
-      refreshToken: tokens.refresh_token,
-    };
-    req.session.regenerate(err => {
-      if (err) return res.redirect('/app?error=session');
-      req.session.auth = auth;
-      req.session.save(err => res.redirect(err ? '/app?error=session' : '/app'));
-    });
-  } catch { res.redirect('/app?error=auth'); }
-});
-app.post('/api/logout', (req, res) => req.session.destroy(() => { res.clearCookie('connect.sid'); res.json({ ok: true }); }));
-async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const auth = req.session.auth;
-  if (!auth || !auth.sub?.trim() || typeof auth.email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(auth.email) || !Number.isFinite(auth.expiresAt)) {
-    res.status(401).json({ error: 'UNAUTHORIZED', message: 'Entre com uma conta com e-mail válido para continuar.' }); return;
-  }
-  if (Date.now() / 1000 >= auth.expiresAt) {
-    try {
-      if (!auth.refreshToken) throw new Error('Expired');
-      const tokens = await oidc.refreshTokenGrant(await getOidc(), auth.refreshToken);
-      auth.expiresAt = Math.floor(Date.now() / 1000) + (tokens.expires_in ?? 3600);
-      auth.refreshToken = tokens.refresh_token ?? auth.refreshToken;
-    } catch {
-      req.session.destroy(() => {});
-      res.status(401).json({ error: 'UNAUTHORIZED', message: 'Sua sessão expirou. Entre novamente.' }); return;
-    }
-  }
-  next();
-}
-app.get('/api/auth/user', requireAuth, (req, res) => {
-  const { sub, email, name } = req.session.auth!;
-  res.json({ id: sub, email, name });
-});
 
 function apiBase() { return (process.env.ACAINFE_API_URL || '').replace(/\/$/, ''); }
 let cachedPricing: { pricePerInvoiceCents: number; monthlyFeeCents: number; [key: string]: unknown } | undefined;
@@ -159,10 +94,10 @@ app.use('/api', (_req, res) => {
 });
 async function proxyApi(req: express.Request, res: express.Response) {
   try {
-    const auth = req.session.auth!;
+    const auth = req.appIdentity!;
     const headers: Record<string, string> = {
       'x-app-key': process.env.ACAINFE_APP_KEY!,
-      'x-user-id': auth.sub, 'x-user-email': auth.email,
+      'x-user-id': auth.id, 'x-user-email': auth.email,
       'x-user-name': encodeURIComponent(auth.name), 'ngrok-skip-browser-warning': '1',
     };
     let body: string | FormData | undefined;
@@ -204,11 +139,11 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(root, 'dist/public'), { index: false }));
   app.get('/{*splat}', async (req, res) => res.type('html').send(await pageHtml(await readFile(path.join(root, 'dist/public/index.html'), 'utf8'), req)));
 } else {
-  const vite = await createServer({ configFile: path.join(root, 'vite.config.ts'), server: { middlewareMode: true }, appType: 'spa' });
-  app.get(['/', '/app'], async (req, res) => {
+  const vite = await createServer({ configFile: path.join(root, 'vite.config.ts'), server: { middlewareMode: true, hmr: { server: httpServer, path: '/__vite_hmr' } }, appType: 'spa' });
+  app.get(['/', '/app', '/app/conta', '/sign-in/{*splat}', '/sign-up/{*splat}', '/sign-in', '/sign-up'], async (req, res) => {
     const template = await pageHtml(await readFile(path.join(root, 'index.html'), 'utf8'), req);
     res.type('html').send(await vite.transformIndexHtml(req.originalUrl, template));
   });
   app.use(vite.middlewares);
 }
-app.listen(Number(process.env.PORT) || 5000, '0.0.0.0', () => console.log('açaínfe ready'));
+httpServer.listen(Number(process.env.PORT) || 5000, '0.0.0.0', () => console.log('açaínfe ready'));

@@ -31,3 +31,5 @@ externalPort = 80
 deploymentTarget = "autoscale"
 run = ["pnpm", "--filter", "@workspace/acainfe", "run", "start"]
 build = ["pnpm", "--filter", "@workspace/acainfe", "run", "build"]
+
+[agent]

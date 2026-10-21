@@ -1,6 +1,6 @@
 # açaínfe
 
-Landing page em `/` e cadastro inicial em `/app`. A operação de notas acontece pela API externa e pelo assistente MCP, não por um emissor local.
+Landing page em `/`, autenticação em `/sign-in` e `/sign-up`, cadastro inicial em `/app` e consulta da conta em `/app/conta`. A operação de notas acontece pela API externa e pelo assistente MCP, não por um emissor local.
 
 ## Desenvolvimento
 
@@ -14,12 +14,14 @@ Landing page em `/` e cadastro inicial em `/app`. A operação de notas acontece
 
 - `ACAINFE_API_URL`: variável compartilhada; alterar aqui quando o endereço da API mudar. Nenhuma URL externa deve ser fixada no frontend.
 - `ACAINFE_APP_KEY`: Secret obrigatório para rotas privadas; nunca usar prefixo `VITE_`.
-- `SESSION_SECRET`: Secret de sessão.
-- `DATABASE_URL` e `REPL_ID`: fornecidos pelo ambiente.
-- Replit Auth via OIDC, com PKCE, state e nonce. O usuário escolhe Google no fluxo de login do Replit.
+- Clerk gerenciado autentica usuários com cookies de sessão na mesma origem. `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY` e `VITE_CLERK_PUBLISHABLE_KEY` são provisionados automaticamente.
+- O proxy do Clerk precisa ser montado antes dos parsers do Express; a resolução de domínio deve permanecer igual no cliente e no servidor.
 - Todas as entradas pela landing precisam passar pela autenticação antes de exibir as etapas. Nunca considerar `{}` ou e-mail em branco uma sessão válida; sem sessão, encaminhar ao login. Após autenticar, retomar a etapa indicada pelos dados da API.
 - O serviço do artefato deve publicar o processo Express (`start`), sem modo estático ou rewrite de `/api/*` para HTML. O comando de publicação da raiz não substitui a configuração de produção do serviço do artefato.
-- O banco local guarda somente sessões em `app_sessions`; empresas, certificados, contatos e saldos ficam na API externa.
+- A tabela legada `app_sessions` permanece intacta, mas não é usada pelo Clerk. Empresas, certificados, contatos e saldos ficam na API externa, sem tabela local de usuários.
+- O vínculo com a API externa continua em `x-user-id`, usando exclusivamente `sessionClaims.userId` validado pelo Clerk. Para contas migradas é o ID original; para contas novas é o ID Clerk. Nunca substituir por `auth.userId`, nem confiar em cabeçalhos de identidade enviados pelo navegador.
+- O frontend usa `apiRequest` de `src/lib/queryClient.ts` (também reexportado como `api` em `src/lib/api.ts`), sem bearer tokens. Esperar o Clerk carregar antes de consultar dados privados; 401/403 de usuário já autenticado deve mostrar erro, não redirecionar ao login.
+- A API privada é somente da mesma origem. Não aplicar CORS global com reflexão de origem e credenciais: subdomínios não podem ler respostas privadas usando os cookies da conta. O proxy Clerk não precisa desse CORS global.
 - Certificados e senhas passam pelo servidor em memória, sem gravar arquivos em disco. Chaves MCP retornadas ficam apenas na memória da página, sem localStorage.
 - Não criar modos de demonstração que simulem certificado válido, emissão ou confirmação de Pix.
 

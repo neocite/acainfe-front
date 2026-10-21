@@ -67,7 +67,7 @@ export default function Landing() {
       <header className="csr-nav">
         <a href="#inicio" className="csr-logo" aria-label="açaínfe, início">aça<span>í</span>nfe<i /></a>
         <nav aria-label="Navegação principal">{NAV.map(([href, label]) => <a key={href} href={href}>{label}</a>)}</nav>
-        <Link className="csr-nav-link" href="/app">Entrar <span aria-hidden="true">↗</span></Link>
+        <Link className="csr-nav-link" href="/sign-in">Entrar <span aria-hidden="true">↗</span></Link>
       </header>
       <main>
         <section className="csr-hero">
@@ -77,7 +77,7 @@ export default function Landing() {
             <h1>Vendeu.<br /><em>A nota foi.</em></h1>
             <p className="csr-lead">Cada pagamento aprovado no AbacatePay ou na Hotmart vira uma NFS-e — sem planilha no fim do mês, {fee === 0 ? 'sem mensalidade nos meses quietos.' : 'com cobrança transparente.'}</p>
             <div className="csr-hero-actions">
-              <Link className="csr-button" href="/app">Começar agora <span aria-hidden="true">↗</span></Link>
+              <Link className="csr-button" href="/sign-up">Começar agora <span aria-hidden="true">↗</span></Link>
               <a className="csr-text-link" href="#como-funciona">Ver como funciona <span aria-hidden="true">↓</span></a>
             </div>
             <div className="csr-proofline"><span className="csr-check" aria-hidden="true">✓</span><span><strong>{P}</strong> por nota emitida com sucesso</span><span className="csr-proof-divider" /><span>{fee === 0 ? 'Sem taxa fixa' : `${brl(fee)} por mês`}</span></div>
@@ -110,7 +110,7 @@ export default function Landing() {
           <span id="compatibilidade" />
           <div className="csr-availability-copy"><span className="csr-label">DISPONÍVEL HOJE</span><h2>Uma cidade de cada vez.<br /><em>Com cuidado em cada nota.</em></h2><p>Atendimento atual para MEI e empresas do Simples Nacional. Estamos ampliando a cobertura municipal. Em outras cidades, cadastre-se para entrar na lista de espera.</p></div>
           <div className="csr-city-card"><span className="csr-pin" aria-hidden="true">◎</span><div><strong>São Bernardo do Campo</strong><span>São Paulo · MEI e Simples Nacional</span></div><span className="csr-active">ATIVO</span></div>
-          <Link href="/app" className="csr-availability-link">Ver disponibilidade para minha empresa <span aria-hidden="true">↗</span></Link>
+          <Link href="/sign-up" className="csr-availability-link">Ver disponibilidade para minha empresa <span aria-hidden="true">↗</span></Link>
           <p className="csr-independent">Produto independente, não afiliado ao AbacatePay ou à Hotmart.</p>
         </section>
         <section className="csr-faq" id="duvidas">
@@ -122,7 +122,7 @@ export default function Landing() {
           <span className="csr-label">PAGUE PELO QUE ACONTECE</span>
           <h2>Seu próximo pagamento<br />já pode virar <em>nota.</em></h2>
           <p>Configure uma vez. Depois, a venda aprovada faz o resto.</p>
-          <Link className="csr-button csr-button-light" href="/app">Começar agora <span aria-hidden="true">↗</span></Link>
+          <Link className="csr-button csr-button-light" href="/sign-up">Começar agora <span aria-hidden="true">↗</span></Link>
           <small>{fee === 0 ? 'Sem mensalidade. ' : ''}Sem taxa de adesão.</small>
         </section>
       </main>
