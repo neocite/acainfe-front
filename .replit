@@ -33,3 +33,7 @@ run = ["pnpm", "--filter", "@workspace/acainfe", "run", "start"]
 build = ["pnpm", "--filter", "@workspace/acainfe", "run", "build"]
 
 [agent]
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 180000
