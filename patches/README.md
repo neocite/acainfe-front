@@ -18,6 +18,13 @@ or relabel the package version to hide it.
 Regression coverage lives in the application's dependency-security tests and runs
 with its regular test suite.
 
+After restoring cached or pre-provisioned `node_modules`, run those tests rather
+than trusting the patched path name alone. If they still report `RangeError:
+Maximum call stack size exceeded`, reinstall with
+`CI=true pnpm install --frozen-lockfile --force` and rerun the tests. An ordinary
+frozen install can report "Already up to date" while leaving stale, unpatched
+files in place.
+
 ## postcss-selector-parser — GHSA-rj75-hqrm-r3gf
 
 The latest `@tailwindcss/typography` release pins the vulnerable 6.0.10 parser.

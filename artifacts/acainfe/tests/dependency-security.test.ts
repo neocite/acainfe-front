@@ -43,16 +43,44 @@ describe('Dependency security regressions', () => {
   });
 
   it('also bounds recursive walkers when callers supply an AST directly', () => {
-    for (const operation of [braces.compile, braces.expand, braces.stringify]) {
-      let ast: object = { type: 'text', value: 'a' };
-      for (let depth = 0; depth < 5000; depth++) {
-        ast = { type: 'root', nodes: [ast] };
+    for (const implementation of [braces, globBraces]) {
+      for (const operation of [implementation.compile, implementation.expand, implementation.stringify]) {
+        let ast: object = { type: 'text', value: 'a' };
+        for (let depth = 0; depth < 5000; depth++) {
+          ast = { type: 'root', nodes: [ast] };
+        }
+        assert.throws(() => operation(ast), {
+          name: 'SyntaxError',
+          message: /maximum nesting depth/,
+        });
       }
-      assert.throws(() => operation(ast), {
-        name: 'SyntaxError',
-        message: /maximum nesting depth/,
-      });
     }
+  });
+
+  it('does not let caller options disable the hard nesting ceiling', () => {
+    const pattern = '{'.repeat(256) + 'a,b' + '}'.repeat(256);
+    const options = { maxLength: Infinity, rangeLimit: false, depth: Infinity };
+    for (const implementation of [braces, globBraces]) {
+      for (const operation of [implementation.parse, implementation.compile, implementation.expand]) {
+        assert.throws(() => operation(pattern, options), {
+          name: 'SyntaxError',
+          message: /maximum nesting depth/,
+        });
+      }
+    }
+  });
+
+  it('rejects hostile patterns through the actual proxy and sandbox consumers', () => {
+    const pattern = '{'.repeat(4000) + 'a,b' + '}'.repeat(4000);
+    // makeRe uses picomatch's own parser; braceExpand reaches braces itself.
+    assert.throws(() => micromatch.braceExpand(pattern), {
+      name: 'SyntaxError',
+      message: /maximum nesting depth/,
+    });
+    assert.throws(() => glob.sync(pattern), {
+      name: 'SyntaxError',
+      message: /maximum nesting depth/,
+    });
   });
 
   it('preserves ordinary brace expansion, ranges, nesting and escaped literals', () => {
