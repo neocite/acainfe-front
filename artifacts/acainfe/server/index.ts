@@ -3,7 +3,6 @@ import { clerkMiddleware } from '@clerk/express';
 import { publishableKeyFromHost } from '@clerk/shared/keys';
 import { CLERK_PROXY_PATH, clerkProxyMiddleware, getClerkProxyHost } from './middlewares/clerkProxyMiddleware';
 import { requireAuth } from './middlewares/requireAuth';
-import multer from 'multer';
 import rateLimit from 'express-rate-limit';
 import { createServer } from 'vite';
 import { readFile } from 'node:fs/promises';
@@ -11,7 +10,7 @@ import { createServer as createHttpServer } from 'node:http';
 import path from 'node:path';
 import sharp from 'sharp';
 import { PRICE_PER_INVOICE_CENTS, brl } from '../src/config/pricing';
-import { isAllowedAppRoute } from './app-routes';
+import { createAppApi } from './app-api';
 import { appUpstreamPath, appJsonBody } from './app-proxy-request';
 
 const app = express();
@@ -77,18 +76,12 @@ app.get(['/api/og.svg', '/api/og.png'], async (req, res) => {
   else res.type('svg').send(svg);
 });
 app.use('/api/app', requireAuth);
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1, fields: 1 } });
-app.use('/api/app', (req, res, next) => {
-  if (!isAllowedAppRoute(req.method, req.path)) {
-    res.status(404).json({ error: 'NOT_FOUND', message: 'Rota não encontrada.' }); return;
-  }
+app.use('/api/app', createAppApi((req, res) => {
   if (!apiBase() || !process.env.ACAINFE_APP_KEY) {
     res.status(503).json({ error: 'NOT_CONFIGURED', message: 'A conexão com o açaínfe ainda está sendo configurada. O responsável precisa adicionar ACAINFE_APP_KEY nos Secrets.' }); return;
   }
-  next();
-});
-app.post('/api/app/onboarding/certificate', upload.single('file'), proxyApi);
-app.use('/api/app', proxyApi);
+  return proxyApi(req, res);
+}));
 app.use('/api', (_req, res) => {
   res.status(404).json({ error: 'NOT_FOUND', message: 'Rota não encontrada.' });
 });
@@ -100,32 +93,17 @@ async function proxyApi(req: express.Request, res: express.Response) {
       'x-user-id': auth.id, 'x-user-email': auth.email,
       'x-user-name': encodeURIComponent(auth.name), 'ngrok-skip-browser-warning': '1',
     };
-    let body: string | FormData | undefined;
-    if (req.originalUrl.split('?')[0].endsWith('/onboarding/certificate')) {
-      if (!req.file || !/\.(pfx|p12)$/i.test(req.file.originalname) || typeof req.body.password !== 'string' || !req.body.password) {
-        res.status(422).json({ error: 'VALIDATION', message: 'Envie um certificado .pfx ou .p12 e sua senha.' }); return;
-      }
-      const form = new FormData();
-      form.append('file', new Blob([new Uint8Array(req.file.buffer)]), req.file.originalname);
-      form.append('password', req.body.password);
-      body = form;
-    } else {
-      body = appJsonBody(req.method, req.body);
-      if (body !== undefined) headers['Content-Type'] = 'application/json';
-    }
+    const body = appJsonBody(req.method, req.body);
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
     const upstreamPath = appUpstreamPath(req.originalUrl);
     const response = await fetch(`${apiBase()}${upstreamPath}`, { method: req.method, headers, body, redirect: 'error', signal: AbortSignal.timeout(45000) });
     const data = await response.json();
     res.status(response.status).json(data);
   } catch {
     res.status(502).json({ error: 'UPSTREAM_UNAVAILABLE', message: 'Não conseguimos falar com o açaínfe agora. Tente novamente em instantes.' });
-  } finally {
-    req.file?.buffer.fill(0);
-    if (req.body?.password) delete req.body.password;
   }
 }
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  if (err instanceof multer.MulterError) { res.status(422).json({ error: 'VALIDATION', message: 'Arquivo inválido. Envie apenas um certificado de até 10 MB.' }); return; }
   res.status(500).json({ error: 'INTERNAL', message: 'Não foi possível concluir. Tente novamente.' });
 });
 const root = path.resolve(import.meta.dirname, '..');

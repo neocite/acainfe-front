@@ -58,7 +58,7 @@ describe('Servidor e login na publicação', () => {
     }
   });
   it('não cria nem confirma produtos sem sessão', async () => {
-    for (const route of ['/api/app/companies/company/products', '/api/app/companies/company/products/p-1/confirm-tax']) {
+    for (const route of ['/api/app/onboarding/certificate', '/api/app/companies/company/products', '/api/app/companies/company/products/p-1/confirm-tax']) {
       const response = await fetch(`${base}${route}`, { method: 'POST', headers: { 'content-type': 'application/json', origin: base }, body: '{}' });
       assert.equal(response.status, 401);
       assert.equal((await response.json()).error, 'UNAUTHORIZED');

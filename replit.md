@@ -22,7 +22,8 @@ Landing page em `/`, autenticação em `/sign-in` e `/sign-up`, cadastro inicial
 - O vínculo com a API externa continua em `x-user-id`, usando exclusivamente `sessionClaims.userId` validado pelo Clerk. Para contas migradas é o ID original; para contas novas é o ID Clerk. Nunca substituir por `auth.userId`, nem confiar em cabeçalhos de identidade enviados pelo navegador.
 - O frontend usa `apiRequest` de `src/lib/queryClient.ts` (também reexportado como `api` em `src/lib/api.ts`), sem bearer tokens. Esperar o Clerk carregar antes de consultar dados privados; 401/403 de usuário já autenticado deve mostrar erro, não redirecionar ao login.
 - A API privada é somente da mesma origem. Não aplicar CORS global com reflexão de origem e credenciais: subdomínios não podem ler respostas privadas usando os cookies da conta. O proxy Clerk não precisa desse CORS global.
-- Certificados e senhas passam pelo servidor em memória, sem gravar arquivos em disco. Chaves MCP retornadas ficam apenas na memória da página, sem localStorage.
+- O envio de certificados está bloqueado no servidor com `503 CERTIFICATE_ONBOARDING_UNAVAILABLE`, antes de ler multipart ou encaminhar à API externa. Não reativar o endpoint legado: ele aceita certificados sem cadeia ICP-Brasil e pode vincular outro proprietário/substituir o A1 de uma empresa existente. A correção definitiva exige alterar a API externa para validar a cadeia ICP-Brasil e o e-CNPJ e autorizar o vínculo de forma atômica antes de qualquer gravação; não basta consultar `/me` nem examinar a resposta após o envio. Não há implementação dessa API neste repositório. Cadastros por certificado ficam pausados até essa correção.
+- Não gravar certificados e senhas em disco. Chaves MCP retornadas ficam apenas na memória da página, sem localStorage.
 - Não criar modos de demonstração que simulem certificado válido, emissão ou confirmação de Pix.
 
 ## Preços
