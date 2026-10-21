@@ -3,10 +3,13 @@ import { Link } from 'wouter';
 import { brl } from '@/config/pricing';
 import { usePricing } from '@/components/landing/use-pricing';
 import { useCoverage } from '@/components/landing/use-coverage';
-import { coverageDescription, coverageFaq, regimeLabels } from '@/lib/coverage';
+import { regimeLabels } from '@/lib/coverage';
+import { HOME_TITLE, AGENT_COPY, LANDING_STEPS, homeDescription, landingFaq } from '@/lib/public-site-content';
+import { structuredData } from '@/lib/public-site-schema';
 import { Calculator } from '@/components/landing/Calculator';
 import { StudioCalculator } from '@/components/landing/StudioCalculator';
-import { LegalModal, SUPPORT_EMAIL, type LegalKind } from '@/components/landing/Legal';
+import { LegalModal, type LegalKind } from '@/components/landing/Legal';
+import { SiteFooter } from '@/components/landing/SiteFooter';
 import './landing-studio.css';
 
 const NAV = [
@@ -30,8 +33,8 @@ export default function Landing() {
   const P = brl(price);
 
   useEffect(() => {
-    const title = 'açaínfe: nota fiscal automática, sem mensalidade, para quem vende no AbacatePay e na Hotmart';
-    const desc = `Não vendeu? Não pagou. NFS-e automática para vendas no AbacatePay e na Hotmart, por ${P} por nota, sem mensalidade. ${coverageDescription(coverage)}`.trim();
+    const title = HOME_TITLE;
+    const desc = homeDescription({ pricePerInvoiceCents: price, monthlyFeeCents: fee });
     const origin = window.location.origin;
     document.title = title;
     document.documentElement.lang = 'pt-BR';
@@ -47,24 +50,13 @@ export default function Landing() {
     setMeta('meta[name="twitter:title"]', 'name', 'twitter:title', title);
     setMeta('meta[name="twitter:description"]', 'name', 'twitter:description', desc);
     setMeta('meta[name="twitter:image"]', 'name', 'twitter:image', `${origin}/api/og.png`);
-  }, [P, coverage]);
+    let schema = document.querySelector<HTMLScriptElement>('script[type="application/ld+json"]');
+    if (!schema) { schema = document.createElement('script'); schema.type = 'application/ld+json'; document.head.appendChild(schema); }
+    schema.textContent = JSON.stringify(structuredData({ pricing: { pricePerInvoiceCents: price, monthlyFeeCents: fee }, coverage }));
+  }, [price, fee, coverage]);
 
-  const faq = [
-    { q: 'Preciso de certificado digital?', a: 'Sim, o A1 (arquivo .pfx), o mesmo usado no e-CAC. Ele fica criptografado e só serve para assinar suas notas.' },
-    { q: 'Minha cidade já é atendida?', a: coverageFaq(coverage) },
-    { q: 'Preciso entender de imposto?', a: 'Não. O assistente explica cada escolha em português claro e você só confirma. Na dúvida, mostre ao seu contador: tudo fica registrado.' },
-    { q: 'E se a prefeitura sair do ar?', a: 'A nota entra na fila e sai sozinha quando o sistema voltar.' },
-    { q: 'Posso cancelar uma nota?', a: 'Pode, pelo assistente. Reembolsos no AbacatePay cancelam a nota automaticamente.' },
-    { q: 'E se eu não vender nada no mês?', a: 'Você não paga nada. Não existe mensalidade, adesão nem plano: a cobrança é só por nota emitida.' },
-    { q: 'Como sou cobrado?', a: `${P} por nota emitida com sucesso. Notas rejeitadas pela prefeitura não são cobradas.` },
-    { q: 'Vocês são do AbacatePay ou da Hotmart?', a: 'Não. O açaínfe é um produto independente, feito para quem vende pelo AbacatePay e pela Hotmart.' },
-  ];
-
-  const steps = [
-    { number: '01', title: 'Conecte sua plataforma', copy: 'Vincule AbacatePay ou Hotmart uma única vez.' },
-    { number: '02', title: 'Configure seus serviços', copy: 'Mapeie cada produto com ajuda do assistente.' },
-    { number: '03', title: 'Venda. A nota vai.', copy: 'Cada pagamento aprovado dispara a emissão.' },
-  ];
+  const faq = landingFaq(price, coverage);
+  const steps = LANDING_STEPS;
   return (
     <div className="csr-page" id="inicio">
       <header className="csr-nav">
@@ -77,7 +69,7 @@ export default function Landing() {
           <div className="csr-hero-copy">
             <div className="csr-eyebrow"><span className="csr-status-dot" /> NOTA FISCAL NO AUTOMÁTICO</div>
             <p className="csr-kicker">Para quem vende no digital</p>
-            <h1>Vendeu.<br /><em>A nota foi.</em></h1>
+            <h1><span className="sr-only">açaínfe: nota fiscal de serviço (NFS-e) automática. </span>Vendeu.<br /><em>A nota foi.</em></h1>
             <p className="csr-lead">Cada pagamento aprovado no AbacatePay ou na Hotmart vira uma NFS-e — sem planilha no fim do mês, {fee === 0 ? 'sem mensalidade nos meses quietos.' : 'com cobrança transparente.'}</p>
             <div className="csr-hero-actions">
               <Link className="csr-button" href="/sign-up">Começar agora <span aria-hidden="true">↗</span></Link>
@@ -92,6 +84,7 @@ export default function Landing() {
           <div className="csr-hero-foot"><span>UMA CONTA SIMPLES, SEM SURPRESAS</span><a href="#simulador">Arraste para simular <b aria-hidden="true">↘</b></a></div>
         </section>
         <section className="csr-equation" aria-label="Modelo de cobrança">
+          <h2 className="sr-only">Preço</h2>
           <span>O volume muda.</span><strong>{fee === 0 ? 'R$ 0' : brl(fee)} fixos <i>+</i> {P} por nota</strong><span>O custo acompanha suas vendas.</span>
         </section>
         <section className="csr-process" id="como-funciona">
@@ -116,6 +109,11 @@ export default function Landing() {
           <Link href="/sign-up" className="csr-availability-link">Ver disponibilidade para minha empresa <span aria-hidden="true">↗</span></Link>
           <p className="csr-independent">Produto independente, não afiliado ao AbacatePay ou à Hotmart.</p>
         </section>
+        <section className="sr-only" aria-label="Agentes de IA e MCP">
+          <h2>Agentes de IA e MCP</h2>
+          <p>{AGENT_COPY}</p>
+          <a href="/llms.txt">Informações para agentes de IA</a>
+        </section>
         <section className="csr-faq" id="duvidas">
           <span id="faq" className="csr-anchor" />
           <div className="csr-faq-intro"><span className="csr-label">ANTES DE COMEÇAR</span><h2>Sem letra miúda.<br /><em>Só respostas.</em></h2><p>O essencial, explicado sem rodeios.</p></div>
@@ -129,21 +127,7 @@ export default function Landing() {
           <small>{fee === 0 ? 'Sem mensalidade. ' : ''}Sem taxa de adesão.</small>
         </section>
       </main>
-      <footer className="csr-footer">
-        <a href="#inicio" className="csr-logo" aria-label="açaínfe, início">aça<span>í</span>nfe<i /></a>
-        <span>Emissão de NFS-e que acompanha suas vendas.</span><a href="#duvidas">Ajuda e dúvidas ↑</a>
-        <div className="csr-company">
-          <span>O açaínfe é uma marca da Extractify.</span>
-          <span>CNPJ: 28.095.894/0001-60</span>
-          <a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a>
-        </div>
-        <div className="csr-footer-legal">
-          <button type="button" onClick={() => setLegal('termos')}>Termos de uso</button>
-          <button type="button" onClick={() => setLegal('privacidade')}>Política de privacidade</button>
-          <button type="button" onClick={() => setLegal('contato')}>Contato</button>
-        </div>
-        <small>O açaínfe não é afiliado ao AbacatePay nem à Hotmart.</small>
-      </footer>
+      <SiteFooter home onTerms={() => setLegal('termos')} />
       <dialog ref={comparison} className="csr-comparison-dialog" aria-label="Comparação de planos e fontes" onClose={() => {
         // O evento nativo de fechamento pode chegar depois de uma reabertura rápida.
         if (!comparison.current?.open) setCompareOpen(false);

@@ -154,7 +154,7 @@
 .csr-company a:focus-visible { outline-offset: 4px; }
 .csr-footer small { flex-basis: 100%; padding-top: 12px; border-top: 1px solid #e8ded3; color: #a1959b; font-size: 8px; }
 .csr-footer-legal { display: flex; flex-wrap: wrap; gap: 16px; }
-.csr-footer-legal button { background: transparent; border: 0; padding: 6px 0; color: #746871; font-size: 10px; }
+.csr-footer-legal button, .csr-footer-legal a { background: transparent; border: 0; padding: 6px 0; color: #746871; font-size: 10px; text-decoration: none; }
 .csr-anchor { position: absolute; top: 0; left: 0; }
 .csr-comparison-dialog { position: fixed; inset: 0; margin: auto; padding: 0; border: 0; border-radius: 20px; width: min(1120px, calc(100vw - 24px)); max-height: 90dvh; overflow: auto; background: #fff8ee; }
 .csr-comparison-dialog::backdrop { background: #351333aa; backdrop-filter: blur(4px); }

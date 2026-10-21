@@ -15,6 +15,9 @@ import { createAppApi } from './app-api';
 import { appUpstreamPath, appJsonBody } from './app-proxy-request';
 import { createCoverageLoader } from './public-coverage';
 import { coverageDescription } from '../src/lib/coverage';
+import { createPublicSiteRouter, fillPublicHtml } from './public-site';
+import type { PublicSiteData } from '../src/lib/public-site-content';
+import { institutionalPage } from '../src/lib/institutional-content';
 
 const app = express();
 const httpServer = createHttpServer(app);
@@ -33,6 +36,7 @@ app.use('/api', rateLimit({ windowMs: 60000, limit: 90, standardHeaders: true, l
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(
+  '/api/app',
   clerkMiddleware((req) => ({
     publishableKey: publishableKeyFromHost(
       getClerkProxyHost(req) ?? "",
@@ -130,20 +134,36 @@ app.use((err: unknown, _req: express.Request, res: express.Response, _next: expr
 });
 const root = path.resolve(import.meta.dirname, '..');
 function escapeHtml(value: string) { return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'); }
-async function pageHtml(template: string, req: express.Request) {
-  const pricing = await getPricing();
-  const description = `Não vendeu? Não pagou. NFS-e automática para vendas no AbacatePay e na Hotmart, por ${brl(pricing.pricePerInvoiceCents)} por nota, sem mensalidade. ${coverageDescription(await getCoverage())}`.trim();
-  return template.replaceAll('__SEO_DESCRIPTION__', escapeHtml(description)).replaceAll('__APP_ORIGIN__', escapeHtml(origin(req)));
-}
+const publicData = async (): Promise<PublicSiteData> => {
+  const [pricing, coverage] = await Promise.all([getPricing(), getCoverage()]);
+  // Explicitly select public fields: never serialize upstream extras or identity.
+  return { pricing: { pricePerInvoiceCents: pricing.pricePerInvoiceCents, monthlyFeeCents: pricing.monthlyFeeCents }, coverage };
+};
+const notFoundBody = '<main style="padding:60px"><h1>Essa página não está por aqui.</h1><a href="/">Voltar ao início</a></main>';
 if (process.env.NODE_ENV === 'production') {
+  const { publishedAt } = JSON.parse(await readFile(path.join(root, 'dist/publication.json'), 'utf8'));
+  const rendererPath = path.join(root, 'dist/server/entry-server.js');
+  const { renderPublicPage } = await import(rendererPath);
   app.use(express.static(path.join(root, 'dist/public'), { index: false }));
-  app.get('/{*splat}', async (req, res) => res.type('html').send(await pageHtml(await readFile(path.join(root, 'dist/public/index.html'), 'utf8'), req)));
+  app.use(createPublicSiteRouter({
+    data: publicData, publishedAt,
+    html: async (req, data, home, notFound) => fillPublicHtml(
+      await readFile(path.join(root, 'dist/public/index.html'), 'utf8'), origin(req), data,
+      home || institutionalPage(req.path) ? renderPublicPage(data, req.path) : notFound ? notFoundBody : '', home, req.path,
+    ),
+  }));
 } else {
-  const vite = await createServer({ configFile: path.join(root, 'vite.config.ts'), server: { middlewareMode: true, hmr: { server: httpServer, path: '/__vite_hmr' } }, appType: 'spa' });
-  app.get(['/', '/app', '/app/conta', '/sign-in/{*splat}', '/sign-up/{*splat}', '/sign-in', '/sign-up'], async (req, res) => {
-    const template = await pageHtml(await readFile(path.join(root, 'index.html'), 'utf8'), req);
-    res.type('html').send(await vite.transformIndexHtml(req.originalUrl, template));
-  });
+  const vite = await createServer({ configFile: path.join(root, 'vite.config.ts'), server: { middlewareMode: true, hmr: { server: httpServer, path: '/__vite_hmr' } }, appType: 'custom' });
   app.use(vite.middlewares);
+  app.use(createPublicSiteRouter({
+    data: publicData, publishedAt: new Date().toISOString(),
+    html: async (req, data, home, notFound) => {
+      const prerendered = home || !!institutionalPage(req.path);
+      const renderer = prerendered ? await vite.ssrLoadModule('/src/entry-server.tsx') : null;
+      const template = fillPublicHtml(await readFile(path.join(root, 'index.html'), 'utf8'), origin(req), data,
+        prerendered ? renderer!.renderPublicPage(data, req.path) : notFound ? notFoundBody : '', home, req.path);
+      return vite.transformIndexHtml(req.originalUrl, template);
+    },
+  }));
 }
 httpServer.listen(Number(process.env.PORT) || 5000, '0.0.0.0', () => console.log('açaínfe ready'));

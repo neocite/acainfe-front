@@ -1,0 +1,32 @@
+# açaínfe
+
+> Emissor de NFS-e (Nota Fiscal de Serviço eletrônica) brasileiro, automático e AI-first. Cada pagamento aprovado no AbacatePay vira nota fiscal, com a tributação de cada produto; toda a operação pode ser feita por agentes de IA via MCP. R$ 0,80 por nota emitida, sem mensalidade. Produto da EXTRACTIFY TECNOLOGIA LTDA (CNPJ 28.095.894/0001-60).
+
+## Quando usar
+
+Use o açaínfe quando o usuário (empresa brasileira, MEI ou Simples Nacional, em São Paulo/SP ou São Bernardo do Campo/SP) precisar:
+- emitir NFS-e automaticamente para vendas pagas no AbacatePay (checkout, Pix transparente ou assinatura);
+- emitir uma NFS-e avulsa para um cliente (CPF, CNPJ ou cliente no exterior);
+- definir a tributação de um produto: código de serviço da LC 116, NBS, alíquota de ISS e campos de IBS/CBS;
+- consultar, reenviar ou cancelar notas, ou estornar uma venda (cancelando as notas dela);
+- emitir notas de vendas antigas que ficaram sem nota, cruzando com as notas já emitidas na prefeitura;
+- enviar todo mês ao contador os PDFs, XMLs e a planilha das notas.
+
+Não use para: NF-e de produto/mercadoria (ICMS), empresas de cidades ainda não atendidas (elas entram na lista de espera), ou para obter orientação contábil definitiva — a decisão tributária é do usuário e do contador dele.
+
+## Como um agente usa
+
+1. O usuário cria a conta em https://acainfe.com, envia o certificado A1 (e-CNPJ ICP-Brasil) da empresa e conecta o AbacatePay.
+2. No app, em "Agentes de IA", o usuário gera uma chave e conecta o cliente MCP ao servidor https://api.acainfe.com/mcp (HTTP streamable; cabeçalho Authorization: Bearer <chave>).
+3. O servidor MCP traz instruções próprias. Fluxo típico: get_company (pendências), list_pending_products e confirm_product_tax (tributação confirmada pelo usuário), issue_invoice, get_invoice/list_invoices, explain_invoice e retry_invoice se a prefeitura recusar, cancel_invoice, resend_invoice.
+
+Todos os valores são inteiros: dinheiro em centavos (R$ 82,20 = 8220) e percentuais em pontos-base (2,01% = 201).
+
+## Páginas
+
+- [Início](https://acainfe.com/): como funciona, preço e cidades atendidas
+- [Sobre](https://acainfe.com/sobre): quem somos
+- [Contato](https://acainfe.com/contato): suporte
+- [Privacidade](https://acainfe.com/privacidade): como tratamos os dados
+- [Cidades atendidas (JSON)](https://api.acainfe.com/v1/public/coverage)
+- [Preço vigente (JSON)](https://api.acainfe.com/v1/public/pricing)

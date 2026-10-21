@@ -10,6 +10,8 @@ import { SignInPage, SignUpPage } from './pages/Auth';
 import { QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { queryClient } from './lib/queryClient';
 import { clerkAppearance } from './lib/clerk-appearance';
+import { INSTITUTIONAL_ROUTES, SITE_ROUTES } from './lib/site-routes';
+import Institutional from './pages/Institutional';
 
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
@@ -67,11 +69,13 @@ function ClerkProviderWithRoutes() {
     <QueryClientProvider client={queryClient}>
       <ClerkQueryClientCacheInvalidator />
       <Switch>
-        <Route path="/" component={HomeRedirect} />
-        <Route path="/sign-in/*?" component={SignInPage} />
-        <Route path="/sign-up/*?" component={SignUpPage} />
-        <Route path="/app"><PrivatePage><Onboarding /></PrivatePage></Route>
-        <Route path="/app/conta"><PrivatePage><Account /></PrivatePage></Route>
+        <Route path={SITE_ROUTES.home} component={HomeRedirect} />
+        <Route path={SITE_ROUTES.signIn} component={SignInPage} />
+        <Route path={SITE_ROUTES.signUp} component={SignUpPage} />
+        <Route path={SITE_ROUTES.app}><PrivatePage><Onboarding /></PrivatePage></Route>
+        <Route path={SITE_ROUTES.account}><PrivatePage><Account /></PrivatePage></Route>
+        <Route path={SITE_ROUTES.onboarding}><PrivatePage><Onboarding /></PrivatePage></Route>
+        {Object.values(INSTITUTIONAL_ROUTES).map(path => <Route key={path} path={path}><Institutional path={path} /></Route>)}
         <Route><main style={{ padding: 60 }}><h1>Essa página não está por aqui.</h1><a href={basePath || '/'}>Voltar ao início</a></main></Route>
       </Switch>
     </QueryClientProvider>

@@ -1,0 +1,107 @@
+import express, { type Request, type Response } from 'express';
+import { readFile } from 'node:fs/promises';
+import { isValidPage, SITEMAP_PATHS } from '../src/lib/site-routes';
+import { AGENT_COPY, HOME_TITLE, LANDING_STEPS, homeDescription, landingFaq, type PublicSiteData } from '../src/lib/public-site-content';
+import { structuredData } from '../src/lib/public-site-schema';
+export { structuredData } from '../src/lib/public-site-schema';
+import { regimeLabels } from '../src/lib/coverage';
+import { brl } from '../src/config/pricing';
+import { institutionalPage, institutionalMarkdown } from '../src/lib/institutional-content';
+
+const LLMS_TEXT = await readFile(new URL('../content/llms.txt', import.meta.url), 'utf8');
+
+const CANONICAL = 'https://acainfe.com';
+export const NOT_FOUND_MARKDOWN = '# Página não encontrada\n\nEste endereço não existe no açaínfe. Veja o que o açaínfe faz e como agentes de IA podem usá-lo em https://acainfe.com/llms.txt, ou a lista de páginas em https://acainfe.com/sitemap.xml.\n';
+const escapeHtml = (text: string) => text.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+export const safeJson = (data: unknown) => JSON.stringify(data).replaceAll('<', '\\u003c').replaceAll('\u2028', '\\u2028').replaceAll('\u2029', '\\u2029');
+const markdownText = (text: string) => text.replace(/([\\`*_[\]<>#])/g, '\\$1').replace(/[\r\n]+/g, ' ');
+
+/** Reusable content negotiation for the public pages added in the next part. */
+export function sendPublicPage(req: Request, res: Response, page: { html: string; markdown: string; status?: number }) {
+  res.vary('Accept');
+  const markdown = req.accepts(['text/html', 'text/markdown']) === 'text/markdown';
+  return res.status(page.status ?? 200).type(markdown ? 'text/markdown; charset=utf-8' : 'text/html; charset=utf-8')
+    .send(markdown ? page.markdown : page.html);
+}
+
+export function landingMarkdown(data: PublicSiteData) {
+  return `# açaínfe: nota fiscal de serviço (NFS-e) automática
+
+Vendeu. A nota foi.
+
+Cada pagamento aprovado no AbacatePay ou na Hotmart vira uma NFS-e — sem planilha no fim do mês, sem mensalidade nos meses quietos.
+
+## Como funciona
+
+${LANDING_STEPS.map(s => `### ${s.number}. ${s.title}\n\n${s.copy}`).join('\n\n')}
+
+## Preço
+
+${brl(data.pricing.pricePerInvoiceCents)} por nota fiscal emitida com sucesso. Sem mensalidade, adesão nem taxa fixa. Não vendeu? Não pagou. Notas rejeitadas pela prefeitura não são cobradas.
+
+## Cidades atendidas
+
+Cidade a cidade. Com cuidado em cada nota.
+
+Atendimento atual para MEI e empresas do Simples Nacional nas cidades abaixo. Estamos ampliando a cobertura municipal. Em outras cidades, cadastre-se para entrar na lista de espera.
+
+${data.coverage.cities.map(c => `- ${markdownText(c.cityName)}/${markdownText(c.uf)} — ${markdownText(regimeLabels(c.regimes))}. ATIVO.`).join('\n')}
+
+## Agentes de IA e MCP
+
+${AGENT_COPY}
+
+[Informações para agentes de IA](${CANONICAL}/llms.txt).
+
+## Dúvidas
+
+${landingFaq(data.pricing.pricePerInvoiceCents, data.coverage).map(f => `### ${f.q}\n\n${markdownText(f.a)}`).join('\n\n')}
+
+## Comece
+
+[Criar conta](${CANONICAL}/sign-up) · [Entrar](${CANONICAL}/sign-in)
+
+O açaínfe é uma marca da Extractify. CNPJ: 28.095.894/0001-60. Contato: contato@extractify.com.br.
+`;
+}
+
+export function fillPublicHtml(template: string, appOrigin: string, data: PublicSiteData, body = '', home = false, pagePath = '/') {
+  const page = institutionalPage(pagePath);
+  const prerendered = home || !!page;
+  const scripts = prerendered ? `<script id="public-site-data" type="application/json">${safeJson(data)}</script>${home ? `<script type="application/ld+json">${safeJson(structuredData(data))}</script>` : ''}` : '';
+  const title = page ? `${page.title} — açaínfe` : HOME_TITLE;
+  return template.replaceAll('__SEO_TITLE__', escapeHtml(title))
+    .replaceAll('Não vendeu? Não pagou. — açaínfe', escapeHtml(title))
+    .replace('name="twitter:title" content="açaínfe"', `name="twitter:title" content="${escapeHtml(title)}"`)
+    .replaceAll('__SEO_DESCRIPTION__', escapeHtml(page?.description ?? homeDescription(data.pricing)))
+    .replaceAll('__APP_ORIGIN__', escapeHtml(appOrigin))
+    .replace('<div id="root"></div>', () => `<div id="root"${prerendered ? ' data-prerendered="true"' : ''}>${body}</div>${scripts}`);
+}
+
+export function createPublicSiteRouter(options: {
+  data: () => Promise<PublicSiteData>;
+  html: (req: Request, data: PublicSiteData, home: boolean, notFound: boolean) => Promise<string>;
+  publishedAt: string;
+}) {
+  const router = express.Router();
+  router.get('/sitemap.xml', (_req, res) => res.type('application/xml').send(
+    `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${SITEMAP_PATHS.map(p => `<url><loc>${CANONICAL}${p}</loc><lastmod>${options.publishedAt}</lastmod></url>`).join('')}</urlset>`,
+  ));
+  router.get('/llms.txt', (_req, res) => res.type('text/plain; charset=utf-8').send(LLMS_TEXT));
+  router.get('/{*splat}', async (req, res) => {
+    const home = req.path === '/';
+    const page = institutionalPage(req.path);
+    const notFound = !isValidPage(req.path);
+    const data = await options.data();
+    const markdown = page ? institutionalMarkdown(page) : home ? landingMarkdown(data) : NOT_FOUND_MARKDOWN;
+    // No render cost is needed for agents requesting Markdown.
+    const wantsMarkdown = req.accepts(['text/html', 'text/markdown']) === 'text/markdown';
+    if ((home || page || notFound) && wantsMarkdown) {
+      return sendPublicPage(req, res, { html: '', markdown, status: notFound ? 404 : 200 });
+    }
+    const html = await options.html(req, data, home, notFound);
+    if (home || page || notFound) return sendPublicPage(req, res, { html, markdown, status: notFound ? 404 : 200 });
+    return res.type('html').send(html);
+  });
+  return router;
+}
