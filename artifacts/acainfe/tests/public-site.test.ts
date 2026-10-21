@@ -198,6 +198,8 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
         for (const text of section.paragraphs) assert.ok(doc.querySelector('main')!.textContent!.includes(text));
       }
       for (const path of ['/sobre', '/contato', '/privacidade', '/developers']) assert.ok(doc.querySelector(`footer a[href="${path}"]`));
+      assert.equal(doc.querySelector('header nav a[href="/developers"]')?.textContent, 'API e MCP');
+      assert.equal(doc.querySelector('footer a[href="/developers"]')?.textContent, 'API e MCP');
       assert.ok(doc.querySelector('a[href="mailto:contato@extractify.com.br"]'));
       assert.equal(doc.querySelectorAll('script[type="application/ld+json"]').length, 0);
       dom.window.close();
@@ -217,8 +219,8 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
   it('landing liga a documentação no menu, no rodapé e no Markdown; llms.txt inclui o novo item', async () => {
     const response = await fetch(base);
     const dom = new JSDOM(await response.text());
-    assert.equal(dom.window.document.querySelector('header nav a[href="/developers"]')?.textContent, 'API');
-    assert.ok(dom.window.document.querySelector('footer a[href="/developers"]'));
+    assert.equal(dom.window.document.querySelector('header nav a[href="/developers"]')?.textContent, 'API e MCP');
+    assert.equal(dom.window.document.querySelector('footer a[href="/developers"]')?.textContent, 'API e MCP');
     assert.ok(landingMarkdown(data).includes('https://acainfe.com/developers'));
     const llms = await (await fetch(base + '/llms.txt')).text();
     assert.ok(llms.includes('- [API e agentes](https://acainfe.com/developers): autenticação, rotas e exemplos'));

@@ -12,7 +12,7 @@ export function SiteFooter({ onTerms, home = false }: { onTerms: () => void; hom
     </div>
     <div className="csr-footer-legal">
       <Link href="/sobre">Sobre</Link>
-      <Link href="/developers">API e agentes</Link>
+      <Link href="/developers">API e MCP</Link>
       <button type="button" onClick={onTerms}>Termos de uso</button>
       <Link href="/privacidade">Política de privacidade</Link>
       <Link href="/contato">Contato</Link>

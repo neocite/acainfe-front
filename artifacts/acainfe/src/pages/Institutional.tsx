@@ -32,7 +32,7 @@ export default function Institutional({ path }: { path: string }) {
     <header className="csr-nav">
       <Link href="/" className="csr-logo" aria-label="açaínfe, início">aça<span>í</span>nfe<i /></Link>
       <nav aria-label="Navegação principal">
-        <Link href="/">Início</Link><Link href="/sobre">Sobre</Link><Link href="/contato">Contato</Link><Link href="/privacidade">Privacidade</Link><Link href="/developers">API</Link>
+        <Link href="/">Início</Link><Link href="/sobre">Sobre</Link><Link href="/contato">Contato</Link><Link href="/privacidade">Privacidade</Link><Link href="/developers">API e MCP</Link>
       </nav>
       <Link className="csr-nav-link" href="/sign-in">Entrar <span aria-hidden="true">↗</span></Link>
     </header>

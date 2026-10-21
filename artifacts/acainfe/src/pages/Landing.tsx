@@ -63,7 +63,7 @@ export default function Landing() {
     <div className="csr-page" id="inicio">
       <header className="csr-nav">
         <a href="#inicio" className="csr-logo" aria-label="açaínfe, início">aça<span>í</span>nfe<i /></a>
-        <nav aria-label="Navegação principal">{NAV.map(([href, label]) => <a key={href} href={href}>{label}</a>)}<Link href="/developers">API</Link></nav>
+        <nav aria-label="Navegação principal">{NAV.map(([href, label]) => <a key={href} href={href}>{label}</a>)}<Link href="/developers">API e MCP</Link></nav>
         <Link className="csr-nav-link" href="/sign-in">Entrar <span aria-hidden="true">↗</span></Link>
       </header>
       <main>
