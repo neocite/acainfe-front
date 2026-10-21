@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { brl } from '@/config/pricing';
 import { usePricing } from '@/components/landing/use-pricing';
+import { useCoverage } from '@/components/landing/use-coverage';
+import { coverageDescription, coverageFaq, regimeLabels } from '@/lib/coverage';
 import { Calculator } from '@/components/landing/Calculator';
 import { StudioCalculator } from '@/components/landing/StudioCalculator';
 import { LegalModal, SUPPORT_EMAIL, type LegalKind } from '@/components/landing/Legal';
@@ -20,6 +22,7 @@ function setMeta(sel: string, attr: string, key: string, value: string) {
 
 export default function Landing() {
   const { pricePerInvoiceCents: price, monthlyFeeCents: fee } = usePricing();
+  const coverage = useCoverage();
   const [legal, setLegal] = useState<LegalKind | null>(null);
   const [invoices, setInvoices] = useState(48);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -28,7 +31,7 @@ export default function Landing() {
 
   useEffect(() => {
     const title = 'açaínfe: nota fiscal automática, sem mensalidade, para quem vende no AbacatePay e na Hotmart';
-    const desc = `Não vendeu? Não pagou. NFS-e automática para vendas no AbacatePay e na Hotmart, por ${P} por nota, sem mensalidade.`;
+    const desc = `Não vendeu? Não pagou. NFS-e automática para vendas no AbacatePay e na Hotmart, por ${P} por nota, sem mensalidade. ${coverageDescription(coverage)}`.trim();
     const origin = window.location.origin;
     document.title = title;
     document.documentElement.lang = 'pt-BR';
@@ -44,11 +47,11 @@ export default function Landing() {
     setMeta('meta[name="twitter:title"]', 'name', 'twitter:title', title);
     setMeta('meta[name="twitter:description"]', 'name', 'twitter:description', desc);
     setMeta('meta[name="twitter:image"]', 'name', 'twitter:image', `${origin}/api/og.png`);
-  }, [P]);
+  }, [P, coverage]);
 
   const faq = [
     { q: 'Preciso de certificado digital?', a: 'Sim, o A1 (arquivo .pfx), o mesmo usado no e-CAC. Ele fica criptografado e só serve para assinar suas notas.' },
-    { q: 'Minha cidade já é atendida?', a: 'No momento, atendemos São Bernardo do Campo (SP), para empresas do Simples Nacional e MEI. Você pode se cadastrar para entrar na lista de espera da sua cidade.' },
+    { q: 'Minha cidade já é atendida?', a: coverageFaq(coverage) },
     { q: 'Preciso entender de imposto?', a: 'Não. O assistente explica cada escolha em português claro e você só confirma. Na dúvida, mostre ao seu contador: tudo fica registrado.' },
     { q: 'E se a prefeitura sair do ar?', a: 'A nota entra na fila e sai sozinha quando o sistema voltar.' },
     { q: 'Posso cancelar uma nota?', a: 'Pode, pelo assistente. Reembolsos no AbacatePay cancelam a nota automaticamente.' },
@@ -108,8 +111,8 @@ export default function Landing() {
         </section>
         <section className="csr-availability" id="disponibilidade">
           <span id="compatibilidade" />
-          <div className="csr-availability-copy"><span className="csr-label">DISPONÍVEL HOJE</span><h2>Uma cidade de cada vez.<br /><em>Com cuidado em cada nota.</em></h2><p>Atendimento atual para MEI e empresas do Simples Nacional. Estamos ampliando a cobertura municipal. Em outras cidades, cadastre-se para entrar na lista de espera.</p></div>
-          <div className="csr-city-card"><span className="csr-pin" aria-hidden="true">◎</span><div><strong>São Bernardo do Campo</strong><span>São Paulo · MEI e Simples Nacional</span></div><span className="csr-active">ATIVO</span></div>
+          <div className="csr-availability-copy"><span className="csr-label">DISPONÍVEL HOJE</span><h2>Cidade a cidade.<br /><em>Com cuidado em cada nota.</em></h2><p>Atendimento atual para MEI e empresas do Simples Nacional nas cidades abaixo. Estamos ampliando a cobertura municipal. Em outras cidades, cadastre-se para entrar na lista de espera.</p></div>
+          <div className="csr-city-list">{coverage.cities.map(city => <div className="csr-city-card" key={city.cityCode}><span className="csr-pin" aria-hidden="true">◎</span><div><strong>{city.cityName}</strong><span>{city.uf} · {regimeLabels(city.regimes)}</span></div><span className="csr-active">ATIVO</span></div>)}</div>
           <Link href="/sign-up" className="csr-availability-link">Ver disponibilidade para minha empresa <span aria-hidden="true">↗</span></Link>
           <p className="csr-independent">Produto independente, não afiliado ao AbacatePay ou à Hotmart.</p>
         </section>

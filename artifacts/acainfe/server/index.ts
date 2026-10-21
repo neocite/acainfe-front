@@ -13,6 +13,8 @@ import sharp from 'sharp';
 import { PRICE_PER_INVOICE_CENTS, brl } from '../src/config/pricing';
 import { createAppApi } from './app-api';
 import { appUpstreamPath, appJsonBody } from './app-proxy-request';
+import { createCoverageLoader } from './public-coverage';
+import { coverageDescription } from '../src/lib/coverage';
 
 const app = express();
 const httpServer = createHttpServer(app);
@@ -51,6 +53,8 @@ app.use('/api', (req, res, next) => {
 function origin(req: express.Request) { return `${req.protocol}://${req.get('host')}`; }
 
 function apiBase() { return (process.env.ACAINFE_API_URL || '').replace(/\/$/, ''); }
+const getCoverage = createCoverageLoader(apiBase);
+app.get('/api/public/coverage', async (_req, res) => res.json(await getCoverage()));
 let cachedPricing: { pricePerInvoiceCents: number; monthlyFeeCents: number; [key: string]: unknown } | undefined;
 let pricingUntil = 0;
 async function getPricing() {
@@ -72,9 +76,11 @@ async function getPricing() {
 app.get('/api/public/pricing', async (_req, res) => res.json(await getPricing()));
 app.get(['/api/og.svg', '/api/og.png'], async (req, res) => {
   const p = await getPricing();
+  const coverage = escapeHtml(coverageDescription(await getCoverage()));
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630"><rect width="1200" height="630" fill="#FFF8EE"/><text x="80" y="110" font-family="sans-serif" font-size="46" font-weight="bold" fill="#4A1942">açaínfe</text><text x="80" y="280" font-family="sans-serif" font-size="88" font-weight="bold" fill="#2A0E2E">Não vendeu?</text><text x="80" y="380" font-family="sans-serif" font-size="88" font-weight="bold" fill="#7B2D6B">Não pagou.</text><text x="80" y="500" font-family="sans-serif" font-size="30" fill="#4A1942">${brl(p.pricePerInvoiceCents)} por nota • Sem mensalidade</text><ellipse cx="970" cy="320" rx="140" ry="50" fill="#7B2D6B"/><path d="M830 320 Q850 500 970 500 Q1090 500 1110 320" fill="#4A1942"/><ellipse cx="970" cy="320" rx="115" ry="33" fill="#2A0E2E"/><circle cx="930" cy="307" r="19" fill="#FF9F1C"/><circle cx="970" cy="300" r="18" fill="#FF9F1C"/><circle cx="1010" cy="310" r="18" fill="#FF9F1C"/></svg>`;
-  if (req.path.endsWith('.png')) res.type('png').send(await sharp(Buffer.from(svg)).png().toBuffer());
-  else res.type('svg').send(svg);
+  const socialSvg = svg.replace('</svg>', `<text x="80" y="570" font-family="sans-serif" font-size="24" fill="#4A1942">${coverage}</text></svg>`);
+  if (req.path.endsWith('.png')) res.type('png').send(await sharp(Buffer.from(socialSvg)).png().toBuffer());
+  else res.type('svg').send(socialSvg);
 });
 app.use('/api/app', requireAuth);
 app.use('/api/app', createAppApi((req, res) => {
@@ -126,7 +132,7 @@ const root = path.resolve(import.meta.dirname, '..');
 function escapeHtml(value: string) { return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;'); }
 async function pageHtml(template: string, req: express.Request) {
   const pricing = await getPricing();
-  const description = `Não vendeu? Não pagou. NFS-e automática para vendas no AbacatePay e na Hotmart, por ${brl(pricing.pricePerInvoiceCents)} por nota, sem mensalidade.`;
+  const description = `Não vendeu? Não pagou. NFS-e automática para vendas no AbacatePay e na Hotmart, por ${brl(pricing.pricePerInvoiceCents)} por nota, sem mensalidade. ${coverageDescription(await getCoverage())}`.trim();
   return template.replaceAll('__SEO_DESCRIPTION__', escapeHtml(description)).replaceAll('__APP_ORIGIN__', escapeHtml(origin(req)));
 }
 if (process.env.NODE_ENV === 'production') {

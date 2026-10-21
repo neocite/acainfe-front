@@ -2,6 +2,7 @@ import { before, after, beforeEach, afterEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement, act } from 'react';
 import { JSDOM } from 'jsdom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Root } from 'react-dom/client';
 import type { ViteDevServer } from 'vite';
 
@@ -10,6 +11,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   let Onboarding: typeof import('../src/pages/Onboarding').default;
   let createRoot: typeof import('react-dom/client').createRoot;
   let modules: ViteDevServer;
+  let coverageClient: QueryClient;
   let company: any, details: any, patches: any[], profilesRequested: number, detailRequests: number, mcpRequests: number, fiscalRequests: number;
   let keys: any[], keyGets: number, keyDeletes: string[], generatedLabels: any[], generationError: boolean;
   let gatewayCalls: any[], gatewayFailure: boolean;
@@ -91,6 +93,10 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
       } else if (path.endsWith('/products')) data = { items: [] };
       else if (path.endsWith('/past-sales')) data = { periods: [] };
       else if (path === '/api/public/pricing') data = { pricePerInvoiceCents: 80 };
+      else if (path === '/api/public/coverage') data = { cities: [
+        { cityCode: '3550308', cityName: 'São Paulo', uf: 'SP', regimes: ['MEI', 'SIMPLES_NACIONAL'] },
+        { cityCode: '3548708', cityName: 'São Bernardo do Campo', uf: 'SP', regimes: ['MEI', 'SIMPLES_NACIONAL'] },
+      ] };
       else if (path.endsWith('/billing')) data = { amountDueCents: 0 };
       else if (path.endsWith('/products?pendingTaxReview=true')) data = [];
       else if (path.endsWith('/mcp-connection')) data = {
@@ -142,7 +148,10 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     };
   });
   afterEach(async () => { await act(async () => root.unmount()); container.remove(); globalThis.fetch = originalFetch; });
-  async function mount() { await act(async () => root.render(createElement(Onboarding))); }
+  async function mount() {
+    coverageClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
+    await act(async () => root.render(createElement(QueryClientProvider, { client: coverageClient }, createElement(Onboarding))));
+  }
   async function click(node: HTMLElement) { await act(async () => node.click()); }
   function button(text: string) {
     const node = [...container.querySelectorAll<HTMLButtonElement>('button')].find(node => node.textContent?.trim().startsWith(text));

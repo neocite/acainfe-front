@@ -22,6 +22,8 @@ import { bpsToPercent } from '../lib/numbers';
 import { isAuthUser, type AuthUser } from '../lib/auth';
 import { onboardingEntry } from '../lib/onboarding-entry';
 import { brl } from '../config/pricing';
+import { useCoverage } from '../components/landing/use-coverage';
+import { coverageWaitlist } from '../lib/coverage';
 import '../onboarding.css';
 import '../mobile-fixes.css';
 import '../company-details.css';
@@ -61,6 +63,7 @@ function Field({ label, help, children }: { label: string; help?: string; childr
   return <label className="app-field"><span>{label}</span>{children}{help && <small>{help}</small>}{error && <small className="danger-text" role="alert">{error}</small>}</label>;
 }
 export default function Onboarding() {
+  const coverage = useCoverage();
   const { user: clerkUser } = useUser();
   const { signOut } = useClerk();
   const user: AuthUser | null = clerkUser ? {
@@ -246,7 +249,7 @@ export default function Onboarding() {
         </select>
       </label>}
       {isTestEnvironment(status?.emission, status?.tenant.environment) && <TestEnvironmentNotice environment="HOMOLOGATION" />}
-      {isWaitlist ? <section className="app-card waitlist"><div className="login-icon"><Mail size={30} /></div><span className="app-eyebrow">VOCÊ JÁ ESTÁ NA LISTA</span><h1>Sua cidade é o<br />nosso próximo passo.</h1><CompanyCard status={status!} /><p>{status?.availability.reason || 'Sua cidade ainda não está liberada. Vamos te avisar por e-mail e WhatsApp assim que estiver tudo pronto.'}</p><p>Por enquanto, atendemos São Bernardo do Campo/SP, para Simples Nacional e MEI.</p>{errorBox}<button className="app-secondary" onClick={refreshPanel} disabled={busy}>Verificar disponibilidade</button></section>
+      {isWaitlist ? <section className="app-card waitlist"><div className="login-icon"><Mail size={30} /></div><span className="app-eyebrow">VOCÊ JÁ ESTÁ NA LISTA</span><h1>Sua cidade é o<br />nosso próximo passo.</h1><CompanyCard status={status!} /><p>{status?.availability.reason || 'Sua cidade ainda não está liberada. Vamos te avisar por e-mail e WhatsApp assim que estiver tudo pronto.'}</p><p>{coverageWaitlist(coverage)}</p>{errorBox}<button className="app-secondary" onClick={refreshPanel} disabled={busy}>Verificar disponibilidade</button></section>
       : view === 'agents' ? <AiAgents key={base} base={base} onUnauthorized={handleError} />
       : view === 'gateways' ? <PaymentGateways key={base} base={base} integration={status?.abacatepay} onRefresh={refreshGateways} onUnauthorized={handleError} />
       : view === 'fiscal' ? <div className="company-fiscal-view"><nav className="company-section-nav" aria-label="Seção da empresa"><button type="button" className="text-button" onClick={() => setView('panel')}>Voltar para Minha empresa</button><span aria-hidden="true">/</span><span>Dados fiscais</span></nav><FiscalSettings key={base} base={base} onUnauthorized={handleError} onChanged={() => { void refreshPanel(); }} /></div>
