@@ -12,10 +12,12 @@ export const SITE_ROUTES = {
   ...INSTITUTIONAL_ROUTES,
 } as const;
 export const SITEMAP_PATHS = ['/', ...Object.values(INSTITUTIONAL_ROUTES), '/llms.txt'] as const;
+export const PUBLIC_RESOURCE_ROUTES: readonly string[] = ['/openapi.json', '/.well-known/mcp.json'];
 
 export function isValidPage(path: string) {
   const normalized = path.length > 1 ? path.replace(/\/+$/, '') : path;
-  return Object.hasOwn(PUBLIC_PAGE_ALIASES, normalized) || Object.values(SITE_ROUTES).some(route => route.endsWith('/*?')
+  return PUBLIC_RESOURCE_ROUTES.includes(normalized)
+    || Object.hasOwn(PUBLIC_PAGE_ALIASES, normalized) || Object.values(SITE_ROUTES).some(route => route.endsWith('/*?')
     ? normalized === route.slice(0, -3) || normalized.startsWith(route.slice(0, -2))
     : route === normalized);
 }

@@ -31,7 +31,10 @@ export const INSTITUTIONAL_PAGES: InstitutionalPage[] = [
       ], links: [{ href: '/llms.txt', label: 'Guia para agentes de IA' }] },
       { title: 'Referência completa', paragraphs: [
         'Consulte a referência Swagger para os detalhes da API pública, seus parâmetros e respostas.',
-      ], links: [{ href: 'https://api.acainfe.com/docs', label: 'Referência completa da API pública (Swagger)' }] },
+      ], links: [
+        { href: 'https://api.acainfe.com/docs', label: 'Referência completa da API pública (Swagger)' },
+        { href: 'https://api.acainfe.com/openapi.json', label: 'Contrato completo da API pública (OpenAPI JSON)' },
+      ] },
     ],
   },
   {

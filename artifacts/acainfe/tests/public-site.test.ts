@@ -12,7 +12,7 @@ import { SITE_ROUTES, PUBLIC_PAGE_ALIASES, isValidPage, publicCanonicalUrl } fro
 import { setPublicCanonical } from '../src/lib/public-metadata';
 import SwaggerParser from '@apidevtools/swagger-parser';
 import { publicOpenApi } from '../server/public-api-schema';
-import { agentResourcesRouter } from '../server/agent-resources';
+import { createAgentResourcesRouter, publicMcpServerCard } from '../server/agent-resources';
 import { INSTITUTIONAL_PAGES, institutionalPage, institutionalMarkdown } from '../src/lib/institutional-content';
 
 const data: PublicSiteData = { pricing: { pricePerInvoiceCents: 80, monthlyFeeCents: 0 }, coverage: FALLBACK_COVERAGE };
@@ -32,7 +32,10 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     html = renderLanding(data);
     template = await readFile('index.html', 'utf8');
     const app = express();
-    app.use(agentResourcesRouter);
+    app.use(await createAgentResourcesRouter({
+      fetcher: async () => new Response('', { status: 404 }),
+      warn: () => {},
+    }));
     app.use(express.static('public', { index: false }));
     // Existing API behavior is not overridden by the public page handler.
     app.get('/api/example', (_req, res) => res.json({ ok: true }));
@@ -239,6 +242,9 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     const dom = new JSDOM(await (await fetch(base + page.path)).text());
     const doc = dom.window.document;
     assert.equal(doc.querySelector('h1')!.textContent, 'API e agentes de IA');
+    assert.equal(doc.querySelector('a[href="https://api.acainfe.com/openapi.json"]')?.textContent, 'Contrato completo da API pública (OpenAPI JSON)');
+    assert.ok((await (await fetch(base + '/developers', { headers: { accept: 'text/markdown' } })).text())
+      .includes('[Contrato completo da API pública (OpenAPI JSON)](https://api.acainfe.com/openapi.json)'));
     const command = `curl -X POST https://api.acainfe.com/v1/sales -H "x-api-key: <chave>" -H "Content-Type: application/json" -d '{"externalId":"pedido-123","customer":{"name":"Ana Souza","taxId":"52998224725","email":"ana@exemplo.com"},"items":[{"productExternalId":"prod_abc","totalCents":9700}]}'`;
     assert.equal(doc.querySelector('pre code')!.textContent, command);
     const markdown = await (await fetch(base + page.path, { headers: { accept: 'text/markdown' } })).text();
@@ -323,7 +329,7 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     }
   });
 
-  it('publica OpenAPI 3.1 válido, só com as oito operações públicas revisadas', async () => {
+  it('mantém a reserva OpenAPI 3.1 válida com oito operações quando a API está indisponível', async () => {
     const response = await fetch(base + '/openapi.json');
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('content-type'), 'application/json; charset=utf-8');
@@ -366,6 +372,7 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
   it('recursos de agentes são públicos, têm tipos corretos, CORS restrito às rotas novas e cache condicional', async () => {
     const resources = [
       ['/openapi.json', 'application/json'],
+      ['/.well-known/mcp.json', 'application/json'],
       ['/mcp.json', 'application/json'],
       ['/agent-instructions.md', 'text/markdown'],
       ['/cli/acainfe.mjs', 'application/javascript'],
@@ -377,7 +384,8 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
       assert.equal(response.headers.get('content-type'), `${type}; charset=utf-8`);
       assert.equal(response.headers.get('access-control-allow-origin'), '*');
       assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
-      assert.equal(response.headers.get('cache-control'), 'public, max-age=300');
+      assert.equal(response.headers.get('cache-control'), ['/openapi.json', '/.well-known/mcp.json'].includes(path)
+        ? 'public, max-age=3600' : 'public, max-age=300');
       const etag = response.headers.get('etag')!;
       assert.ok(etag);
       const cached = await fetch(base + path, { headers: { 'If-None-Match': etag, 'Cache-Control': 'max-age=0' } });
@@ -408,6 +416,13 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     assert.match(llms, /## Quando usar \(When to use\)/);
     for (const path of ['/agent-instructions.md', '/openapi.json', '/mcp.json', '/cli/README.md']) assert.ok(llms.includes(`https://acainfe.com${path}`));
     assert.ok(llms.includes('não é um manifesto de protocolo'));
+    assert.ok(llms.includes('contrato completo da API pública'));
+    assert.ok(llms.includes('[Servidor MCP (JSON)](https://acainfe.com/.well-known/mcp.json): endereço, transporte e autenticação do servidor MCP'));
+    assert.ok(isValidPage('/openapi.json'));
+    assert.ok(isValidPage('/.well-known/mcp.json'));
+    const card = await fetch(base + '/.well-known/mcp.json');
+    assert.equal(card.status, 200);
+    assert.deepEqual(await card.json(), publicMcpServerCard);
     const cliDocs = await (await fetch(base + '/cli/README.md')).text();
     assert.ok(cliDocs.includes('npm ainda não foi publicada'));
     assert.ok(cliDocs.includes('Não use `npx acainfe-cli`'));

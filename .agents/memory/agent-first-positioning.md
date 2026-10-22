@@ -14,3 +14,9 @@ O guia público para agentes deve mencionar somente ferramentas MCP confirmadas,
 **Why:** O usuário forneceu um texto aprovado para o guia e exigiu explicitamente que nenhuma ferramenta fosse inventada.
 
 **How to apply:** Ao atualizar documentação para agentes, confirmar nomes e capacidades no contrato público antes de acrescentá-los; não inferir ferramentas a partir de telas do app.
+
+O formato do cartão de descoberta é o contrato público definido pelo mantenedor da API do açaínfe; não deve ser confundido com o exemplo de configuração de cliente nem com outro esquema genérico de Server Card.
+
+**Why:** O usuário designou o cartão publicado pela própria API como fonte de verdade e forneceu seu objeto de reserva. Exigir identidade, versão ou campos de outra especificação impediria a integração pedida sem necessidade.
+
+**How to apply:** Preservar o documento público fornecido pela API, sem inventar campos adicionais ou anunciar que o formato é um padrão universal do MCP.

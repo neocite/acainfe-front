@@ -26,7 +26,8 @@ Todos os valores são inteiros: dinheiro em centavos (R$ 82,20 = 8220) e percent
 
 - [Início](https://acainfe.com/): como funciona, preço e cidades atendidas
 - [API e agentes](https://acainfe.com/developers): autenticação, rotas e exemplos
-- [OpenAPI (JSON)](https://acainfe.com/openapi.json): contrato das operações públicas documentadas no site; respostas não especificadas na origem estão sinalizadas
+- [OpenAPI (JSON)](https://acainfe.com/openapi.json): contrato completo da API pública
+- [Servidor MCP (JSON)](https://acainfe.com/.well-known/mcp.json): endereço, transporte e autenticação do servidor MCP
 - [Instruções para agentes](https://acainfe.com/agent-instructions.md): when to use, casos indicados e como chamar
 - [Configuração MCP (JSON)](https://acainfe.com/mcp.json): exemplo de configuração de cliente, com marcador no lugar da chave; não é um manifesto de protocolo
 - [CLI](https://acainfe.com/cli/README.md): download, uso local e comandos; publicação no npm ainda pendente
