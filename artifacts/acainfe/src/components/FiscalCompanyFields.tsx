@@ -8,9 +8,10 @@ type Props = {
   missing: ReadinessItem[]; businessType: string; issRate: string;
   onBusinessType: (value: string) => void; onIssRate: (value: string) => void;
   errors: Record<string, string>; disabled: boolean; onUnauthorized: (error: ApiError) => void;
+  showBusiness?: boolean;
 };
-export function FiscalCompanyFields({ missing, businessType, issRate, onBusinessType, onIssRate, errors, disabled, onUnauthorized }: Props) {
-  const needsBusiness = missing.some(item => item.field === 'businessType');
+export function FiscalCompanyFields({ missing, businessType, issRate, onBusinessType, onIssRate, errors, disabled, onUnauthorized, showBusiness = false }: Props) {
+  const needsBusiness = showBusiness || missing.some(item => item.field === 'businessType');
   const iss = missing.find(item => item.field === 'issRateBps');
   const [profiles, setProfiles] = useState<FiscalProfile[]>([]);
   const [error, setError] = useState('');
@@ -40,7 +41,7 @@ export function FiscalCompanyFields({ missing, businessType, issRate, onBusiness
       <div className="fiscal-business-options">{profiles.map(profile =>
         <label className={businessType === profile.businessType ? 'selected' : ''} key={profile.businessType}>
           <input type="radio" name="businessType" value={profile.businessType} checked={businessType === profile.businessType} required onChange={() => onBusinessType(profile.businessType)} />
-          <span><strong>{profile.label}</strong><small>{profile.examples}</small></span>
+          <span><strong>{profile.label}</strong><small>{profile.examples}</small>{profile.businessType === 'CUSTOM' && profile.validationNote && <small>{profile.validationNote}</small>}</span>
         </label>)}</div>
       <p className="app-muted">Usamos isso para preencher a tributação dos seus produtos. Você pode revisar depois.</p>
       {errors.businessType && <p className="danger-text" role="alert">{errors.businessType}</p>}

@@ -2,7 +2,7 @@ import { ApiError } from './api';
 import { percentToBps } from './numbers';
 import type { ReadinessItem } from './company-details';
 
-export type FiscalProfile = { businessType: string; label: string; examples: string; validated: boolean };
+export type FiscalProfile = { businessType: string; label: string; examples: string; validated: boolean; validationNote?: string };
 export function fiscalCompanyPatch(missing: ReadinessItem[], values: { businessType: string; issRate: string }) {
   const patch: { businessType?: string; issRateBps?: number } = {};
   if (missing.some(item => item.field === 'businessType')) {

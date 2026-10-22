@@ -1,6 +1,8 @@
 const appRoutes = [
   ['GET', /^\/me$/], ['PUT', /^\/me$/],
   ['GET', /^\/fiscal-profiles$/],
+  ['GET', /^\/service-codes$/],
+  ['GET', /^\/companies\/[a-zA-Z0-9_-]+\/municipal-rate\/[a-zA-Z0-9._-]+$/],
   ['POST', /^\/onboarding\/certificate$/],
   ['GET', /^\/companies\/[a-zA-Z0-9_-]+$/], ['PATCH', /^\/companies\/[a-zA-Z0-9_-]+$/],
   ['PUT', /^\/companies\/[a-zA-Z0-9_-]+\/accountant$/],

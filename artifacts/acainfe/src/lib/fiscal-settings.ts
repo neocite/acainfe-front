@@ -5,7 +5,7 @@ import type { ReadinessItem } from './company-details';
 export const DEFAULT_TAX_TEMPLATE = 'Valor aprox dos tributos: R$ [ValorTributos]. Fonte: IBPT';
 export type ApproximateTaxes = { rateBps: number; descriptionTemplate: string };
 export type Emission = {
-  system?: 'NACIONAL' | 'GINFES'; systemLabel?: string; environment?: string;
+  system?: 'NACIONAL' | 'GINFES' | 'PAULISTANA'; systemLabel?: string; environment?: string;
   approvalRequired?: boolean; series?: string | number | null; nextNumber?: number | null;
 };
 export type Accountant = { name?: string | null; email?: string | null; whatsapp?: string | null };
@@ -18,7 +18,8 @@ export type FiscalSettings = {
   };
   emission: Emission;
   taxDefaults?: {
-    profileLabel?: string; validated?: boolean; nationalServiceCode?: string | null;
+    profileLabel?: string; validated?: boolean; autoConfirm?: boolean; warning?: string;
+    issRateBps?: number; approximateTaxRateBps?: number; nationalServiceCode?: string | null;
     localServiceCode?: string | null; nbsCode?: string | null; issRetention?: boolean | string | null;
     ibsCbs?: { cst?: string; cClassTrib?: string; operationIndicator?: string };
   } | null;

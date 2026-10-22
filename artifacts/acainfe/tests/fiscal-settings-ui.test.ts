@@ -77,15 +77,21 @@ describe('Dados fiscais: consulta, edição e envio reais da interface', () => {
           if (body.approximateTaxes) data.approximateTaxes = body.approximateTaxes;
           if (body.municipalRegistration !== undefined) data.company.municipalRegistration = body.municipalRegistration;
           if (body.simplesNacionalTaxRateBps !== undefined) data.company.simplesNacionalTaxRateBps = body.simplesNacionalTaxRateBps;
+          if (body.businessType === 'CUSTOM') data.taxDefaults = { ...data.taxDefaults, warning: undefined, autoConfirm: false };
+          if ('defaultService' in body) data.taxDefaults = body.defaultService?.taxProfile ?? null;
           response = {};
         }
-      } else if (path === `/api${base}/accountant` && method === 'PUT') { data.accountant = body; response = {}; }
+      } else if (path.startsWith('/api/app/service-codes?q=')) response = [
+        { nationalServiceCode: '010701', lc116Item: '1.07', description: 'Suporte técnico', nbsOptions: ['115022000'], operationIndicators: ['100301'] },
+      ];
+      else if (path.endsWith('/municipal-rate/010701')) response = { issRateBps: 201 };
+      else if (path === `/api${base}/accountant` && method === 'PUT') { data.accountant = body; response = {}; }
       else throw new Error(`Rota não prevista: ${method} ${path}`);
       return new Response(JSON.stringify(response), { status, headers: { 'content-type': 'application/json' } });
     };
   });
   afterEach(async () => { await act(async () => root.unmount()); container.remove(); globalThis.fetch = originalFetch; });
-  async function mount() { await act(async () => root.render(createElement(Component, { base, onUnauthorized() { unauthorized++; }, onChanged() { changed++; } }))); }
+  async function mount(businessType?: string) { await act(async () => root.render(createElement(Component, { base, businessType, onUnauthorized() { unauthorized++; }, onChanged() { changed++; } }))); }
   function button(label: string) {
     const found = [...document.querySelectorAll<HTMLButtonElement>('button')].find(node => node.textContent?.trim() === label || node.getAttribute('aria-label') === label);
     assert.ok(found, `Botão não encontrado: ${label}`); return found;
@@ -102,6 +108,52 @@ describe('Dados fiscais: consulta, edição e envio reais da interface', () => {
   }
   const patches = () => calls.filter(call => call.method === 'PATCH');
 
+  it('CUSTOM edita no formulário compartilhado e mostra os percentuais atuais', async () => {
+    data.emission.system = 'PAULISTANA';
+    data.taxDefaults = { ...data.taxDefaults, issRetention: 'NONE', issRateBps: 201, approximateTaxRateBps: 1553, localServiceCode: '02501', autoConfirm: false };
+    await mount('CUSTOM');
+    assert.ok(container.textContent?.includes('Produtos novos precisam da sua confirmação antes de vender.'));
+    await click('Editar tributação padrão');
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 350)); });
+    assert.ok(document.querySelector('.default-service-editor'));
+    assert.ok(document.body.textContent?.includes('5 dígitos'));
+    await fill('Alíquota de ISS (%)', '2,5');
+    await click('Salvar tributação padrão');
+    assert.deepEqual(patches()[0].body, { defaultService: { taxProfile: {
+      nationalServiceCode: '010701', nbsCode: '115022000', localServiceCode: '02501',
+      issRateBps: 250, approximateTaxRateBps: 1553, issRetention: 'NONE',
+      ibsCbs: { cst: '000', cClassTrib: '000001', operationIndicator: '100301' },
+    } } });
+    assert.ok(container.textContent?.includes('Tributação padrão atualizada.'));
+  });
+  it('remove a sugestão com defaultService null e não exibe código municipal no Nacional', async () => {
+    data.emission.system = 'NACIONAL';
+    await mount('CUSTOM'); await click('Editar tributação padrão');
+    assert.equal(document.body.textContent?.includes('Código municipal'), false);
+    await click('Remover tributação padrão');
+    assert.deepEqual(patches()[0].body, { defaultService: null });
+    assert.ok(container.textContent?.includes('Nenhuma tributação padrão definida ainda.'));
+  });
+  it('aviso incompatível permite mudar para CUSTOM e libera a edição fiscal', async () => {
+    data.taxDefaults = { ...data.taxDefaults, warning: 'Nenhum CNAE de ensino. Confira a tributação.', autoConfirm: false };
+    await mount('INFOPRODUCER');
+    assert.ok(container.textContent?.includes('Nenhum CNAE de ensino.'));
+    assert.equal([...container.querySelectorAll('button')].some(n => n.textContent === 'Editar tributação padrão'), false);
+    await click('Mudar para Outro serviço');
+    assert.deepEqual(patches()[0].body, { businessType: 'CUSTOM' });
+    assert.equal(container.textContent?.includes('Nenhum CNAE de ensino.'), false);
+    assert.ok(button('Editar tributação padrão'));
+    assert.equal(changed, 1);
+  });
+  it('mantém o editor e a mensagem da API quando o PATCH da tributação falha', async () => {
+    await mount('CUSTOM'); await click('Editar tributação padrão');
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 350)); });
+    saveFailure = true;
+    await click('Salvar tributação padrão');
+    assert.ok(document.body.textContent?.includes('Dados fiscais recusados.'));
+    assert.ok(document.querySelector('.default-service-editor'));
+    assert.equal(changed, 0);
+  });
   it('mostra todos os cards, percentuais, origem do ISS, CNAEs, certificado e avisos', async () => {
     await mount();
     for (const name of ['Empresa', 'Emissão', 'Tributação padrão dos produtos', 'ISS', 'Tributos aproximados', 'Certificado A1', 'Contador', 'Produtos', 'Pendências']) assert.ok(container.querySelector(`section[aria-label="${name}"]`), name);

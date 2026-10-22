@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNod
 import { Loader2, Copy, Send, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from './ui/dialog';
 import { ApproximateTaxesFields } from './ApproximateTaxesFields';
+import { DefaultServiceEditor } from './DefaultServiceEditor';
+import { FiscalProfileWarning } from './FiscalProfileWarning';
 import { ApiError, api, phoneMask } from '../lib/api';
 import { bpsToPercent, percentToBps } from '../lib/numbers';
 import { approximateTaxInputs, approximateTaxPatch, isTestEnvironment, type FiscalSettings as Settings } from '../lib/fiscal-settings';
@@ -36,12 +38,16 @@ function Actions({ busy, onCancel }: { busy: boolean; onCancel: () => void }) {
     <button className="app-primary" type="submit" disabled={busy}>{busy && <Loader2 size={17} className="spin" />}{busy ? 'Salvando…' : 'Salvar'}</button></div>;
 }
 
-export function FiscalSettings({ base, onUnauthorized, onChanged }: { base: string; onUnauthorized: (error: unknown) => void; onChanged?: () => void }) {
+export function FiscalSettings({ base, businessType, onUnauthorized, onChanged }: { base: string; businessType?: string | null; onUnauthorized: (error: unknown) => void; onChanged?: () => void }) {
   const [data, setData] = useState<Settings | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
-  const [dialog, setDialog] = useState<'company' | 'taxes' | 'accountant' | null>(null);
+  const [dialog, setDialog] = useState<'company' | 'taxes' | 'accountant' | 'defaultService' | null>(null);
+  const [currentBusinessType, setCurrentBusinessType] = useState(businessType);
+  const [changingProfile, setChangingProfile] = useState(false);
+  const [editingDefaultBusy, setEditingDefaultBusy] = useState(false);
+  useEffect(() => setCurrentBusinessType(businessType), [businessType]);
   const [busyAction, setBusyAction] = useState<'copy' | 'send' | null>(null);
   const reqId = useRef(0);
   const lock = useRef(false);
@@ -140,6 +146,17 @@ export function FiscalSettings({ base, onUnauthorized, onChanged }: { base: stri
       </Card>
 
       <Card title="Tributação padrão dos produtos">
+        <FiscalProfileWarning warning={td?.warning} busy={changingProfile} onCustom={() => {
+          if (lock.current) return;
+          lock.current = true; setChangingProfile(true);
+          void api(base, 'PATCH', { businessType: 'CUSTOM' }).then(async () => {
+            setCurrentBusinessType('CUSTOM'); await refreshAfterSave('Perfil alterado para Outro serviço.');
+          }).catch(e => {
+            if (e instanceof ApiError && e.status === 401) authRef.current(e);
+            setNotice({ ok: false, text: errMsg(e, 'Não foi possível alterar o perfil.') });
+          }).finally(() => { lock.current = false; setChangingProfile(false); });
+        }} />
+        {td?.autoConfirm === false && <p className="fs-muted">Produtos novos precisam da sua confirmação antes de vender.</p>}
         {td ? <dl><Row k="Perfil">{txt(td.profileLabel)}</Row>
           <Row k="Validado">{td.validated === undefined ? NI : <span className={`fs-badge ${td.validated ? 'ok' : 'bad'}`}>{td.validated ? 'Validado' : 'Não validado'}</span>}</Row>
           <Row k="Serviço nacional">{txt(td.nationalServiceCode)}</Row><Row k="Serviço municipal">{txt(td.localServiceCode)}</Row><Row k="NBS">{txt(td.nbsCode)}</Row>
@@ -147,6 +164,9 @@ export function FiscalSettings({ base, onUnauthorized, onChanged }: { base: stri
           <Row k="IBS/CBS - CST">{txt(td.ibsCbs?.cst)}</Row><Row k="IBS/CBS - classificação">{txt(td.ibsCbs?.cClassTrib)}</Row>
           <Row k="IBS/CBS - operação">{txt(td.ibsCbs?.operationIndicator)}</Row></dl>
           : <div className="fs-empty">Nenhuma tributação padrão definida ainda.</div>}
+        {typeof td?.issRateBps === 'number' && <p>ISS: {bpsToPercent(td.issRateBps)}%</p>}
+        {typeof td?.approximateTaxRateBps === 'number' && <p>Tributos aproximados: {bpsToPercent(td.approximateTaxRateBps)}%</p>}
+        {currentBusinessType === 'CUSTOM' && <button type="button" className="app-secondary" onClick={() => setDialog('defaultService')}>Editar tributação padrão</button>}
       </Card>
 
       <Card title="ISS">
@@ -188,6 +208,11 @@ export function FiscalSettings({ base, onUnauthorized, onChanged }: { base: stri
     </div>
 
     {dialog === 'company' && <CompanyDialog base={base} data={data} required={ccmRequired} onClose={() => setDialog(null)} onUnauthorized={e => authRef.current(e)} onSaved={() => { setDialog(null); void refreshAfterSave('Dados da empresa atualizados.'); }} />}
+    {dialog === 'defaultService' && <Shell open title="Tributação padrão da empresa" desc="Confira a sugestão com seu contador. Os produtos continuam precisando de confirmação." busy={editingDefaultBusy} onClose={() => setDialog(null)}>
+      <DefaultServiceEditor base={base} system={em?.system} initial={td} onUnauthorized={e => authRef.current(e)} onSkip={() => setDialog(null)}
+        onBusyChange={setEditingDefaultBusy}
+        onSaved={() => { setDialog(null); void refreshAfterSave('Tributação padrão atualizada.'); }} />
+    </Shell>}
     {dialog === 'taxes' && <TaxesDialog base={base} data={data} onClose={() => setDialog(null)} onUnauthorized={e => authRef.current(e)} onSaved={() => { setDialog(null); void refreshAfterSave('Tributos aproximados atualizados.'); }} />}
     {dialog === 'accountant' && <AccountantDialog base={base} data={data} onClose={() => setDialog(null)} onUnauthorized={e => authRef.current(e)} onSaved={() => { setDialog(null); void refreshAfterSave('Contador atualizado. Toque em Enviar ao contador para mandar o resumo.'); }} />}
   </div>;

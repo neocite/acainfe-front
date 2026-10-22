@@ -17,6 +17,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   let gatewayCalls: any[], gatewayFailure: boolean;
   let certificateResponse: { status: number; code: string; message: string } | null;
   let certificateUploads: number;
+  let profileWarning: string | undefined;
   const descriptors = new Map<string, PropertyDescriptor | undefined>();
   const originalFetch = globalThis.fetch;
   before(async () => {
@@ -56,6 +57,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     keys = []; keyGets = 0; keyDeletes = []; generatedLabels = []; generationError = false;
     gatewayCalls = []; gatewayFailure = false;
     certificateResponse = null; certificateUploads = 0;
+    profileWarning = undefined;
     company = {
       tenant: { id: 'test-company', taxRegime: 'SIMPLES_NACIONAL', municipalRegistration: '123', integrations: {} },
       company: { legalName: 'EMPRESA DE TESTE' }, availability: { status: 'AVAILABLE' },
@@ -84,8 +86,13 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
         data = [
           { businessType: 'INFOPRODUCER', label: 'Infoprodutor', examples: 'Cursos, treinamentos, mentorias', validated: true },
           { businessType: 'MICROSAAS', label: 'MicroSaaS', examples: 'Assinaturas e licenças de software', validated: false },
+          { businessType: 'CUSTOM', label: 'Outro serviço (configuro eu mesmo)', examples: 'Design e consultoria', validated: false, validationNote: 'Confira os códigos com seu contador.' },
         ];
-      } else if (path.endsWith('/abacatepay') && method === 'POST') {
+      } else if (path.startsWith('/api/app/service-codes?q=')) data = [
+        { nationalServiceCode: '010601', lc116Item: '1.06', description: 'Consultoria', nbsOptions: ['115010000'], operationIndicators: ['100302'] },
+      ];
+      else if (path.endsWith('/municipal-rate/010601')) data = { issRateBps: 201 };
+      else if (path.endsWith('/abacatepay') && method === 'POST') {
         gatewayCalls.push(JSON.parse(String(init?.body)));
         if (gatewayFailure) return new Response(JSON.stringify({ message: 'Permissão CUSTOMER:READ ausente.' }), { status: 422, headers: { 'content-type': 'application/json' } });
         company.abacatepay = { ...company.abacatepay, connected: true };
@@ -127,7 +134,8 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
       }
       else if (path === '/api/app/companies/test-company/fiscal-settings' && method === 'GET') {
         fiscalRequests++;
-        data = { company: { legalName: 'DADOS FISCAIS COMPLETOS' }, emission: { systemLabel: 'Emissor Nacional', environment: 'PRODUCTION' }, text: 'Resumo de teste' };
+        data = { company: { legalName: 'DADOS FISCAIS COMPLETOS' }, emission: { systemLabel: 'Emissor Nacional', environment: 'PRODUCTION' },
+          taxDefaults: { warning: company.tenant.businessType === 'INFOPRODUCER' ? profileWarning : undefined, autoConfirm: company.tenant.businessType !== 'CUSTOM' }, text: 'Resumo de teste' };
       }
       else if (path === '/api/app/companies/test-company' && method === 'GET') {
         detailRequests++;
@@ -248,6 +256,67 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     assert.ok(container.textContent?.includes('Conecte seu AbacatePay'));
     assert.equal(container.querySelector<HTMLInputElement>('input[type="checkbox"]')!.checked, true);
     for (const permission of ['CHECKOUT:READ', 'TRANSPARENT:READ', 'SUBSCRIPTION:READ', 'CUSTOMER:READ']) assert.ok(container.textContent?.includes(permission));
+  });
+  async function customInput(label: string, value: string) {
+    const editor = container.querySelector('.default-service-editor')!;
+    const field = [...editor.querySelectorAll('label')].find(node => node.textContent?.startsWith(label))?.querySelector('input')!;
+    assert.ok(field, label);
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value')!.set!.call(field, value);
+      field.dispatchEvent(new dom.window.Event('input', { bubbles: true }));
+    });
+  }
+  it('CUSTOM pode pular sem enviar defaultService e avança até AbacatePay', async () => {
+    await mount(); await selectBusiness('CUSTOM');
+    assert.ok(container.textContent?.includes('Confira os códigos com seu contador.'));
+    assert.ok(container.textContent?.includes('Opcional. Isso vira só uma sugestão'));
+    await click(button('Pular'));
+    await click(container.querySelector('input[name="numbering"][value="no"]')!);
+    await submit();
+    assert.equal(patches[0].businessType, 'CUSTOM');
+    assert.equal(patches.some(p => 'defaultService' in p), false);
+    await click(button('Não tenho contador agora'));
+    assert.ok(container.textContent?.includes('Conecte seu AbacatePay'));
+  });
+  it('CUSTOM busca serviço, exige o NBS permitido e salva a sugestão com ISS e IBPT inteiros', async () => {
+    company.emission = { system: 'PAULISTANA' };
+    await mount(); await selectBusiness('CUSTOM');
+    await customInput('Código de serviço', 'consultoria');
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 350)); });
+    await click(container.querySelector('input[name="defaultServiceCode"]')!);
+    assert.ok(container.textContent?.includes('1.06 — Consultoria'));
+    assert.ok(container.textContent?.includes('5 dígitos'));
+    await click(button('Salvar tributação padrão'));
+    assert.ok(container.textContent?.includes('Escolha um NBS'));
+    assert.equal(patches.length, 0);
+    const select = container.querySelector<HTMLSelectElement>('.default-service-editor select')!;
+    await act(async () => { select.value = '115010000'; select.dispatchEvent(new dom.window.Event('change', { bubbles: true })); });
+    await customInput('Código municipal', '02501');
+    await click(button('Consultar na prefeitura'));
+    await customInput('Tributos aproximados (IBPT', '15,53');
+    await click(button('Salvar tributação padrão'));
+    assert.deepEqual(patches[0], { businessType: 'CUSTOM' });
+    assert.deepEqual(patches[1], { defaultService: { taxProfile: {
+      nationalServiceCode: '010601', nbsCode: '115010000', localServiceCode: '02501', issRateBps: 201,
+      issRetention: 'NONE', ibsCbs: { cst: '000', cClassTrib: '000001', operationIndicator: '100302' }, approximateTaxRateBps: 1553,
+    } } });
+    assert.ok(container.textContent?.includes('Cada produto ainda precisa de confirmação.'));
+    await click(container.querySelector('input[name="numbering"][value="no"]')!);
+    await submit();
+    assert.ok(container.textContent?.includes('Quem é seu contador?'));
+  });
+  it('perfil incompatível mostra aviso após salvar e permite mudar para CUSTOM sem avançar', async () => {
+    profileWarning = 'Sua empresa não tem CNAE de ensino. Os produtos serão apenas sugestões.';
+    await mount(); await selectBusiness('INFOPRODUCER');
+    await click(container.querySelector('input[name="numbering"][value="no"]')!);
+    await submit();
+    assert.ok(container.textContent?.includes(profileWarning));
+    assert.ok(container.textContent?.includes('Só mais alguns detalhes.'));
+    await click(button('Mudar para Outro serviço'));
+    assert.deepEqual(patches.at(-1), { businessType: 'CUSTOM' });
+    assert.equal(container.querySelector<HTMLInputElement>('input[name="businessType"][value="CUSTOM"]')?.checked, true);
+    assert.ok(container.querySelector('.default-service-editor'));
+    assert.equal(container.textContent?.includes(profileWarning), false);
   });
   it('não envia PATCH sem escolha e mantém as opções para corrigir', async () => {
     await mount(); await click(container.querySelector('input[name="numbering"][value="no"]')!);

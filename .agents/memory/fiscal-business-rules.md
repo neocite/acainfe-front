@@ -14,3 +14,9 @@ Ao corrigir uma etapa do cadastro, verificar também a continuidade das etapas v
 **Why:** Testes dos componentes fiscais passaram mesmo quando a página de cadastro deixou de exibir a escolha de atividade e de enviar a resposta; isso bloqueou a configuração da empresa. O mesmo problema ocorreu com o cartão da empresa: o componente isolado estava correto, mas a página usava outra implementação.
 
 **How to apply:** Cobrir a escolha de cada atividade, o envio junto com a numeração e a chegada à conexão com o AbacatePay. Incluir a entrada e a atualização do painel na página real. A existência do componente e seus testes isolados não comprovam que ele está ligado ao fluxo real.
+
+A configuração fiscal manual é uma exceção opcional para quem escolhe “Outro serviço (configuro eu mesmo)”, não uma obrigação para todos. Seu padrão é somente sugestão; os produtos continuam precisando de confirmação. Não reclassificar retroativamente empresas ou produtos existentes.
+
+**Why:** O proprietário pediu uma saída para serviços que não são curso nem SaaS, inclusive usuários cautelosos que querem conferir os códigos, e delimitou a mudança como “só daqui pra frente”.
+
+**How to apply:** Manter os perfis simples para o público geral e oferecer a configuração avançada sem impor preenchimento. Alterações de perfil ou padrão devem decorrer de ação explícita do usuário, sem migração automática de tributação anterior.
