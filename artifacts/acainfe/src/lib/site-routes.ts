@@ -12,7 +12,7 @@ export const SITE_ROUTES = {
   ...INSTITUTIONAL_ROUTES,
 } as const;
 export const SITEMAP_PATHS = ['/', ...Object.values(INSTITUTIONAL_ROUTES), '/llms.txt'] as const;
-export const PUBLIC_RESOURCE_ROUTES: readonly string[] = ['/openapi.json', '/.well-known/mcp.json'];
+export const PUBLIC_RESOURCE_ROUTES: readonly string[] = ['/openapi.json', '/.well-known/mcp.json', '/.well-known/mcp/server-card.json'];
 
 export function isValidPage(path: string) {
   const normalized = path.length > 1 ? path.replace(/\/+$/, '') : path;

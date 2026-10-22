@@ -22,6 +22,10 @@ Não use para: NF-e de produto/mercadoria (ICMS), empresas de cidades ainda não
 
 Todos os valores são inteiros: dinheiro em centavos (R$ 82,20 = 8220) e percentuais em pontos-base (2,01% = 201).
 
+## Versionamento
+
+A versão da API está no caminho (/v1); dentro de uma versão, só entram mudanças compatíveis: novos campos, novas rotas e novos valores opcionais; uma mudança incompatível só sai numa nova versão (/v2); uma rota ou versão descontinuada continua funcionando por pelo menos 90 dias, responde com os cabeçalhos Deprecation (RFC 9745) e Sunset (RFC 8594) e é anunciada nesta página e no llms.txt.
+
 ## Páginas
 
 - [Início](https://acainfe.com/): como funciona, preço e cidades atendidas

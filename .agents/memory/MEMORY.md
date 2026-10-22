@@ -14,3 +14,4 @@
 - [Cobertura municipal](public-coverage.md) — capital de São Paulo incluída; comunicação pública não substitui a liberação individual da empresa pela API.
 - [Produto pensado para agentes](agent-first-positioning.md) — objetivo comercial inclui operação via MCP; não afirmar pioneirismo sem comprovação.
 - [Arquivos públicos e Vite](public-resource-routing.md) — downloads e arquivos para agentes devem passar antes do Vite, sem transformação de módulos.
+- [Versionamento da API](api-versioning-policy.md) — proprietário aprovou novas versões para incompatibilidades e pelo menos 90 dias para descontinuação.

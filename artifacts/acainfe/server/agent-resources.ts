@@ -57,13 +57,13 @@ export async function createAgentResourcesRouter(options: PublicDocumentOptions 
   const router = express.Router();
   const now = options.now ?? Date.now;
   const remoteDocuments = [
-    { path: '/openapi.json', fallback: publicOpenApi, valid: isPublicOpenApi },
-    { path: '/.well-known/mcp.json', fallback: publicMcpServerCard, valid: isMcpServerCard },
+    { paths: ['/openapi.json'], source: '/openapi.json', fallback: publicOpenApi, valid: isPublicOpenApi },
+    { paths: ['/.well-known/mcp.json', '/.well-known/mcp/server-card.json'], source: '/.well-known/mcp.json', fallback: publicMcpServerCard, valid: isMcpServerCard },
   ].map(doc => ({
-    ...doc, get: cachedPublicDocument(`https://api.acainfe.com${doc.path}`, doc.fallback, doc.valid, options),
+    ...doc, get: cachedPublicDocument(`https://api.acainfe.com${doc.source}`, doc.fallback, doc.valid, options),
   }));
   for (const doc of remoteDocuments) {
-    router.get(doc.path, async (_req, res) => {
+    router.get(doc.paths, async (_req, res) => {
       const entry = await doc.get();
       res.set({
         'Cache-Control': 'public, max-age=3600',
@@ -75,7 +75,7 @@ export async function createAgentResourcesRouter(options: PublicDocumentOptions 
         'X-Content-Type-Options': 'nosniff',
       }).status(200).type('application/json; charset=utf-8').send(entry.content);
     });
-    router.options(doc.path, (_req, res) => res.set({
+    router.options(doc.paths, (_req, res) => res.set({
       'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
       'Access-Control-Allow-Headers': 'If-None-Match',
     }).sendStatus(204));

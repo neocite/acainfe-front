@@ -26,6 +26,19 @@ export const INSTITUTIONAL_PAGES: InstitutionalPage[] = [
       { title: 'Valores inteiros', paragraphs: [
         'Envie sempre valores inteiros: dinheiro em centavos (R$ 82,20 = 8220) e percentuais em pontos-base (2,01% = 201).',
       ] },
+      { title: 'Versionamento e descontinuação', paragraphs: [
+        'A versão da API está no caminho (/v1). Dentro de uma versão, só entram mudanças compatíveis: novos campos, novas rotas e novos valores opcionais. Uma mudança incompatível só sai numa nova versão (/v2). Uma rota ou versão descontinuada continua funcionando por pelo menos 90 dias, responde com os cabeçalhos Deprecation (RFC 9745) e Sunset (RFC 8594) e é anunciada nesta página e no llms.txt.',
+      ] },
+      { title: 'Erros', paragraphs: [
+        'Toda resposta de erro tem o formato { "error": "<CÓDIGO>", "message": "...", "details": {...} }: error identifica o código, message explica o problema e details traz os detalhes.',
+        'VALIDATION (422): os dados enviados não passaram na validação.',
+        'NOT_FOUND (404): o recurso não foi encontrado.',
+        'CONFLICT e INVALID_STATE (409): há um conflito ou o estado atual não permite a ação.',
+        'UNAUTHORIZED (401): a autenticação está ausente ou não foi aceita.',
+        'CERTIFICATE_INVALID e CERTIFICATE_MISSING (422): o certificado é inválido ou está ausente.',
+        'UNAVAILABLE (503): o serviço está temporariamente indisponível; pode tentar de novo.',
+        'INTERNAL (500): ocorreu um erro interno.',
+      ] },
       { title: 'Agentes de IA e MCP', paragraphs: [
         'O servidor MCP é https://api.acainfe.com/mcp, com transporte HTTP streamable e a mesma chave, no cabeçalho Authorization: Bearer <chave>. O guia para agentes está em /llms.txt.',
       ], links: [{ href: '/llms.txt', label: 'Guia para agentes de IA' }] },

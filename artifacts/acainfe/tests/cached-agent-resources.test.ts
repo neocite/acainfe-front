@@ -49,7 +49,9 @@ describe('Documentos públicos da API — transporte e relógio simulados', () =
 
   it('repassa o cartão completo da API, inclusive descrição e outros metadados públicos', async () => {
     const card = { ...publicMcpServerCard, description: 'Mock upstream description', metadata: { mock: true } };
+    let calls = 0;
     await withRouter(async url => {
+      calls++;
       assert.equal(String(url), 'https://api.acainfe.com/.well-known/mcp.json');
       return json(card);
     }, async base => {
@@ -57,6 +59,12 @@ describe('Documentos públicos da API — transporte e relógio simulados', () =
       assert.equal(result.status, 200);
       assert.equal(result.headers.get('content-type'), 'application/json; charset=utf-8');
       assert.deepEqual(await result.json(), card);
+      const alias = await fetch(base + '/.well-known/mcp/server-card.json');
+      assert.equal(alias.status, 200);
+      assert.equal(alias.headers.get('content-type'), 'application/json; charset=utf-8');
+      assert.equal(alias.headers.get('etag'), result.headers.get('etag'));
+      assert.deepEqual(await alias.json(), card);
+      assert.equal(calls, 1, 'os dois endereços compartilham uma busca e o mesmo cache');
     });
   });
 
@@ -100,6 +108,7 @@ describe('Documentos públicos da API — transporte e relógio simulados', () =
     for (const fetcher of failures) await withRouter(fetcher, async base => {
       for (const [path, expected] of [
         ['/openapi.json', publicOpenApi], ['/.well-known/mcp.json', publicMcpServerCard],
+        ['/.well-known/mcp/server-card.json', publicMcpServerCard],
       ] as const) {
         const response = await fetch(base + path);
         assert.equal(response.status, 200);

@@ -373,6 +373,7 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     const resources = [
       ['/openapi.json', 'application/json'],
       ['/.well-known/mcp.json', 'application/json'],
+      ['/.well-known/mcp/server-card.json', 'application/json'],
       ['/mcp.json', 'application/json'],
       ['/agent-instructions.md', 'text/markdown'],
       ['/cli/acainfe.mjs', 'application/javascript'],
@@ -384,7 +385,7 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
       assert.equal(response.headers.get('content-type'), `${type}; charset=utf-8`);
       assert.equal(response.headers.get('access-control-allow-origin'), '*');
       assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
-      assert.equal(response.headers.get('cache-control'), ['/openapi.json', '/.well-known/mcp.json'].includes(path)
+      assert.equal(response.headers.get('cache-control'), ['/openapi.json', '/.well-known/mcp.json', '/.well-known/mcp/server-card.json'].includes(path)
         ? 'public, max-age=3600' : 'public, max-age=300');
       const etag = response.headers.get('etag')!;
       assert.ok(etag);
@@ -420,9 +421,11 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     assert.ok(llms.includes('[Servidor MCP (JSON)](https://acainfe.com/.well-known/mcp.json): endereço, transporte e autenticação do servidor MCP'));
     assert.ok(isValidPage('/openapi.json'));
     assert.ok(isValidPage('/.well-known/mcp.json'));
+    assert.ok(isValidPage('/.well-known/mcp/server-card.json'));
     const card = await fetch(base + '/.well-known/mcp.json');
     assert.equal(card.status, 200);
     assert.deepEqual(await card.json(), publicMcpServerCard);
+    assert.deepEqual(await (await fetch(base + '/.well-known/mcp/server-card.json')).json(), publicMcpServerCard);
     const cliDocs = await (await fetch(base + '/cli/README.md')).text();
     assert.ok(cliDocs.includes('npm ainda não foi publicada'));
     assert.ok(cliDocs.includes('Não use `npx acainfe-cli`'));
@@ -449,6 +452,42 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     for (const path of ['/openapi.json', '/agent-instructions.md', '/mcp.json', '/cli/README.md']) assert.ok(markdown.includes(path));
     const llms = await fetch(base + '/llms.txt');
     assert.ok(llms.headers.get('link')?.includes('rel="service-desc"'));
+  });
+
+  it('developers publica a política aprovada e todos os códigos de erro em HTML e Markdown', async () => {
+    const policy = 'A versão da API está no caminho (/v1). Dentro de uma versão, só entram mudanças compatíveis: novos campos, novas rotas e novos valores opcionais. Uma mudança incompatível só sai numa nova versão (/v2). Uma rota ou versão descontinuada continua funcionando por pelo menos 90 dias, responde com os cabeçalhos Deprecation (RFC 9745) e Sunset (RFC 8594) e é anunciada nesta página e no llms.txt.';
+    const response = await fetch(base + '/developers');
+    assert.equal(response.status, 200);
+    const dom = new JSDOM(await response.text());
+    const doc = dom.window.document;
+    const text = doc.body.textContent!;
+    for (const title of ['Versionamento e descontinuação', 'Erros']) {
+      assert.ok([...doc.querySelectorAll('h2')].some(heading => heading.textContent === title));
+    }
+    assert.ok(text.includes(policy));
+    const markdown = await (await fetch(base + '/developers', { headers: { accept: 'text/markdown' } })).text();
+    assert.ok(markdown.includes('## Versionamento e descontinuação'));
+    assert.ok(markdown.includes('## Erros'));
+    assert.ok(markdown.includes(policy));
+    for (const expected of [
+      '{ "error": "<CÓDIGO>", "message": "...", "details": {...} }',
+      'VALIDATION (422)', 'NOT_FOUND (404)', 'CONFLICT e INVALID_STATE (409)',
+      'UNAUTHORIZED (401)', 'CERTIFICATE_INVALID e CERTIFICATE_MISSING (422)',
+      'UNAVAILABLE (503)', 'pode tentar de novo', 'INTERNAL (500)',
+    ]) {
+      assert.ok(text.includes(expected), expected);
+      assert.ok(markdown.includes(expected), expected);
+    }
+    dom.window.close();
+  });
+
+  it('llms publica a política em uma frase, após Como um agente usa e antes das páginas', async () => {
+    const response = await fetch(base + '/llms.txt');
+    assert.equal(response.status, 200);
+    const text = await response.text();
+    const expected = 'A versão da API está no caminho (/v1); dentro de uma versão, só entram mudanças compatíveis: novos campos, novas rotas e novos valores opcionais; uma mudança incompatível só sai numa nova versão (/v2); uma rota ou versão descontinuada continua funcionando por pelo menos 90 dias, responde com os cabeçalhos Deprecation (RFC 9745) e Sunset (RFC 8594) e é anunciada nesta página e no llms.txt.';
+    assert.ok(text.includes(`## Versionamento\n\n${expected}\n\n## Páginas`));
+    assert.ok(text.indexOf('## Como um agente usa') < text.indexOf('## Versionamento'));
   });
 
   it('privacidade contém só os 12 tópicos aprovados e a versão e aviso no topo', async () => {
