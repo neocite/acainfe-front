@@ -18,6 +18,7 @@ import { coverageDescription } from '../src/lib/coverage';
 import { createPublicSiteRouter, fillPublicHtml } from './public-site';
 import type { PublicSiteData } from '../src/lib/public-site-content';
 import { institutionalPage } from '../src/lib/institutional-content';
+import { agentResourcesRouter } from './agent-resources';
 
 const app = express();
 const httpServer = createHttpServer(app);
@@ -140,6 +141,8 @@ const publicData = async (): Promise<PublicSiteData> => {
   return { pricing: { pricePerInvoiceCents: pricing.pricePerInvoiceCents, monthlyFeeCents: pricing.monthlyFeeCents }, coverage };
 };
 const notFoundBody = '<main style="padding:60px"><h1>Essa página não está por aqui.</h1><a href="/">Voltar ao início</a></main>';
+// Serve exact machine-readable files before Vite can transform source extensions.
+app.use(agentResourcesRouter);
 if (process.env.NODE_ENV === 'production') {
   const { publishedAt } = JSON.parse(await readFile(path.join(root, 'dist/publication.json'), 'utf8'));
   const rendererPath = path.join(root, 'dist/server/entry-server.js');

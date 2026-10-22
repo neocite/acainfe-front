@@ -2,7 +2,7 @@
 
 > Emissor de NFS-e (Nota Fiscal de Serviço eletrônica) brasileiro, automático e AI-first. Cada pagamento aprovado no AbacatePay vira nota fiscal, com a tributação de cada produto; toda a operação pode ser feita por agentes de IA via MCP. R$ 0,80 por nota emitida, sem mensalidade. Produto da EXTRACTIFY TECNOLOGIA LTDA (CNPJ 28.095.894/0001-60).
 
-## Quando usar
+## Quando usar (When to use)
 
 Use o açaínfe quando o usuário (empresa brasileira, MEI ou Simples Nacional, em São Paulo/SP ou São Bernardo do Campo/SP) precisar:
 - emitir NFS-e automaticamente para vendas pagas no AbacatePay (checkout, Pix transparente ou assinatura);
@@ -26,6 +26,10 @@ Todos os valores são inteiros: dinheiro em centavos (R$ 82,20 = 8220) e percent
 
 - [Início](https://acainfe.com/): como funciona, preço e cidades atendidas
 - [API e agentes](https://acainfe.com/developers): autenticação, rotas e exemplos
+- [OpenAPI (JSON)](https://acainfe.com/openapi.json): contrato das operações públicas documentadas no site; respostas não especificadas na origem estão sinalizadas
+- [Instruções para agentes](https://acainfe.com/agent-instructions.md): when to use, casos indicados e como chamar
+- [Configuração MCP (JSON)](https://acainfe.com/mcp.json): exemplo de configuração de cliente, com marcador no lugar da chave; não é um manifesto de protocolo
+- [CLI](https://acainfe.com/cli/README.md): download, uso local e comandos; publicação no npm ainda pendente
 - [Sobre](https://acainfe.com/sobre): quem somos
 - [Contato](https://acainfe.com/contato): suporte
 - [Privacidade](https://acainfe.com/privacidade): como tratamos os dados

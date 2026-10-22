@@ -10,6 +10,9 @@ import { FALLBACK_COVERAGE } from '../src/lib/coverage';
 import { HOME_TITLE, homeDescription, type PublicSiteData } from '../src/lib/public-site-content';
 import { SITE_ROUTES, PUBLIC_PAGE_ALIASES, isValidPage, publicCanonicalUrl } from '../src/lib/site-routes';
 import { setPublicCanonical } from '../src/lib/public-metadata';
+import SwaggerParser from '@apidevtools/swagger-parser';
+import { publicOpenApi } from '../server/public-api-schema';
+import { agentResourcesRouter } from '../server/agent-resources';
 import { INSTITUTIONAL_PAGES, institutionalPage, institutionalMarkdown } from '../src/lib/institutional-content';
 
 const data: PublicSiteData = { pricing: { pricePerInvoiceCents: 80, monthlyFeeCents: 0 }, coverage: FALLBACK_COVERAGE };
@@ -29,9 +32,13 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     html = renderLanding(data);
     template = await readFile('index.html', 'utf8');
     const app = express();
+    app.use(agentResourcesRouter);
     app.use(express.static('public', { index: false }));
     // Existing API behavior is not overridden by the public page handler.
     app.get('/api/example', (_req, res) => res.json({ ok: true }));
+    // Include the actual dev middleware so download routes cannot silently
+    // become Vite browser modules instead of the original CLI source.
+    app.use(vite.middlewares);
     app.use(createPublicSiteRouter({
       data: async () => data, publishedAt,
       html: async (req, state, home, notFound) => fillPublicHtml(template, 'https://acainfe.com', state,
@@ -268,7 +275,7 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
       assert.equal(doc.querySelector('meta[property="og:url"]')?.getAttribute('content'), canonical);
       assert.equal(doc.querySelector('meta[property="og:type"]')?.getAttribute('content'), 'website');
       assert.equal(doc.querySelector('meta[property="og:image"]')?.getAttribute('content'), 'https://acainfe.com/api/og.png');
-      assert.equal(response.headers.get('link'), `<${canonical}>; rel="canonical"`);
+      assert.ok(response.headers.get('link')?.includes(`<${canonical}>; rel="canonical"`));
       dom.window.close();
     });
   }
@@ -290,7 +297,7 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
       assert.equal(markdown.status, 200);
       assert.equal(markdown.headers.get('content-type'), 'text/markdown; charset=utf-8');
       assert.match(markdown.headers.get('vary')!, /Accept/);
-      assert.equal(markdown.headers.get('link'), `<https://acainfe.com${original}>; rel="canonical"`);
+      assert.ok(markdown.headers.get('link')?.includes(`<https://acainfe.com${original}>; rel="canonical"`));
       assert.equal(await markdown.text(), institutionalMarkdown(institutionalPage(original)!));
       assert.equal(institutionalPage(alias + '/'), institutionalPage(original));
       dom.window.close(); originalDom.window.close();
@@ -314,6 +321,119 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
       else Reflect.deleteProperty(globalThis, 'document');
       dom.window.close();
     }
+  });
+
+  it('publica OpenAPI 3.1 válido, só com as oito operações públicas revisadas', async () => {
+    const response = await fetch(base + '/openapi.json');
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'application/json; charset=utf-8');
+    const spec = await response.json();
+    await SwaggerParser.validate(structuredClone(spec));
+    assert.equal(spec.openapi, '3.1.0');
+    assert.deepEqual(spec.servers, [{ url: 'https://api.acainfe.com' }]);
+    assert.deepEqual(spec, publicOpenApi);
+    assert.deepEqual(Object.keys(spec.paths), [
+      '/v1/sales', '/v1/invoices', '/v1/invoices/{id}', '/v1/invoices/{id}/cancel',
+      '/v1/products', '/v1/public/pricing', '/v1/public/coverage',
+    ]);
+    const ids = new Set<string>();
+    for (const methods of Object.values(spec.paths) as any[]) for (const operation of Object.values(methods) as any[]) {
+      assert.ok(operation.operationId && !ids.has(operation.operationId));
+      ids.add(operation.operationId);
+      assert.ok(operation.description.length > 20);
+      for (const parameter of operation.parameters ?? []) assert.equal(parameter.schema.type, 'string');
+      if (operation.requestBody) assert.equal(operation.requestBody.content['application/json'].schema.type, 'object');
+      for (const result of Object.values(operation.responses) as any[]) {
+        assert.ok(result.description);
+        assert.ok(result.content['application/json'].schema);
+      }
+    }
+    assert.equal(ids.size, 8);
+    const text = JSON.stringify(spec);
+    for (const forbidden of ['/v1/admin', '/v1/app', '/v1/tenants', 'x-admin-key', 'x-app-key', 'ACAINFE_APP_KEY']) assert.ok(!text.includes(forbidden));
+    assert.equal(spec.paths['/v1/public/pricing'].get.security.length, 0);
+    assert.equal(spec.paths['/v1/public/coverage'].get.security.length, 0);
+    assert.equal(spec.components.securitySchemes.apiKey.name, 'x-api-key');
+    assert.equal(spec.components.securitySchemes.bearerAuth.scheme, 'bearer');
+    const sale = spec.paths['/v1/sales'].post;
+    assert.ok(sale.responses['202']);
+    assert.equal(sale.requestBody.content['application/json'].schema.properties.items.items.properties.totalCents.type, 'integer');
+    // No made-up response fields to hide the missing upstream contract.
+    assert.equal(sale.responses['202'].content['application/json'].schema.type, undefined);
+    assert.match(sale.responses['202'].content['application/json'].schema.description, /não especifica/);
+  });
+
+  it('recursos de agentes são públicos, têm tipos corretos, CORS restrito às rotas novas e cache condicional', async () => {
+    const resources = [
+      ['/openapi.json', 'application/json'],
+      ['/mcp.json', 'application/json'],
+      ['/agent-instructions.md', 'text/markdown'],
+      ['/cli/acainfe.mjs', 'application/javascript'],
+      ['/cli/README.md', 'text/markdown'],
+    ];
+    for (const [path, type] of resources) {
+      const response = await fetch(base + path, { headers: { accept: '*/*', origin: 'https://client.example' } });
+      assert.equal(response.status, 200, path);
+      assert.equal(response.headers.get('content-type'), `${type}; charset=utf-8`);
+      assert.equal(response.headers.get('access-control-allow-origin'), '*');
+      assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+      assert.equal(response.headers.get('cache-control'), 'public, max-age=300');
+      const etag = response.headers.get('etag')!;
+      assert.ok(etag);
+      const cached = await fetch(base + path, { headers: { 'If-None-Match': etag, 'Cache-Control': 'max-age=0' } });
+      assert.equal(cached.status, 304, path);
+      assert.equal(await cached.text(), '');
+      const head = await fetch(base + path, { method: 'HEAD' });
+      assert.equal(head.status, 200);
+      assert.equal(await head.text(), '');
+      const options = await fetch(base + path, { method: 'OPTIONS' });
+      assert.equal(options.status, 204);
+      assert.equal(options.headers.get('access-control-allow-methods'), 'GET, HEAD, OPTIONS');
+    }
+    const api = await fetch(base + '/api/example');
+    assert.equal(api.headers.get('access-control-allow-origin'), null);
+    const cli = await (await fetch(base + '/cli/acainfe.mjs')).text();
+    assert.equal(cli, await readFile('cli/acainfe.mjs', 'utf8'));
+  });
+
+  it('instruções when-to-use e configuração MCP dizem como usar sem inventar manifesto nem ferramentas', async () => {
+    const instructions = await (await fetch(base + '/agent-instructions.md')).text();
+    assert.match(instructions, /## When to use/);
+    for (const phrase of ['MEI', 'Simples Nacional', 'São Paulo', 'São Bernardo do Campo', 'Do not use', 'Streamable HTTP', 'at runtime', 'integer cents', 'basis points']) assert.ok(instructions.includes(phrase));
+    const config = await (await fetch(base + '/mcp.json')).json();
+    assert.deepEqual(config, { mcpServers: { acainfe: {
+      type: 'http', url: 'https://api.acainfe.com/mcp', headers: { Authorization: 'Bearer <SUA_CHAVE>' },
+    } } });
+    const llms = await (await fetch(base + '/llms.txt')).text();
+    assert.match(llms, /## Quando usar \(When to use\)/);
+    for (const path of ['/agent-instructions.md', '/openapi.json', '/mcp.json', '/cli/README.md']) assert.ok(llms.includes(`https://acainfe.com${path}`));
+    assert.ok(llms.includes('não é um manifesto de protocolo'));
+    const cliDocs = await (await fetch(base + '/cli/README.md')).text();
+    assert.ok(cliDocs.includes('npm ainda não foi publicada'));
+    assert.ok(cliDocs.includes('Não use `npx acainfe-cli`'));
+  });
+
+  it('descoberta por HTML e cabeçalhos liga OpenAPI e instruções sem alterar conteúdo visual', async () => {
+    for (const path of ['/', '/developers', '/about']) {
+      const response = await fetch(base + path);
+      const dom = new JSDOM(await response.text());
+      const doc = dom.window.document;
+      assert.equal(doc.querySelector('head link[rel="service-desc"]')?.getAttribute('href'), 'https://acainfe.com/openapi.json');
+      assert.equal(doc.querySelector('head link[rel="describedby"]')?.getAttribute('href'), 'https://acainfe.com/agent-instructions.md');
+      assert.equal(doc.querySelector('head link[rel="service-doc"]')?.getAttribute('href'), 'https://acainfe.com/developers');
+      assert.ok(response.headers.get('link')?.includes('rel="service-desc"'));
+      assert.ok(response.headers.get('link')?.includes('rel="describedby"'));
+      if (path === '/') {
+        assert.match(doc.querySelector('meta[name="description"]')!.getAttribute('content')!, /EXTRACTIFY TECNOLOGIA LTDA/);
+        const graph = JSON.parse(doc.querySelector('script[type="application/ld+json"]')!.textContent!);
+        assert.equal(graph['@graph'][1].name, 'EXTRACTIFY TECNOLOGIA LTDA');
+      }
+      dom.window.close();
+    }
+    const markdown = await (await fetch(base, { headers: { accept: 'text/markdown' } })).text();
+    for (const path of ['/openapi.json', '/agent-instructions.md', '/mcp.json', '/cli/README.md']) assert.ok(markdown.includes(path));
+    const llms = await fetch(base + '/llms.txt');
+    assert.ok(llms.headers.get('link')?.includes('rel="service-desc"'));
   });
 
   it('privacidade contém só os 12 tópicos aprovados e a versão e aviso no topo', async () => {

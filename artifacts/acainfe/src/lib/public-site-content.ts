@@ -7,7 +7,7 @@ export const HOME_TITLE = 'açaínfe: emissor de NFS-e automático para AbacateP
 export const AGENT_DESCRIPTION = 'Emissor de NFS-e (nota fiscal de serviço eletrônica) automático e operável por agentes de IA via MCP. Cada pagamento aprovado no AbacatePay vira nota fiscal, com a tributação de cada produto. Atende MEI e Simples Nacional em São Paulo e São Bernardo do Campo.';
 export const AGENT_COPY = 'O açaínfe pode ser operado por agentes de IA via MCP (Model Context Protocol). Configure sua empresa e conecte seu assistente para trabalhar com suas notas fiscais.';
 export function homeDescription(pricing: PublicPricing) {
-  return `Nota fiscal de serviço (NFS-e) automática para cada venda no AbacatePay, operável por agentes de IA via MCP. ${brl(pricing.pricePerInvoiceCents).replace(/\u00a0/g, ' ')} por nota, sem mensalidade. São Paulo e São Bernardo do Campo.`;
+  return `Nota fiscal de serviço (NFS-e) automática para cada venda no AbacatePay, operável por agentes de IA via MCP. ${brl(pricing.pricePerInvoiceCents).replace(/\u00a0/g, ' ')} por nota, sem mensalidade. São Paulo e São Bernardo do Campo. Produto da EXTRACTIFY TECNOLOGIA LTDA.`;
 }
 export const LANDING_STEPS = [
   { number: '01', title: 'Conecte sua plataforma', copy: 'Vincule AbacatePay ou Hotmart uma única vez.' },

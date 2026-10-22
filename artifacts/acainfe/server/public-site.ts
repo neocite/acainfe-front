@@ -7,6 +7,7 @@ export { structuredData } from '../src/lib/public-site-schema';
 import { regimeLabels } from '../src/lib/coverage';
 import { brl } from '../src/config/pricing';
 import { institutionalPage, institutionalMarkdown } from '../src/lib/institutional-content';
+import { agentDiscoveryHtml, agentDiscoveryLinks } from './agent-resources';
 
 const LLMS_TEXT = await readFile(new URL('../content/llms.txt', import.meta.url), 'utf8');
 
@@ -20,6 +21,7 @@ const markdownText = (text: string) => text.replace(/([\\`*_[\]<>#])/g, '\\$1').
 export function sendPublicPage(req: Request, res: Response, page: { html: string; markdown: string; status?: number; canonical?: string }) {
   res.vary('Accept');
   if (page.canonical) res.set('Link', `<${page.canonical}>; rel="canonical"`);
+  res.append('Link', agentDiscoveryLinks.join(', '));
   const markdown = req.accepts(['text/html', 'text/markdown']) === 'text/markdown';
   return res.status(page.status ?? 200).type(markdown ? 'text/markdown; charset=utf-8' : 'text/html; charset=utf-8')
     .send(markdown ? page.markdown : page.html);
@@ -56,6 +58,11 @@ ${AGENT_COPY}
 
 [API e agentes: autenticação, rotas e exemplos](${CANONICAL}/developers).
 
+[Especificação OpenAPI da API pública](${CANONICAL}/openapi.json).
+[Quando e como usar o açaínfe: instruções para agentes](${CANONICAL}/agent-instructions.md).
+[Exemplo de configuração MCP](${CANONICAL}/mcp.json).
+[CLI: download e instruções](${CANONICAL}/cli/README.md).
+
 ## Dúvidas
 
 ${landingFaq(data.pricing.pricePerInvoiceCents, data.coverage).map(f => `### ${f.q}\n\n${markdownText(f.a)}`).join('\n\n')}
@@ -79,7 +86,7 @@ export function fillPublicHtml(template: string, appOrigin: string, data: Public
     .replace('name="twitter:title" content="açaínfe"', `name="twitter:title" content="${escapeHtml(title)}"`)
     .replaceAll('__SEO_DESCRIPTION__', escapeHtml(page?.description ?? homeDescription(data.pricing)))
     .replaceAll('__APP_ORIGIN__', escapeHtml(appOrigin))
-    .replace('</head>', `${canonical ? `<link rel="canonical" href="${canonical}" />\n<meta property="og:url" content="${canonical}" />\n` : ''}</head>`)
+    .replace('</head>', `${canonical ? `<link rel="canonical" href="${canonical}" />\n<meta property="og:url" content="${canonical}" />\n${agentDiscoveryHtml}\n` : ''}</head>`)
     .replace('<div id="root"></div>', () => `<div id="root"${prerendered ? ' data-prerendered="true"' : ''}>${body}</div>${scripts}`);
 }
 
@@ -93,7 +100,7 @@ export function createPublicSiteRouter(options: {
   router.get('/sitemap.xml', (_req, res) => res.type('application/xml').send(
     `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${SITEMAP_PATHS.map(p => `<url><loc>${CANONICAL}${p}</loc><lastmod>${options.publishedAt}</lastmod></url>`).join('')}</urlset>`,
   ));
-  router.get('/llms.txt', (_req, res) => res.type('text/plain; charset=utf-8').send(LLMS_TEXT));
+  router.get('/llms.txt', (_req, res) => res.set('Link', agentDiscoveryLinks.join(', ')).type('text/plain; charset=utf-8').send(LLMS_TEXT));
   router.get('/{*splat}', async (req, res) => {
     const home = req.path === '/';
     const page = institutionalPage(req.path);
