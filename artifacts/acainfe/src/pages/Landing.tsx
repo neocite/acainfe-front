@@ -45,13 +45,15 @@ export default function Landing() {
     setMeta('meta[property="og:description"]', 'property', 'og:description', desc);
     setMeta('meta[property="og:type"]', 'property', 'og:type', 'website');
     setMeta('meta[property="og:locale"]', 'property', 'og:locale', 'pt_BR');
-    setMeta('meta[property="og:image"]', 'property', 'og:image', `${origin}/api/og.png`);
+    setMeta('meta[property="og:image"]', 'property', 'og:image', `${origin}/api/og.png?v=2`);
+    setMeta('meta[property="og:image:alt"]', 'property', 'og:image:alt', 'açaínfe: Vendeu. A nota foi. NFS-e automática para AbacatePay');
     setMeta('meta[property="og:image:width"]', 'property', 'og:image:width', '1200');
     setMeta('meta[property="og:image:height"]', 'property', 'og:image:height', '630');
     setMeta('meta[name="twitter:card"]', 'name', 'twitter:card', 'summary_large_image');
     setMeta('meta[name="twitter:title"]', 'name', 'twitter:title', title);
     setMeta('meta[name="twitter:description"]', 'name', 'twitter:description', desc);
-    setMeta('meta[name="twitter:image"]', 'name', 'twitter:image', `${origin}/api/og.png`);
+    setMeta('meta[name="twitter:image"]', 'name', 'twitter:image', `${origin}/api/og.png?v=2`);
+    setMeta('meta[name="twitter:image:alt"]', 'name', 'twitter:image:alt', 'açaínfe: Vendeu. A nota foi. NFS-e automática para AbacatePay');
     let schema = document.querySelector<HTMLScriptElement>('script[type="application/ld+json"]');
     if (!schema) { schema = document.createElement('script'); schema.type = 'application/ld+json'; document.head.appendChild(schema); }
     schema.textContent = JSON.stringify(structuredData({ pricing: { pricePerInvoiceCents: price, monthlyFeeCents: fee }, coverage }));

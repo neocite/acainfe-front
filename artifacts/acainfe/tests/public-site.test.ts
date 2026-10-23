@@ -80,7 +80,9 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     }
     assert.equal(document.title, HOME_TITLE);
     assert.equal(document.querySelector('meta[name="description"]')!.getAttribute('content'), homeDescription(data.pricing));
-    assert.equal(document.querySelector('meta[property="og:image"]')!.getAttribute('content'), 'https://acainfe.com/api/og.png');
+    assert.equal(document.querySelector('meta[property="og:image"]')!.getAttribute('content'), 'https://acainfe.com/api/og.png?v=2');
+    assert.equal(document.querySelector('meta[property="og:image:alt"]')!.getAttribute('content'), 'açaínfe: Vendeu. A nota foi. NFS-e automática para AbacatePay');
+    assert.equal(document.querySelector('meta[name="twitter:image"]')!.getAttribute('content'), 'https://acainfe.com/api/og.png?v=2');
     dom.window.close();
   });
 
@@ -280,7 +282,7 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
       assert.equal(doc.querySelector('link[rel="canonical"]')?.getAttribute('href'), canonical);
       assert.equal(doc.querySelector('meta[property="og:url"]')?.getAttribute('content'), canonical);
       assert.equal(doc.querySelector('meta[property="og:type"]')?.getAttribute('content'), 'website');
-      assert.equal(doc.querySelector('meta[property="og:image"]')?.getAttribute('content'), 'https://acainfe.com/api/og.png');
+      assert.equal(doc.querySelector('meta[property="og:image"]')?.getAttribute('content'), 'https://acainfe.com/api/og.png?v=2');
       assert.ok(response.headers.get('link')?.includes(`<${canonical}>; rel="canonical"`));
       dom.window.close();
     });

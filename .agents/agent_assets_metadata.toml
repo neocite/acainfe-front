@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "LcH-7ESEChiHyAIoiSvoF"
+uri = "file://generated-artifacts/acainfe-social-preview.png"
+type = "image"
+title = "Nova imagem de prévia do açaínfe"
+description = "PNG 1200×630 com as fontes locais, preço e cidades da cobertura pública."
+logical_id = "b3991971-fa5c-411a-b137-15a4321625f3"
+content_hash = "sha256:8a6792ef1b5652de0ac886491a1cb7a81927429f780f57190992181083cc7b36"
+size = 56553
+mtime_ms = 1792714001585
+storage_uri = "gcs://replit-rams-assets-spock/rams/assets/repl:bb54be84-7ed0-4c25-b08d-e97209f3c12e/b3991971-fa5c-411a-b137-15a4321625f3/33bb4c48-a778-47f4-8c63-cf23f35bad86"
+storage_version_token = "1792714002181424"
+content_type = "image/png"
