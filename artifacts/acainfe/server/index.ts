@@ -65,7 +65,7 @@ async function getPricing() {
   if (Date.now() < pricingUntil && cachedPricing) return cachedPricing;
   try {
     if (!apiBase()) throw new Error('No API');
-    const response = await fetch(`${apiBase()}/v1/public/pricing`, { signal: AbortSignal.timeout(6000), headers: { 'ngrok-skip-browser-warning': '1' } });
+    const response = await fetch(`${apiBase()}/v1/public/pricing`, { redirect: 'error', signal: AbortSignal.timeout(6000), headers: { 'ngrok-skip-browser-warning': '1' } });
     if (!response.ok) throw new Error('Pricing unavailable');
     const data = await response.json();
     if (!Number.isSafeInteger(data.pricePerInvoiceCents) || data.pricePerInvoiceCents < 0) throw new Error('Invalid pricing');

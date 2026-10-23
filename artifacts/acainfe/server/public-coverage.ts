@@ -8,6 +8,7 @@ export function createCoverageLoader(base: () => string, request: typeof fetch =
     try {
       if (!base()) throw new Error('No API');
       const response = await request(`${base()}/v1/public/coverage`, {
+        redirect: 'error',
         signal: AbortSignal.timeout(6000), headers: { 'ngrok-skip-browser-warning': '1' },
       });
       if (!response.ok) throw new Error('Coverage unavailable');

@@ -15,3 +15,4 @@
 - [Produto pensado para agentes](agent-first-positioning.md) — objetivo comercial inclui operação via MCP; não afirmar pioneirismo sem comprovação.
 - [Arquivos públicos e Vite](public-resource-routing.md) — downloads e arquivos para agentes devem passar antes do Vite, sem transformação de módulos.
 - [Versionamento da API](api-versioning-policy.md) — proprietário aprovou novas versões para incompatibilidades e pelo menos 90 dias para descontinuação.
+- [Node do app e das ferramentas](node-tooling-runtime.md) — o pnpm do Nix pode usar um Node diferente daquele disponível no PATH e nos scripts do app.

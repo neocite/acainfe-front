@@ -35,6 +35,7 @@ describe('Cobertura pública', () => {
       calls++;
       assert.equal(url, 'https://api.example.test/v1/public/coverage');
       assert.equal(options?.method, undefined);
+      assert.equal(options?.redirect, 'error');
       assert.deepEqual(options?.headers, { 'ngrok-skip-browser-warning': '1' });
       return Response.json(FALLBACK_COVERAGE);
     });
