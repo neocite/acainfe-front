@@ -7,11 +7,11 @@ export function publicCanonicalPath(path: string) {
 export const publicCanonicalUrl = (path: string) => `https://acainfe.com${publicCanonicalPath(path)}`;
 /** Shared by the browser router and HTTP status resolver. */
 export const SITE_ROUTES = {
-  home: '/', signIn: '/sign-in/*?', signUp: '/sign-up/*?',
+  home: '/', english: '/en', signIn: '/sign-in/*?', signUp: '/sign-up/*?',
   app: '/app', account: '/app/conta', onboarding: '/onboarding',
   ...INSTITUTIONAL_ROUTES,
 } as const;
-export const SITEMAP_PATHS = ['/', ...Object.values(INSTITUTIONAL_ROUTES), '/llms.txt'] as const;
+export const SITEMAP_PATHS = ['/', '/en', ...Object.values(INSTITUTIONAL_ROUTES), '/llms.txt'] as const;
 export const PUBLIC_RESOURCE_ROUTES: readonly string[] = ['/openapi.json', '/.well-known/mcp.json', '/.well-known/mcp/server-card.json'];
 
 export function isValidPage(path: string) {

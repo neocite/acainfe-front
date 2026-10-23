@@ -4,6 +4,7 @@ import { ClerkProvider, useAuth, useClerk } from '@clerk/react';
 import { publishableKeyFromHost } from '@clerk/react/internal';
 import { ptBR } from '@clerk/localizations';
 import Landing from './pages/Landing';
+import EnglishLanding from './pages/EnglishLanding';
 import Onboarding from './pages/Onboarding';
 import Account from './pages/Account';
 import { SignInPage, SignUpPage } from './pages/Auth';
@@ -70,6 +71,7 @@ function ClerkProviderWithRoutes() {
       <ClerkQueryClientCacheInvalidator />
       <Switch>
         <Route path={SITE_ROUTES.home} component={HomeRedirect} />
+        <Route path={SITE_ROUTES.english} component={EnglishLanding} />
         <Route path={SITE_ROUTES.signIn} component={SignInPage} />
         <Route path={SITE_ROUTES.signUp} component={SignUpPage} />
         <Route path={SITE_ROUTES.app}><PrivatePage><Onboarding /></PrivatePage></Route>

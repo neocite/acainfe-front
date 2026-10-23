@@ -4,6 +4,7 @@ import { access } from 'node:fs/promises';
 import sharp from 'sharp';
 import { brl } from '../src/config/pricing';
 import { coverageDescription, type PublicCoverage } from '../src/lib/coverage';
+import { englishCities, landingLanguage, type LandingLocale } from '../src/lib/landing-language';
 
 export const SOCIAL_IMAGE_PATH = '/api/og.png?v=2';
 export const SOCIAL_IMAGE_ALT = 'açaínfe: Vendeu. A nota foi. NFS-e automática para AbacatePay';
@@ -15,7 +16,7 @@ export const SOCIAL_FONTS = {
   mono: { file: path.join(fonts, 'DMMono-Regular.ttf'), family: 'DM Mono' },
   body: { file: path.join(fonts, 'DMSans-Regular.ttf'), family: 'DM Sans' },
 } as const;
-type SocialData = { pricePerInvoiceCents: number; coverage: PublicCoverage };
+type SocialData = { pricePerInvoiceCents: number; coverage: PublicCoverage; locale?: LandingLocale };
 const escapeMarkup = (text: string) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;');
 
 /** Pango loads each bundled font file explicitly; no browser or system font fallback. */
@@ -31,6 +32,7 @@ async function textLayer(markup: string, font: keyof typeof SOCIAL_FONTS, size: 
 }
 
 export async function renderSocialImage(data: SocialData): Promise<Buffer> {
+  const english = data.locale === 'en';
   const cream = '#fbf7ef', plum = '#351333', acai = '#7B2D6B', muted = '#746871';
   const background = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">
     <rect width="1200" height="630" fill="${cream}"/>
@@ -45,12 +47,12 @@ export async function renderSocialImage(data: SocialData): Promise<Buffer> {
   </svg>`);
   const layers = await Promise.all([
     textLayer('aça<span foreground="#8c4b79">í</span>nfe', 'logo', 43, plum, -3.44),
-    textLayer('NOTA FISCAL NO AUTOMÁTICO', 'mono', 13, acai, 1.1),
-    textLayer('Vendeu.', 'display', 126, plum, -7.5, 850),
-    textLayer('A nota foi.', 'display', 126, acai, -7.5, 850),
-    textLayer(escapeMarkup(`${brl(data.pricePerInvoiceCents)} por nota · sem mensalidade`), 'body', 29, plum),
-    textLayer('NFS-e automática para AbacatePay · agentes de IA via MCP', 'body', 21, muted),
-    textLayer(escapeMarkup(coverageDescription(data.coverage)), 'body', 19, muted),
+    textLayer(english ? 'INVOICES ON AUTOPILOT' : 'NOTA FISCAL NO AUTOMÁTICO', 'mono', 13, acai, 1.1),
+    textLayer(english ? 'Sold.' : 'Vendeu.', 'display', 126, plum, -7.5, 850),
+    textLayer(english ? 'Invoice sent.' : 'A nota foi.', 'display', 126, acai, -7.5, 850),
+    textLayer(escapeMarkup(english ? `${landingLanguage('en').money(data.pricePerInvoiceCents)} per invoice · no monthly fee` : `${brl(data.pricePerInvoiceCents)} por nota · sem mensalidade`), 'body', 29, plum),
+    textLayer(english ? 'Automatic NFS-e for AbacatePay · AI agents via MCP' : 'NFS-e automática para AbacatePay · agentes de IA via MCP', 'body', 21, muted),
+    textLayer(escapeMarkup(english ? `Available in ${englishCities(data.coverage)}.` : coverageDescription(data.coverage)), 'body', 19, muted),
   ]);
   const positions = [[64, 44], [94, 155], [60, 208], [60, 322], [66, 452], [64, 546], [64, 583]];
   return sharp(background).composite(layers.map((input, index) => ({
@@ -66,21 +68,24 @@ export function createSocialImageRouter(options: {
 }) {
   const router = express.Router();
   const now = options.now ?? Date.now;
-  let cached: { png: Buffer; createdAt: number } | undefined;
-  let pending: Promise<NonNullable<typeof cached>> | undefined;
-  async function image() {
+  type Entry = { png: Buffer; createdAt: number };
+  const cache = new Map<LandingLocale, Entry>();
+  const pending = new Map<LandingLocale, Promise<Entry>>();
+  async function image(locale: LandingLocale) {
+    const cached = cache.get(locale);
     if (cached && now() - cached.createdAt < SOCIAL_CACHE_SECONDS * 1000) return cached;
-    if (!pending) pending = (async () => {
+    if (!pending.has(locale)) pending.set(locale, (async () => {
       const [pricing, coverage] = await Promise.all([options.pricing(), options.coverage()]);
-      const png = await (options.render ?? renderSocialImage)({ pricePerInvoiceCents: pricing.pricePerInvoiceCents, coverage });
-      cached = { png, createdAt: now() };
-      return cached;
-    })().finally(() => { pending = undefined; });
-    return pending;
+      const png = await (options.render ?? renderSocialImage)({ pricePerInvoiceCents: pricing.pricePerInvoiceCents, coverage, ...(locale === 'en' ? { locale } : {}) });
+      const entry = { png, createdAt: now() };
+      cache.set(locale, entry);
+      return entry;
+    })().finally(() => { pending.delete(locale); }));
+    return pending.get(locale)!;
   }
-  router.get(['/api/og.png', '/api/og.svg'], async (req, res, next) => {
+  router.get(['/api/og.png', '/api/og.svg', '/api/og-en.png'], async (req, res, next) => {
     try {
-      const { png, createdAt } = await image();
+      const { png, createdAt } = await image(req.path === '/api/og-en.png' ? 'en' : 'pt');
       res.set('Cache-Control', `public, max-age=${SOCIAL_CACHE_SECONDS}`);
       res.set('Age', String(Math.max(0, Math.floor((now() - createdAt) / 1000))));
       if (req.path.endsWith('.svg')) {

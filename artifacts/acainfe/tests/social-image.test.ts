@@ -95,4 +95,16 @@ describe('Imagem social: fontes locais, PNG e cache compartilhado', () => {
     } });
     assert.equal(png.equals(changedCity), false);
   });
+  it('mantém cache independente para a prévia inglesa, sem servir a versão portuguesa', async () => {
+    const before = renders;
+    await Promise.all(Array.from({ length: 8 }, () => fetch(base + '/api/og-en.png?v=2')));
+    assert.equal(renders, before + 1);
+    assert.deepEqual(renderedData.at(-1), { pricePerInvoiceCents: 95, coverage: FALLBACK_COVERAGE, locale: 'en' });
+    await fetch(base + '/api/og.png?v=2');
+    assert.equal(renders, before + 1);
+    const en = await renderSocialImage({ pricePerInvoiceCents: 80, coverage: FALLBACK_COVERAGE, locale: 'en' });
+    const metadata = await sharp(en).metadata();
+    assert.equal(metadata.width, 1200); assert.equal(metadata.height, 630);
+    assert.equal(png.equals(en), false);
+  });
 });

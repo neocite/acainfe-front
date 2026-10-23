@@ -45,7 +45,7 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     app.use(createPublicSiteRouter({
       data: async () => data, publishedAt,
       html: async (req, state, home, notFound) => fillPublicHtml(template, 'https://acainfe.com', state,
-        home ? html : institutionalPage(req.path) ? renderPublicPage(state, req.path) : notFound ? '<main><h1>Essa página não está por aqui.</h1><a href="/">Voltar ao início</a></main>' : '', home, req.path),
+        home ? req.path === '/en' ? renderPublicPage(state, req.path) : html : institutionalPage(req.path) ? renderPublicPage(state, req.path) : notFound ? '<main><h1>Essa página não está por aqui.</h1><a href="/">Voltar ao início</a></main>' : '', home, req.path),
     }));
     server = await new Promise<Server>(resolve => {
       const s = app.listen(0, '127.0.0.1', () => resolve(s));
@@ -157,9 +157,54 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     assert.equal(response.headers.get('content-type'), 'application/xml; charset=utf-8');
     const dom = new JSDOM(await response.text(), { contentType: 'text/xml' });
     assert.equal(dom.window.document.documentElement.namespaceURI, 'http://www.sitemaps.org/schemas/sitemap/0.9');
-    assert.deepEqual([...dom.window.document.querySelectorAll('loc')].map(n => n.textContent), ['https://acainfe.com/', 'https://acainfe.com/sobre', 'https://acainfe.com/contato', 'https://acainfe.com/privacidade', 'https://acainfe.com/developers', 'https://acainfe.com/llms.txt']);
-    assert.deepEqual([...dom.window.document.querySelectorAll('lastmod')].map(n => n.textContent), Array(6).fill(publishedAt));
+    assert.deepEqual([...dom.window.document.querySelectorAll('loc')].map(n => n.textContent), ['https://acainfe.com/', 'https://acainfe.com/en', 'https://acainfe.com/sobre', 'https://acainfe.com/contato', 'https://acainfe.com/privacidade', 'https://acainfe.com/developers', 'https://acainfe.com/llms.txt']);
+    assert.deepEqual([...dom.window.document.querySelectorAll('lastmod')].map(n => n.textContent), Array(7).fill(publishedAt));
     dom.window.close();
+  });
+  it('entrega /en completo no HTML, com idioma, canonical, prévia inglesa e links de idioma', async () => {
+    const response = await fetch(base + '/en', { headers: { accept: 'text/html' } });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'text/html; charset=utf-8');
+    assert.match(response.headers.get('vary')!, /Accept/);
+    const dom = new JSDOM(await response.text()), doc = dom.window.document;
+    assert.equal(doc.documentElement.lang, 'en');
+    assert.equal(doc.querySelector('link[rel="canonical"]')?.getAttribute('href'), 'https://acainfe.com/en');
+    assert.equal(doc.querySelector('meta[property="og:url"]')?.getAttribute('content'), 'https://acainfe.com/en');
+    assert.equal(doc.querySelector('meta[property="og:locale"]')?.getAttribute('content'), 'en_US');
+    for (const selector of ['meta[property="og:image"]', 'meta[name="twitter:image"]']) {
+      assert.equal(doc.querySelector(selector)?.getAttribute('content'), 'https://acainfe.com/api/og-en.png?v=2');
+    }
+    assert.match(doc.querySelector('meta[property="og:image:alt"]')!.getAttribute('content')!, /Sold\. Invoice sent/);
+    assert.equal(doc.querySelectorAll('h1').length, 1);
+    assert.ok(doc.querySelector('#root[data-prerendered="true"]'));
+    for (const copy of ['Sold.', 'Invoice sent.', 'How it works', 'No monthly fee', 'City by city.',
+      'São Paulo', 'São Bernardo do Campo', 'Is my city supported?', 'Get started', 'açaínfe is an Extractify brand.']) {
+      assert.ok(doc.body.textContent?.includes(copy), copy);
+    }
+    assert.ok((doc.querySelector('main')?.textContent?.length ?? 0) > 500);
+    assert.ok(doc.querySelector('a[href="/sign-up"]'));
+    assert.ok(doc.querySelector('a[href="/"][hreflang="pt-BR"]'));
+    assert.equal(doc.querySelector('head link[hreflang="en"]')?.getAttribute('href'), 'https://acainfe.com/en');
+    assert.equal(doc.querySelector('head link[hreflang="pt-BR"]')?.getAttribute('href'), 'https://acainfe.com/');
+    const schema = JSON.parse(doc.querySelector('script[type="application/ld+json"]')!.textContent!);
+    assert.equal(schema['@graph'][0].inLanguage, 'en');
+    assert.equal(schema['@graph'][0].offers.priceCurrency, 'BRL');
+    const portuguese = new JSDOM(await (await fetch(base)).text()).window.document;
+    assert.equal(portuguese.documentElement.lang, 'pt-BR');
+    assert.ok(portuguese.querySelector('a[href="/en"]'));
+    assert.ok(portuguese.querySelector('meta[property="og:image"]')?.getAttribute('content')?.endsWith('/api/og.png?v=2'));
+    dom.window.close();
+  });
+  it('entrega Markdown em inglês em /en e mantém o português na raiz', async () => {
+    const english = await fetch(base + '/en', { headers: { accept: 'text/markdown' } });
+    assert.equal(english.status, 200);
+    assert.equal(english.headers.get('content-type'), 'text/markdown; charset=utf-8');
+    assert.equal(english.headers.get('link')?.includes('<https://acainfe.com/en>; rel="canonical"'), true);
+    const body = await english.text();
+    for (const text of ['Sold. Invoice sent.', '## How it works', '## Pricing', '## Coverage', '## FAQ', 'São Paulo', 'São Bernardo do Campo', 'R$0.80']) assert.ok(body.includes(text), text);
+    const pt = await (await fetch(base, { headers: { accept: 'text/markdown' } })).text();
+    assert.ok(pt.includes('## Como funciona'));
+    assert.equal(pt.includes('## How it works'), false);
   });
 
   it('mantém robots e acrescenta sitemap; conteúdo público não expõe rotas internas', async () => {
