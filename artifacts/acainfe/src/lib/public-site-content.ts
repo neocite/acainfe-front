@@ -10,7 +10,7 @@ export function homeDescription(pricing: PublicPricing) {
   return `Nota fiscal de serviço (NFS-e) automática para cada venda no AbacatePay, operável por agentes de IA via MCP. ${brl(pricing.pricePerInvoiceCents).replace(/\u00a0/g, ' ')} por nota, sem mensalidade. São Paulo e São Bernardo do Campo. Produto da EXTRACTIFY TECNOLOGIA LTDA.`;
 }
 export const LANDING_STEPS = [
-  { number: '01', title: 'Conecte sua plataforma', copy: 'Vincule AbacatePay ou Hotmart uma única vez.' },
+  { number: '01', title: 'Conecte sua plataforma', copy: 'Vincule o AbacatePay uma única vez.' },
   { number: '02', title: 'Configure seus serviços', copy: 'Mapeie cada produto com ajuda do assistente.' },
   { number: '03', title: 'Venda. A nota vai.', copy: 'Cada pagamento aprovado dispara a emissão.' },
 ];
@@ -23,6 +23,6 @@ export function landingFaq(price: number, coverage: PublicCoverage) {
     { q: 'Posso cancelar uma nota?', a: 'Pode, pelo assistente. Reembolsos no AbacatePay cancelam a nota automaticamente.' },
     { q: 'E se eu não vender nada no mês?', a: 'Você não paga nada. Não existe mensalidade, adesão nem plano: a cobrança é só por nota emitida.' },
     { q: 'Como sou cobrado?', a: `${brl(price)} por nota emitida com sucesso. Notas rejeitadas pela prefeitura não são cobradas.` },
-    { q: 'Vocês são do AbacatePay ou da Hotmart?', a: 'Não. O açaínfe é um produto independente, feito para quem vende pelo AbacatePay e pela Hotmart.' },
+    { q: 'Vocês são do AbacatePay?', a: 'Não. O açaínfe é um produto independente, feito para quem vende pelo AbacatePay.' },
   ];
 }

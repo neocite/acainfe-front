@@ -33,7 +33,7 @@ export function englishLandingMarkdown(data: PublicSiteData) {
 
 Sold. Invoice sent.
 
-Each approved payment on AbacatePay or Hotmart becomes an NFS-e — no end-of-month spreadsheets.
+Each approved payment on AbacatePay becomes an NFS-e — no end-of-month spreadsheets.
 
 ## How it works
 
@@ -63,7 +63,7 @@ ${englishFaq(data.pricing.pricePerInvoiceCents, data.coverage).map(item => `### 
 
 [Create an account](${CANONICAL}/sign-up) · [Sign in](${CANONICAL}/sign-in) · [Português](${CANONICAL}/)
 
-açaínfe is an Extractify brand. CNPJ: 28.095.894/0001-60. Contact: contato@extractify.com.br. Independent product, not affiliated with AbacatePay or Hotmart.
+açaínfe is an Extractify brand. CNPJ: 28.095.894/0001-60. Contact: contato@extractify.com.br. Independent product, not affiliated with AbacatePay.
 `;
 }
 
@@ -72,7 +72,7 @@ export function landingMarkdown(data: PublicSiteData) {
 
 Vendeu. A nota foi.
 
-Cada pagamento aprovado no AbacatePay ou na Hotmart vira uma NFS-e — sem planilha no fim do mês, sem mensalidade nos meses quietos.
+Cada pagamento aprovado no AbacatePay vira uma NFS-e — sem planilha no fim do mês, sem mensalidade nos meses quietos.
 
 ## Como funciona
 

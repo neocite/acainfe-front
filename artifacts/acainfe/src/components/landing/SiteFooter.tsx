@@ -20,6 +20,6 @@ export function SiteFooter({ onTerms, home = false, locale = 'pt' }: { onTerms: 
       <Link href="/contato">{t('Contato', 'Contact (Portuguese)')}</Link>
       <Link href={locale === 'en' ? '/' : '/en'} hrefLang={locale === 'en' ? 'pt-BR' : 'en'}>{locale === 'en' ? 'Português' : 'English'}</Link>
     </div>
-    <small>{t('O açaínfe não é afiliado ao AbacatePay nem à Hotmart.', 'açaínfe is not affiliated with AbacatePay or Hotmart.')}</small>
+    <small>{t('O açaínfe não é afiliado ao AbacatePay.', 'açaínfe is not affiliated with AbacatePay.')}</small>
   </footer>;
 }

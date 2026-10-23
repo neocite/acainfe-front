@@ -3,7 +3,7 @@
 ## Project Overview
 
 açaínfe is a Node.js/Express + React (Vite) single-origin web app that helps Brazilian
-micro-businesses issue NFS-e (fiscal invoices) for sales made via AbacatePay/Hotmart.
+micro-businesses issue NFS-e (fiscal invoices) for sales made via AbacatePay.
 Authentication is handled by Clerk (managed, same-origin session cookies, proxied via
 `/api/__clerk`). The app itself holds almost no business data: companies, certificates,
 contacts, balances, products, billing, and MCP keys all live in an **external API**

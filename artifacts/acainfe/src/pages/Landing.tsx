@@ -74,7 +74,7 @@ export default function Landing() {
             <div className="csr-eyebrow"><span className="csr-status-dot" /> NOTA FISCAL NO AUTOMÁTICO</div>
             <p className="csr-kicker">Para quem vende no digital</p>
             <h1><span className="sr-only">açaínfe: nota fiscal de serviço (NFS-e) automática. </span>Vendeu.<br /><em>A nota foi.</em></h1>
-            <p className="csr-lead">Cada pagamento aprovado no AbacatePay ou na Hotmart vira uma NFS-e — sem planilha no fim do mês, {fee === 0 ? 'sem mensalidade nos meses quietos.' : 'com cobrança transparente.'}</p>
+            <p className="csr-lead">Cada pagamento aprovado no AbacatePay vira uma NFS-e — sem planilha no fim do mês, {fee === 0 ? 'sem mensalidade nos meses quietos.' : 'com cobrança transparente.'}</p>
             <div className="csr-hero-actions">
               <Link className="csr-button" href="/sign-up">Começar agora <span aria-hidden="true">↗</span></Link>
               <a className="csr-text-link" href="#como-funciona">Ver como funciona <span aria-hidden="true">↓</span></a>
@@ -111,7 +111,7 @@ export default function Landing() {
           <div className="csr-availability-copy"><span className="csr-label">DISPONÍVEL HOJE</span><h2>Cidade a cidade.<br /><em>Com cuidado em cada nota.</em></h2><p>Atendimento atual para MEI e empresas do Simples Nacional nas cidades abaixo. Estamos ampliando a cobertura municipal. Em outras cidades, cadastre-se para entrar na lista de espera.</p></div>
           <div className="csr-city-list">{coverage.cities.map(city => <div className="csr-city-card" key={city.cityCode}><span className="csr-pin" aria-hidden="true">◎</span><div><strong>{city.cityName}</strong><span>{city.uf} · {regimeLabels(city.regimes)}</span></div><span className="csr-active">ATIVO</span></div>)}</div>
           <Link href="/sign-up" className="csr-availability-link">Ver disponibilidade para minha empresa <span aria-hidden="true">↗</span></Link>
-          <p className="csr-independent">Produto independente, não afiliado ao AbacatePay ou à Hotmart.</p>
+          <p className="csr-independent">Produto independente, não afiliado ao AbacatePay.</p>
         </section>
         <section className="sr-only" aria-label="Agentes de IA e MCP">
           <h2>Agentes de IA e MCP</h2>

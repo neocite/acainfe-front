@@ -54,7 +54,7 @@ export default function EnglishLanding() {
           <div className="csr-eyebrow"><span className="csr-status-dot" /> INVOICES ON AUTOPILOT</div>
           <p className="csr-kicker">For digital businesses</p>
           <h1><span className="sr-only">açaínfe: automatic Brazilian service invoices (NFS-e). </span>Sold.<br /><em>Invoice sent.</em></h1>
-          <p className="csr-lead">Each approved payment on AbacatePay or Hotmart becomes an NFS-e — no end-of-month spreadsheets, {fee === 0 ? 'no monthly fee when sales are quiet.' : 'with transparent pricing.'}</p>
+          <p className="csr-lead">Each approved payment on AbacatePay becomes an NFS-e — no end-of-month spreadsheets, {fee === 0 ? 'no monthly fee when sales are quiet.' : 'with transparent pricing.'}</p>
           <div className="csr-hero-actions">
             <Link className="csr-button" href="/sign-up">Get started <span aria-hidden="true">↗</span></Link>
             <a className="csr-text-link" href="#como-funciona">See how it works <span aria-hidden="true">↓</span></a>
@@ -82,7 +82,7 @@ export default function EnglishLanding() {
         <div className="csr-availability-copy"><span className="csr-label">AVAILABLE TODAY</span><h2>City by city.<br /><em>Care in every invoice.</em></h2><p>Currently available for MEI and Simples Nacional businesses in the Brazilian cities below. We are expanding municipal coverage. In other cities, sign up for the waiting list.</p></div>
         <div className="csr-city-list">{coverage.cities.map(city => <div className="csr-city-card" key={city.cityCode}><span className="csr-pin" aria-hidden="true">◎</span><div><strong>{city.cityName}</strong><span>{city.uf} · {englishRegimes(city.regimes)}</span></div><span className="csr-active">ACTIVE</span></div>)}</div>
         <Link href="/sign-up" className="csr-availability-link">Check coverage for my business <span aria-hidden="true">↗</span></Link>
-        <p className="csr-independent">Independent product, not affiliated with AbacatePay or Hotmart.</p>
+        <p className="csr-independent">Independent product, not affiliated with AbacatePay.</p>
       </section>
       <section className="sr-only" aria-label="AI agents and MCP"><h2>AI agents and MCP</h2><p>açaínfe can be operated by AI agents via MCP (Model Context Protocol). Set up your company and connect your assistant to work with your service invoices.</p><a href="/llms.txt">Information for AI agents</a></section>
       <section className="csr-faq" id="duvidas">

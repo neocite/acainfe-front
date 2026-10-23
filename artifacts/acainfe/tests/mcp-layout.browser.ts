@@ -189,7 +189,8 @@ try {
   // Navegação rápida entre âncoras não deve competir com a animação de scroll no teste.
   await evaluate('document.documentElement.style.scrollBehavior = "auto"');
   assert.ok(landing.calculator.includes('R$ 59,04'), landing.calculator);
-  assert.ok(landing.text.includes('AbacatePay ou na Hotmart'), landing.text);
+  assert.ok(landing.text.includes('Cada pagamento aprovado no AbacatePay vira uma NFS-e'), landing.text);
+  assert.ok(!/hotmart/i.test(landing.text), landing.text);
   assert.ok(landing.footer.includes('marca da Extractify') && landing.footer.includes('CNPJ: 28.095.894/0001-60'), landing.footer);
   assert.ok(landing.footer.includes('contato@extractify.com.br'), landing.footer);
   assert.equal(landing.emailHref, 'mailto:contato@extractify.com.br');

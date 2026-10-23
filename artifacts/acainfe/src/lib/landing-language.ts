@@ -19,7 +19,7 @@ export function englishDescription(pricing: PublicPricing, coverage: PublicCover
   return `Automatic Brazilian service invoices (NFS-e) for AbacatePay sales, operable by AI agents via MCP. ${landingLanguage('en').money(pricing.pricePerInvoiceCents)} per invoice. ${pricing.monthlyFeeCents === 0 ? 'No monthly fee.' : `${landingLanguage('en').money(pricing.monthlyFeeCents)} monthly fee.`} Available in ${englishCities(coverage)} for MEI and Simples Nacional businesses.`;
 }
 export const EN_STEPS = [
-  { number: '01', title: 'Connect your platform', copy: 'Connect AbacatePay or Hotmart just once.' },
+  { number: '01', title: 'Connect your platform', copy: 'Connect AbacatePay just once.' },
   { number: '02', title: 'Set up your services', copy: 'Map each product with help from your assistant.' },
   { number: '03', title: 'Sell. The invoice follows.', copy: 'Each approved payment triggers an invoice.' },
 ];
@@ -32,6 +32,6 @@ export function englishFaq(price: number, coverage: PublicCoverage) {
     { q: 'Can I cancel an invoice?', a: 'Yes, through your assistant. AbacatePay refunds automatically cancel the invoice.' },
     { q: 'What if I have no sales this month?', a: 'You pay nothing. There is no monthly fee, setup fee or plan: you only pay for successfully issued invoices.' },
     { q: 'How am I charged?', a: `${landingLanguage('en').money(price)} per successfully issued invoice. Invoices rejected by the municipality are not charged.` },
-    { q: 'Are you part of AbacatePay or Hotmart?', a: 'No. açaínfe is an independent product for businesses selling through AbacatePay and Hotmart.' },
+    { q: 'Are you part of AbacatePay?', a: 'No. açaínfe is an independent product for businesses selling through AbacatePay.' },
   ];
 }

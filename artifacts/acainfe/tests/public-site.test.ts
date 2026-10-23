@@ -86,6 +86,18 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     dom.window.close();
   });
 
+  it('anuncia somente AbacatePay nas landings HTML e Markdown em ambos os idiomas', async () => {
+    for (const path of ['/', '/en']) {
+      for (const accept of ['text/html', 'text/markdown']) {
+        const response = await fetch(base + path, { headers: { accept } });
+        assert.equal(response.status, 200);
+        const text = await response.text();
+        assert.match(text, /AbacatePay/);
+        assert.doesNotMatch(text, /hotmart/i);
+      }
+    }
+  });
+
   it('entrega Markdown equivalente, 200, charset e Vary Accept', async () => {
     const response = await fetch(base, { headers: { accept: 'text/markdown' } });
     assert.equal(response.status, 200);

@@ -4,7 +4,7 @@
 - [Vendas passadas](past-sales-rules.md) — competência original, consentimento para meses anteriores e marcação manual de notas emitidas fora do app.
 - [Perfis fiscais](fiscal-business-rules.md) — público não contábil; API aplica perfis, MicroSaaS pede confirmação e ISS não é o padrão de tributos aproximados.
 - [Chaves MCP](mcp-key-lifecycle.md) — gerenciamento sem gerar outra chave; nova chave não revoga as anteriores e revogação exige confirmação explícita.
-- [Plataformas de venda](sales-platforms.md) — o posicionamento do produto inclui AbacatePay e Hotmart; menção comercial não implica paridade técnica.
+- [Plataformas de venda](sales-platforms.md) — suporte atual apenas ao AbacatePay; não anunciar integração com outros gateways.
 - [Webhooks AbacatePay](abacatepay-webhooks.md) — a URL não pode ser editada; substituir o webhook exige recriação explícita e limpeza manual do antigo.
 - [Produto padrão AbacatePay](abacatepay-default-product.md) — decisão explícita para Pix sem produto; o padrão inclui testes, que devem poder ser ignorados sem fingir emissão.
 - [Navegação da empresa](company-navigation.md) — “Minha empresa” reúne os dados fiscais; gateways ficam separados, sem resumo na área da empresa.
