@@ -36,6 +36,9 @@
 .csr-hero h1 { color: var(--plum); font: 800 clamp(62px, 7vw, 92px)/.91 'Manrope', sans-serif; letter-spacing: -.085em; margin: 0; }
 .csr-hero h1 em, .csr-section-head h2 em, .csr-zero h2 em, .csr-availability h2 em, .csr-faq h2 em { color: var(--berry); font-style: normal; }
 .csr-lead { max-width: 430px; margin: 24px 0 27px; color: var(--muted); font-size: 14px; line-height: 1.75; }
+.csr-hero-price { margin: -6px 0 24px; padding-left: 14px; border-left: 3px solid var(--orange); color: var(--muted); font-size: 13px; line-height: 1.5; }
+.csr-hero-price strong { display: inline-block; color: var(--plum); font: 800 clamp(30px, 3.4vw, 40px)/1 'Manrope', sans-serif; letter-spacing: -.06em; margin-right: 4px; }
+.csr-hero-price span { display: block; margin-top: 4px; }
 .csr-hero-actions { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
 .csr-button { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; gap: 26px; padding: 0 19px; background: var(--orange); color: var(--plum); font-size: 12px; font-weight: 700; transition: transform .2s ease, background .2s ease; }
 .csr-button:hover { background: #ffb944; transform: translateY(-2px); }
@@ -182,6 +185,7 @@
   .csr-kicker { margin-top: 28px; }
   .csr-hero h1 { font-size: clamp(58px, 15vw, 76px); }
   .csr-lead { font-size: 13px; }
+  .csr-hero-price { margin-bottom: 20px; font-size: 12px; }
   .csr-proofline { flex-wrap: wrap; font-size: 9px; }
   .csr-calculator { padding: 23px 18px; }
   .csr-calc-top h2 { font-size: 18px; }

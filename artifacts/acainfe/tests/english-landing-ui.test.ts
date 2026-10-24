@@ -10,6 +10,7 @@ import { FALLBACK_COVERAGE } from '../src/lib/coverage';
 describe('Landing inglesa: simulador, comparação e termos', () => {
   let dom: JSDOM, root: Root, container: HTMLElement, vite: ViteDevServer, client: QueryClient;
   let Page: typeof import('../src/pages/EnglishLanding').default;
+  let PortuguesePage: typeof import('../src/pages/Landing').default;
   let createRoot: typeof import('react-dom/client').createRoot;
   const originals = new Map<string, PropertyDescriptor | undefined>();
   const originalFetch = globalThis.fetch;
@@ -35,6 +36,7 @@ describe('Landing inglesa: simulador, comparação e termos', () => {
       esbuild: { jsx: 'automatic' }, resolve: { alias: { '@': `${process.cwd()}/src` }, dedupe: ['react', 'react-dom'] },
       server: { middlewareMode: true, hmr: false, ws: false, watch: null }, optimizeDeps: { noDiscovery: true } });
     ({ default: Page } = await vite.ssrLoadModule('/src/pages/EnglishLanding.tsx'));
+    ({ default: PortuguesePage } = await vite.ssrLoadModule('/src/pages/Landing.tsx'));
   });
   after(async () => {
     await vite?.close(); dom.window.close(); globalThis.fetch = originalFetch;
@@ -87,6 +89,42 @@ describe('Landing inglesa: simulador, comparação e termos', () => {
     assert.equal(container.textContent?.includes('Planos de entrada'), false);
     assert.equal(container.textContent?.includes('Notas emitidas'), false);
   });
+  it('atualiza o destaque do preço e respeita mensalidade diferente de zero', async () => {
+    const heroPrice = () => container.querySelector('.csr-hero-price')!.textContent!;
+    assert.match(heroPrice(), /R\$0\.80 per issued invoice/);
+    assert.match(heroPrice(), /No monthly fee\. No sales, no charges\./);
+    await act(async () => {
+      client.setQueryData(['public-pricing'], { pricePerInvoiceCents: 137, monthlyFeeCents: 2500 });
+      await new Promise(resolve => setTimeout(resolve, 30));
+    });
+    assert.match(heroPrice(), /R\$1\.37 per issued invoice/);
+    assert.match(heroPrice(), /R\$25\.00/);
+    assert.doesNotMatch(heroPrice(), /No monthly fee|No sales, no charges/);
+    await act(async () => {
+      client.setQueryData(['public-pricing'], { pricePerInvoiceCents: 90, monthlyFeeCents: 0 });
+      await new Promise(resolve => setTimeout(resolve, 30));
+    });
+    assert.match(heroPrice(), /R\$0\.90 per issued invoice/);
+    assert.match(heroPrice(), /No monthly fee\. No sales, no charges\./);
+  });
+
+  it('também atualiza o destaque em português sem prometer gratuidade quando há mensalidade', async () => {
+    await act(async () => root.render(createElement(QueryClientProvider, { client }, createElement(PortuguesePage))));
+    const heroPrice = () => container.querySelector('.csr-hero-price')!.textContent!.replace(/\u00a0/g, ' ');
+    assert.match(heroPrice(), /R\$ 0,80 por nota emitida\. Sem mensalidade\. Não vendeu, não pagou\./);
+    await act(async () => {
+      client.setQueryData(['public-pricing'], { pricePerInvoiceCents: 137, monthlyFeeCents: 2500 });
+      await new Promise(resolve => setTimeout(resolve, 30));
+    });
+    assert.match(heroPrice(), /R\$ 1,37 por nota emitida\. Mensalidade de R\$ 25,00\./);
+    assert.doesNotMatch(heroPrice(), /Sem mensalidade|Não vendeu, não pagou/);
+    await act(async () => {
+      client.setQueryData(['public-pricing'], { pricePerInvoiceCents: 90, monthlyFeeCents: 0 });
+      await new Promise(resolve => setTimeout(resolve, 30));
+    });
+    assert.match(heroPrice(), /R\$ 0,90 por nota emitida\. Sem mensalidade\. Não vendeu, não pagou\./);
+  });
+
   it('usa preço e cobertura atualizados sem trocar idioma ou ampliar a disponibilidade', async () => {
     await act(async () => {
       client.setQueryData(['public-pricing'], { pricePerInvoiceCents: 95, monthlyFeeCents: 0 });

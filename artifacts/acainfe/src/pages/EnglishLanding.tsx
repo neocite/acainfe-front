@@ -54,7 +54,8 @@ export default function EnglishLanding() {
           <div className="csr-eyebrow"><span className="csr-status-dot" /> INVOICES ON AUTOPILOT</div>
           <p className="csr-kicker">For digital businesses</p>
           <h1><span className="sr-only">açaínfe: automatic Brazilian service invoices (NFS-e). </span>Sold.<br /><em>Invoice sent.</em></h1>
-          <p className="csr-lead">Each approved payment on AbacatePay becomes an NFS-e — no end-of-month spreadsheets, {fee === 0 ? 'no monthly fee when sales are quiet.' : 'with transparent pricing.'}</p>
+          <p className="csr-lead">Each approved payment on AbacatePay becomes an NFS-e automatically, with no end-of-month spreadsheets.</p>
+          <p className="csr-hero-price"><strong>{money(price)}</strong> per issued invoice.{' '}<span>{fee === 0 ? 'No monthly fee. No sales, no charges.' : `Monthly fee of ${money(fee)}.`}</span></p>
           <div className="csr-hero-actions">
             <Link className="csr-button" href="/sign-up">Get started <span aria-hidden="true">↗</span></Link>
             <a className="csr-text-link" href="#como-funciona">See how it works <span aria-hidden="true">↓</span></a>

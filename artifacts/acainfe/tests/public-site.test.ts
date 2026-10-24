@@ -20,6 +20,7 @@ const publishedAt = '2026-10-21T12:00:00.000Z';
 
 describe('Site público para navegadores e agentes — sem API externa', () => {
   let vite: ViteDevServer, server: Server, base: string, html: string, template: string;
+  let renderPage: (data: PublicSiteData, path: string) => string;
   before(async () => {
     vite = await createServer({
       configFile: false, envFile: false, root: process.cwd(), appType: 'custom',
@@ -29,6 +30,7 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
       optimizeDeps: { noDiscovery: true },
     });
     const { renderLanding, renderPublicPage } = await vite.ssrLoadModule('/src/entry-server.tsx');
+    renderPage = renderPublicPage;
     html = renderLanding(data);
     template = await readFile('index.html', 'utf8');
     const app = express();
@@ -84,6 +86,36 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     assert.equal(document.querySelector('meta[property="og:image:alt"]')!.getAttribute('content'), 'açaínfe: Vendeu. A nota foi. NFS-e automática para AbacatePay');
     assert.equal(document.querySelector('meta[name="twitter:image"]')!.getAttribute('content'), 'https://acainfe.com/api/og.png?v=2');
     dom.window.close();
+  });
+
+  it('destaca o preço dinâmico antes do CTA no HTML pré-renderizado nos dois idiomas', () => {
+    for (const path of ['/', '/en']) {
+      for (const fee of [0, 2500]) {
+        const dom = new JSDOM(renderPage({
+          ...data, pricing: { pricePerInvoiceCents: 137, monthlyFeeCents: fee },
+        }, path));
+        try {
+          const doc = dom.window.document;
+          const hero = doc.querySelector('.csr-hero-copy')!;
+          const price = hero.querySelector('.csr-hero-price')!;
+          assert.ok(price, `Preço destacado ausente em ${path}`);
+          const text = price.textContent!.replace(/\u00a0/g, ' ');
+          assert.ok(text.includes(path === '/' ? 'R$ 1,37' : 'R$1.37'), text);
+          assert.ok(price.querySelector('strong'), 'Preço deve ter destaque semântico');
+          assert.ok(price.compareDocumentPosition(hero.querySelector('.csr-hero-actions')!) & dom.window.Node.DOCUMENT_POSITION_FOLLOWING);
+          assert.match(hero.querySelector('.csr-lead')!.textContent!, /AbacatePay/);
+          assert.match(hero.querySelector('h1')!.textContent!, path === '/' ? /Vendeu\..*A nota foi\./ : /Sold\..*Invoice sent\./);
+          if (fee === 0) {
+            assert.match(text, path === '/' ? /Sem mensalidade\. Não vendeu, não pagou\./ : /No monthly fee\. No sales, no charges\./);
+          } else {
+            assert.ok(text.includes(path === '/' ? 'R$ 25,00' : 'R$25.00'), text);
+            assert.doesNotMatch(text, /Sem mensalidade|Não vendeu, não pagou|No monthly fee|No sales, no charges/i);
+          }
+        } finally {
+          dom.window.close();
+        }
+      }
+    }
   });
 
   it('anuncia somente AbacatePay nas landings HTML e Markdown em ambos os idiomas', async () => {

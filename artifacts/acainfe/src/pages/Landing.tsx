@@ -74,7 +74,8 @@ export default function Landing() {
             <div className="csr-eyebrow"><span className="csr-status-dot" /> NOTA FISCAL NO AUTOMÁTICO</div>
             <p className="csr-kicker">Para quem vende no digital</p>
             <h1><span className="sr-only">açaínfe: nota fiscal de serviço (NFS-e) automática. </span>Vendeu.<br /><em>A nota foi.</em></h1>
-            <p className="csr-lead">Cada pagamento aprovado no AbacatePay vira uma NFS-e — sem planilha no fim do mês, {fee === 0 ? 'sem mensalidade nos meses quietos.' : 'com cobrança transparente.'}</p>
+            <p className="csr-lead">Cada pagamento aprovado no AbacatePay vira uma NFS-e automaticamente, sem planilha no fim do mês.</p>
+            <p className="csr-hero-price"><strong>{P}</strong> por nota emitida.{' '}<span>{fee === 0 ? 'Sem mensalidade. Não vendeu, não pagou.' : `Mensalidade de ${brl(fee)}.`}</span></p>
             <div className="csr-hero-actions">
               <Link className="csr-button" href="/sign-up">Começar agora <span aria-hidden="true">↗</span></Link>
               <a className="csr-text-link" href="#como-funciona">Ver como funciona <span aria-hidden="true">↓</span></a>
