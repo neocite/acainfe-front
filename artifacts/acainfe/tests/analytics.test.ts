@@ -15,6 +15,54 @@ function fixture(url = 'https://acainfe.com/app?email=private@example.test#secre
 }
 
 describe('Google Analytics: consentimento, privacidade e eventos', () => {
+  it('purchase usa o pagamento confirmado e valor efetivamente pago, com deduplicação por ID entre instâncias', () => {
+    const f = fixture();
+    try {
+      f.tracker.setConsent('granted');
+      const payment = { paymentId: 'pix-123', status: 'PAID', currency: 'BRL', paidAmountCents: 13000 };
+      assert.equal(f.tracker.pixPaid(payment), true);
+      assert.equal(f.tracker.pixPaid(payment), false);
+      const reloaded = createAnalytics(f.win); reloaded.init();
+      assert.equal(reloaded.pixPaid(payment), false);
+      const purchases = f.events().filter(e => e[1] === 'purchase');
+      assert.equal(purchases.length, 1);
+      assert.equal((purchases[0][2] as any).transaction_id, 'pix-123');
+      assert.equal((purchases[0][2] as any).value, 130);
+      assert.equal((purchases[0][2] as any).items[0].price, 130);
+      assert.equal((purchases[0][2] as any).payment_type, 'pix');
+      assert.equal((purchases[0][2] as any).checkout_type, 'billing_balance');
+    } finally { f.dom.window.close(); }
+  });
+  it('não deduplica como enviado antes de consentir, nem emite para pendente, expirado ou valores inválidos', () => {
+    const f = fixture();
+    try {
+      const payment = { paymentId: 'pix-123', status: 'PAID', currency: 'BRL', paidAmountCents: 100 };
+      assert.equal(f.tracker.pixPaid(payment), false);
+      assert.equal(f.win.sessionStorage.length, 0);
+      f.tracker.setConsent('granted');
+      for (const status of ['PENDING', 'EXPIRED']) assert.equal(f.tracker.pixPaid({ ...payment, status }), false);
+      for (const paidAmountCents of [undefined, null, NaN, Infinity, 0, -1, 1.5]) assert.equal(f.tracker.pixPaid({ ...payment, paidAmountCents }), false);
+      assert.equal(f.tracker.pixPaid({ ...payment, currency: 'USD' }), false);
+      assert.equal(f.tracker.pixPaid({ ...payment, paymentId: '' }), false);
+      assert.equal(f.tracker.pixPaid(payment), true);
+      f.tracker.setConsent('denied');
+      assert.equal(f.tracker.pixPaid({ ...payment, paymentId: 'second' }), false);
+    } finally { f.dom.window.close(); }
+  });
+  it('deduplica em memória quando sessionStorage está bloqueado, e não marca evento que falhou na fila', () => {
+    const f = fixture();
+    try {
+      f.tracker.setConsent('granted');
+      Object.defineProperty(f.win, 'sessionStorage', { get: () => { throw new Error('blocked'); } });
+      const payment = { paymentId: 'pix-123', status: 'PAID', currency: 'BRL', paidAmountCents: 100 };
+      const original = f.win.gtag;
+      f.win.gtag = () => { throw new Error('blocked'); };
+      assert.equal(f.tracker.pixPaid(payment), false);
+      f.win.gtag = original;
+      assert.equal(f.tracker.pixPaid(payment), true);
+      assert.equal(f.tracker.pixPaid(payment), false);
+    } finally { f.dom.window.close(); }
+  });
   it('não carrega a tag nem rastreia antes da autorização ou depois de recusar', async () => {
     const f = fixture();
     try {

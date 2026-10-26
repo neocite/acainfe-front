@@ -11,7 +11,6 @@ import { PaymentGateways } from '../components/PaymentGateways';
 import { FiscalCompanyFields } from '../components/FiscalCompanyFields';
 import { AiAgents } from '../components/AiAgents';
 import { OnboardingAssistant } from '../components/OnboardingAssistant';
-import { CopyButton } from '../components/CopyButton';
 import { CompanyCard, TestEnvironmentNotice } from '../components/CompanyCard';
 import { ApproximateTaxesFields } from '../components/ApproximateTaxesFields';
 import { FiscalSettings } from '../components/FiscalSettings';
@@ -28,6 +27,8 @@ import { brl } from '../config/pricing';
 import { useCoverage } from '../components/landing/use-coverage';
 import { coverageWaitlist } from '../lib/coverage';
 import { trackOnboarding, trackPixGenerated, type OnboardingStep } from '../lib/analytics';
+import { BillingPix } from '../components/BillingPix';
+import { createBillingPayment, getBillingPayment, lastBillingPayment, rememberBillingPayment, type BillingPayment } from '../lib/billing-payments';
 import '../onboarding.css';
 import '../mobile-fixes.css';
 import '../company-details.css';
@@ -50,7 +51,7 @@ type CompanyStatus = CompanyProfile & {
   certificate?: { expiresAt?: string; validUntil?: string };
 };
 type Billing = { status: string; openCents: number; openCharges: number; creditCents: number; amountDueCents: number; blocksAt?: string; overdue: boolean; pricePerInvoiceCents: number };
-type Pix = { amountCents: number; pixCopyPaste: string; pixQrCodeImage: string; expiresAt: string };
+type Pix = BillingPayment;
 const steps = ['Seus dados', 'Certificado', 'Sua empresa', 'AbacatePay', 'Seu assistente'];
 const analyticsSteps: Record<number, OnboardingStep> = { 1: 'personal_details', 2: 'certificate', 3: 'company', 3.1: 'accountant', 4: 'abacatepay', 5: 'assistant' };
 const ValidationContext = createContext<Record<string, string>>({});
@@ -203,11 +204,22 @@ export default function Onboarding() {
   }
   async function generatePix() {
     await run(async () => {
-      const result = await api<Pix>(`${base}/billing/payments`, 'POST');
+      const result = await createBillingPayment(base);
       setPix(result);
-      trackPixGenerated(result.amountCents, result.pixCopyPaste);
+      rememberBillingPayment(base, result.paymentId);
+      if (result.status === 'PENDING') trackPixGenerated(result.amountCents, result.pixCopyPaste);
     });
   }
+  useEffect(() => {
+    if (view !== 'billing' || !id || !user || pix) return;
+    const paymentId = lastBillingPayment(base);
+    if (!paymentId) return;
+    let stopped = false;
+    getBillingPayment(base, paymentId).then(payment => {
+      if (!stopped) setPix(payment);
+    }).catch(e => { if (!stopped) handleError(e); });
+    return () => { stopped = true; };
+  }, [base, id, user, view, pix]);
   useEffect(() => {
     if (status?.availability.status === 'WAITLIST' || !id || !user) return;
     api<Billing>(`${base}/billing`).then(setBilling).catch(() => {});
@@ -311,8 +323,8 @@ export default function Onboarding() {
       : view === 'gateways' ? <PaymentGateways key={base} base={base} integration={status?.abacatepay} onRefresh={refreshGateways} onUnauthorized={handleError} />
       : view === 'fiscal' ? <div className="company-fiscal-view"><nav className="company-section-nav" aria-label="Seção da empresa"><button type="button" className="text-button" onClick={() => setView('panel')}>Voltar para Minha empresa</button><span aria-hidden="true">/</span><span>Dados fiscais</span></nav><FiscalSettings key={base} base={base} businessType={status?.tenant.businessType} onUnauthorized={handleError} onChanged={() => { void refreshPanel(); }} /></div>
       : view === 'billing' ? <section className="app-card"><span className="app-eyebrow">SEM MENSALIDADE. SEM SURPRESA.</span><h1>Seu saldo.</h1>{errorBox}{billing ? <><div className="balance-value">{brl(billing.amountDueCents)}</div><p>Você tem <strong>{brl(billing.openCents)}</strong> em aberto ({billing.openCharges} notas).{billing.blocksAt && <> Pague até <strong>{new Date(billing.blocksAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</strong> para manter a emissão ativa.</>}</p>{billing.overdue && <p className="danger-text">O pagamento está atrasado.</p>}{billing.creditCents > 0 && <div className="app-success">Você tem {brl(billing.creditCents)} de crédito para as próximas notas.</div>}<p className="app-muted">Cada nota custa {brl(billing.pricePerInvoiceCents)}. O saldo é avisado todo dia por e-mail e WhatsApp. Pix mínimo de R$ 1,00; a sobra vira crédito.</p>
-      <button className="app-primary" disabled={busy || billing.amountDueCents <= 0} onClick={() => void generatePix()}>{busy ? <Loader2 className="spin" size={17} /> : <Wallet size={17} />} {billing.amountDueCents > 0 ? 'Pagar com Pix' : 'Tudo em dia'}</button>
-      {pix && <div className="pix-section"><h2>Pix de {brl(pix.amountCents)}</h2>{/^data:image\/(png|jpeg|webp);base64,/.test(pix.pixQrCodeImage) && <img src={pix.pixQrCodeImage} alt="QR Code para pagamento Pix" />}<p>Expira em {new Date(pix.expiresAt).toLocaleString('pt-BR')}</p><div className="copy-field"><code>{pix.pixCopyPaste}</code><CopyButton text={pix.pixCopyPaste} /></div><button className="app-secondary" disabled={busy} onClick={() => run(async () => { const b = await api<Billing>(`${base}/billing`); setBilling(b); if (b.amountDueCents <= 0) setPix(null); })}>Verificar pagamento</button></div>}</> : <p>Não foi possível carregar o saldo. Use a aba Saldo para tentar novamente.</p>}</section>
+      {(!pix || pix.status === 'PAID') && <button className="app-primary" disabled={busy || billing.amountDueCents <= 0} onClick={() => void generatePix()}>{busy ? <Loader2 className="spin" size={17} /> : <Wallet size={17} />} {billing.amountDueCents > 0 ? 'Pagar com Pix' : 'Tudo em dia'}</button>}
+      {pix && <BillingPix key={`${base}:${pix.paymentId}`} base={base} payment={pix} onChange={setPix} onGenerate={() => void generatePix()} generating={busy} onRefreshBalance={async () => { setBilling(await api<Billing>(`${base}/billing`)); }} onUnauthorized={handleError} />}</> : <p>Não foi possível carregar o saldo. Use a aba Saldo para tentar novamente.</p>}</section>
       : view === 'panel' ? <section className="app-card"><span className="app-eyebrow">TUDO NO SEU LUGAR</span><h1>Seu negócio, por aqui.</h1>{errorBox}{status && <><CompanyCard status={status} onFiscalSettings={() => setView('fiscal')} /><div className="panel-grid"><div><small>Status da empresa</small><strong>{companyStatusLabel(status.tenant.status)}</strong></div><div><small>Emissão de notas</small><strong>{status.readiness.canIssue ? 'Empresa pronta' : 'Há pendências'}</strong></div><div><small>Produtos aguardando tributação</small><strong>{Array.isArray(status.pendingTaxReview) ? status.pendingTaxReview.length : status.pendingTaxReview}</strong></div><div><small>Validade do certificado</small><strong>{certificateExpiryLabel(status)}</strong></div></div>
        {status.readiness.missing.length > 0 && <div className="app-notice"><h3>O que falta para emitir</h3><ul>{status.readiness.missing.map(m => <li key={m.field}>{m.message}</li>)}</ul><button className="app-secondary" onClick={() => { setStep(3); setView('wizard'); }}>Completar dados</button></div>}
        {companyRecommendations.length > 0 && <section className="company-recommendations" aria-labelledby="recommendations-title"><h3 id="recommendations-title">Complete quando puder</h3><p>Esses dados são recomendados e não impedem a emissão.</p><ul>{companyRecommendations.map(item => <li key={item.field}><span>{item.message}</span>{isOptionalCompanyField(item.field) ? <button className="app-secondary" type="button" disabled={busy} onClick={() => setEditingRecommendation({ ...item, field: item.field as OptionalCompanyField })}>Informar<span className="sr-only"> {item.field === 'municipalRegistration' ? 'CCM' : 'alíquota do Simples'}</span></button> : item.field === 'approximateTaxes' ? <button type="button" className="app-secondary" onClick={() => setView('fiscal')}>Conferir tributos</button> : null}</li>)}</ul></section>}

@@ -10,6 +10,7 @@ const appRoutes = [
   ['GET', /^\/companies\/[a-zA-Z0-9_-]+\/fiscal-settings$/],
   ['POST', /^\/companies\/[a-zA-Z0-9_-]+\/fiscal-settings\/send$/],
   ['POST', /^\/companies\/[a-zA-Z0-9_-]+\/(?:abacatepay(?:\/webhook)?|mcp-key|billing\/payments)$/],
+  ['GET', /^\/companies\/[a-zA-Z0-9_-]+\/billing\/payments\/[a-zA-Z0-9_-]+$/],
   ['GET', /^\/companies\/[a-zA-Z0-9_-]+\/mcp-keys$/],
   ['GET', /^\/companies\/[a-zA-Z0-9_-]+\/mcp-connection$/],
   ['DELETE', /^\/companies\/[a-zA-Z0-9_-]+\/mcp-keys(?:\/[a-zA-Z0-9_-]+)?$/],

@@ -94,7 +94,7 @@ export const INSTITUTIONAL_PAGES: InstitutionalPage[] = [
       { title: '8. Prazo', paragraphs: ['Documentos fiscais pelo prazo da legislação tributária; demais dados enquanto a conta estiver ativa ou conforme obrigação legal.'] },
       { title: '9. Segurança', paragraphs: ['Criptografia dos segredos (certificado, chaves), chaves de API revogáveis em "Agentes de IA" e acesso restrito.'] },
       { title: '10. Direitos do titular (LGPD, art. 18)', paragraphs: ['Confirmação, acesso, correção, anonimização, portabilidade, eliminação e informação sobre compartilhamento, pedidos por contato@extractify.com.br. Tomadores procuram primeiro a empresa que emitiu a nota.'] },
-      { title: '11. Cookies', paragraphs: ['Usamos cookies necessários ao login e ao funcionamento. Com sua autorização, usamos também o Google Analytics para medir a navegação, as etapas do cadastro e a geração do Pix no checkout. Não enviamos os dados pessoais dos formulários, certificados ou chaves ao Google Analytics. Você pode aceitar, recusar ou retirar a autorização pelo botão “Cookies” no site. Não habilitamos recursos de publicidade.'] },
+      { title: '11. Cookies', paragraphs: ['Usamos cookies necessários ao login e ao funcionamento. Com sua autorização, usamos também o Google Analytics para medir a navegação, as etapas do cadastro e a geração e confirmação do Pix no checkout. Não enviamos os dados pessoais dos formulários, certificados ou chaves ao Google Analytics. Você pode aceitar, recusar ou retirar a autorização pelo botão “Cookies” no site. Não habilitamos recursos de publicidade.'] },
       { title: '12. Alterações', paragraphs: ['A data no topo indica a versão vigente.'] },
     ],
   },

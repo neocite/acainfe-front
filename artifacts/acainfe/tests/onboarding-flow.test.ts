@@ -15,6 +15,8 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   let coverageClient: QueryClient;
   let analytics: ReturnType<typeof import('../src/lib/analytics').createAnalytics>;
   let billingDue: number;
+  let paymentData: any, paymentQueries: number, paymentError: number | undefined;
+  let paymentSequence = 0;
   let company: any, details: any, patches: any[], profilesRequested: number, detailRequests: number, mcpRequests: number, fiscalRequests: number;
   let keys: any[], keyGets: number, keyDeletes: string[], generatedLabels: any[], generationError: boolean;
   let gatewayCalls: any[], gatewayFailure: boolean;
@@ -63,6 +65,9 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     dom.window.sessionStorage.clear();
     (dom.window as any).dataLayer = [];
     billingDue = 0;
+    paymentData = null; paymentQueries = 0; paymentError = undefined;
+    paymentSequence++;
+    Object.defineProperty(dom.window.document, 'hidden', { configurable: true, value: false });
     patches = []; profilesRequested = 0; details = undefined; detailRequests = 0; mcpRequests = 0; fiscalRequests = 0;
     keys = []; keyGets = 0; keyDeletes = []; generatedLabels = []; generationError = false;
     gatewayCalls = []; gatewayFailure = false;
@@ -115,7 +120,18 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
         { cityCode: '3548708', cityName: 'São Bernardo do Campo', uf: 'SP', regimes: ['MEI', 'SIMPLES_NACIONAL'] },
       ] };
       else if (path.endsWith('/billing')) data = { amountDueCents: billingDue };
-      else if (path.endsWith('/billing/payments')) data = { amountCents: billingDue, pixCopyPaste: 'fixture-pix-only', pixQrCodeImage: '', expiresAt: '2030-01-01T12:00:00Z' };
+      else if (path.endsWith('/billing/payments')) {
+        assert.equal(method, 'POST');
+        paymentData = { id: `pix-fixture-${paymentSequence}`, paymentId: `pix-fixture-${paymentSequence}`, status: 'PENDING', currency: 'BRL', amountCents: billingDue, pixCopyPaste: 'fixture-pix-only', pixQrCodeImage: '', expiresAt: '2030-01-01T12:00:00Z' };
+        data = paymentData;
+      }
+      else if (path.includes('/billing/payments/')) {
+        assert.equal(method, 'GET');
+        assert.equal(path, `/api/app/companies/test-company/billing/payments/${paymentData.paymentId}`);
+        paymentQueries++;
+        if (paymentError) return new Response(JSON.stringify({ message: 'Pagamento não encontrado' }), { status: paymentError, headers: { 'Content-Type': 'application/json' } });
+        data = paymentData;
+      }
       else if (path.endsWith('/products?pendingTaxReview=true')) data = [];
       else if (path.endsWith('/mcp-connection')) data = {
         mcpUrl: 'https://example.test/mcp', keyPlaceholder: '<SUA_CHAVE>',
@@ -193,7 +209,104 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     assert.equal(events.find((event: any[]) => event[1] === 'begin_checkout')[2].value, 123.45);
     billingDue = 0;
     await click(button('Verificar pagamento'));
-    assert.equal(container.querySelector('.pix-section'), null);
+    assert.ok(container.querySelector('.pix-section'));
+    assert.equal(gaEvents().some((event: any[]) => event[1] === 'purchase'), false);
+  });
+  it('confirma PAID com valor efetivamente pago, atualiza saldo e recupera sem duplicar após recarga', async () => {
+    readyPanel(); billingDue = 12345;
+    analytics.setConsent('granted');
+    await mount(); await click(button('Saldo')); await click(button('Pagar com Pix'));
+    paymentData.status = 'PAID'; paymentData.paidAmountCents = 13000; paymentData.paidAt = '2026-10-26T18:00:00Z';
+    billingDue = 0;
+    await click(button('Verificar pagamento'));
+    assert.ok(container.textContent?.includes('Pagamento confirmado'));
+    assert.ok(container.textContent?.includes('R$ 130,00'));
+    assert.ok(button('Tudo em dia').hasAttribute('disabled'));
+    assert.equal(container.querySelector('.copy-field'), null);
+    const purchases = () => gaEvents().filter((event: any[]) => event[1] === 'purchase');
+    assert.equal(purchases().length, 1);
+    assert.equal(purchases()[0][2].value, 130);
+    assert.equal(purchases()[0][2].transaction_id, paymentData.paymentId);
+    await act(async () => root.unmount()); root = createRoot(container);
+    await mount(); await click(button('Saldo'));
+    assert.ok(container.textContent?.includes('Pagamento confirmado'));
+    assert.equal(purchases().length, 1);
+    assert.doesNotMatch(JSON.stringify(gaEvents()), /fixture-pix-only/);
+  });
+  it('consulta automaticamente em 7,5s, pausa oculta, para ao expirar e permite gerar outro Pix', async t => {
+    readyPanel(); billingDue = 12345;
+    await mount(); await click(button('Saldo')); await click(button('Pagar com Pix'));
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    // Re-enter the tab so its polling timer is created under the controlled clock.
+    await click(button('Minha empresa')); await click(button('Saldo'));
+    Object.defineProperty(document, 'hidden', { configurable: true, value: true });
+    await act(async () => document.dispatchEvent(new dom.window.Event('visibilitychange')));
+    await act(async () => t.mock.timers.tick(15000));
+    assert.equal(paymentQueries, 0);
+    Object.defineProperty(document, 'hidden', { configurable: true, value: false });
+    await act(async () => document.dispatchEvent(new dom.window.Event('visibilitychange')));
+    assert.equal(paymentQueries, 1);
+    paymentData.status = 'EXPIRED';
+    await act(async () => t.mock.timers.tick(7500));
+    assert.equal(paymentQueries, 2);
+    assert.ok(container.textContent?.includes('Este Pix expirou'));
+    await act(async () => t.mock.timers.tick(30000));
+    assert.equal(paymentQueries, 2);
+    assert.equal(gaEvents().some((event: any[]) => event[1] === 'purchase'), false);
+    await click(button('Gerar outro Pix'));
+    assert.ok(button('Verificar pagamento'));
+  });
+  it('para as consultas após confirmação automática ou saída da aba', async t => {
+    readyPanel(); billingDue = 12345;
+    analytics.setConsent('granted');
+    await mount(); await click(button('Saldo'));
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    await click(button('Pagar com Pix'));
+    paymentData.status = 'PAID'; paymentData.paidAmountCents = 12345;
+    await act(async () => t.mock.timers.tick(7500));
+    assert.ok(container.textContent?.includes('Pagamento confirmado'));
+    await act(async () => t.mock.timers.tick(30000));
+    assert.equal(paymentQueries, 1);
+    assert.equal(gaEvents().filter((event: any[]) => event[1] === 'purchase').length, 1);
+    await click(button('Minha empresa'));
+    await act(async () => t.mock.timers.tick(30000));
+    assert.equal(paymentQueries, 1);
+  });
+  it('erro 404 na consulta mostra a mensagem e nunca confirma nem envia purchase', async () => {
+    readyPanel(); billingDue = 12345;
+    analytics.setConsent('granted');
+    await mount(); await click(button('Saldo')); await click(button('Pagar com Pix'));
+    paymentError = 404;
+    await click(button('Verificar pagamento'));
+    assert.ok(container.textContent?.includes('Pagamento não encontrado'));
+    assert.ok(button('Verificar pagamento'));
+    assert.equal(gaEvents().some((event: any[]) => event[1] === 'purchase'), false);
+  });
+  it('confirma o pagamento sem consentimento, mas só mede após autorização explícita', async () => {
+    readyPanel(); billingDue = 12345;
+    await mount(); await click(button('Saldo')); await click(button('Pagar com Pix'));
+    paymentData.status = 'PAID'; paymentData.paidAmountCents = 12345;
+    await click(button('Verificar pagamento'));
+    assert.ok(container.textContent?.includes('Pagamento confirmado'));
+    assert.equal(gaEvents().some((event: any[]) => event[1] === 'purchase'), false);
+    await act(async () => analytics.setConsent('granted'));
+    assert.equal(gaEvents().filter((event: any[]) => event[1] === 'purchase').length, 1);
+    await act(async () => analytics.setConsent('granted'));
+    assert.equal(gaEvents().filter((event: any[]) => event[1] === 'purchase').length, 1);
+  });
+  it('descarta resposta de outro pagamento e mantém pendente sem conversão', async () => {
+    readyPanel(); billingDue = 12345;
+    analytics.setConsent('granted');
+    await mount(); await click(button('Saldo')); await click(button('Pagar com Pix'));
+    const originalId = paymentData.paymentId;
+    // The server returns an unexpected payment even though the requested URL is unchanged.
+    const previousFetch = globalThis.fetch;
+    globalThis.fetch = async (url, init) => String(url).endsWith(`/billing/payments/${originalId}`)
+      ? new Response(JSON.stringify({ ...paymentData, paymentId: 'other', status: 'PAID', paidAmountCents: 12345 }), { headers: { 'Content-Type': 'application/json' } })
+      : previousFetch(url, init);
+    await click(button('Verificar pagamento'));
+    assert.ok(container.textContent?.includes('A API não retornou os dados necessários'));
+    assert.ok(button('Verificar pagamento'));
     assert.equal(gaEvents().some((event: any[]) => event[1] === 'purchase'), false);
   });
   async function mount() {

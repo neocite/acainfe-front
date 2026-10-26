@@ -27,7 +27,11 @@ export function createAnalytics(win: AnalyticsWindow) {
     } catch { return choice ?? 'unknown'; }
   }
   function gtag(...args: unknown[]) {
-    try { win.gtag?.(...args); } catch { /* Telemetry must never break a user action. */ }
+    try {
+      if (!win.gtag) return false;
+      win.gtag(...args);
+      return true;
+    } catch { return false; /* Telemetry must never break a user action. */ }
   }
   function page() {
     const path = analyticsPagePath(win.location.pathname);
@@ -35,8 +39,7 @@ export function createAnalytics(win: AnalyticsWindow) {
   }
   function event(name: string, params: Record<string, unknown> = {}) {
     if (!active || !production || consent() !== 'granted') return false;
-    gtag('event', name, { ...page(), ...params, send_to: GA_MEASUREMENT_ID });
-    return true;
+    return gtag('event', name, { ...page(), ...params, send_to: GA_MEASUREMENT_ID });
   }
   function pageView() {
     const path = page().page_path;
@@ -114,7 +117,23 @@ export function createAnalytics(win: AnalyticsWindow) {
     emitted.add(key);
     try { win.sessionStorage.setItem(key, '1'); } catch { /* No sensitive checkout data is persisted. */ }
   }
-  return { consent, init, setConsent, pageView, onboarding, pixGenerated };
+  function pixPaid(payment: { paymentId: string; status: string; currency: string; paidAmountCents?: number | null }) {
+    if (payment.status !== 'PAID' || payment.currency !== 'BRL' ||
+        typeof payment.paymentId !== 'string' || !payment.paymentId ||
+        !Number.isSafeInteger(payment.paidAmountCents) || payment.paidAmountCents! <= 0) return false;
+    const key = `acainfe.ga.purchase.${encodeURIComponent(payment.paymentId)}`;
+    if (emitted.has(key)) return false;
+    try { if (win.sessionStorage.getItem(key)) return false; } catch { /* In-memory fallback. */ }
+    const value = payment.paidAmountCents! / 100;
+    if (!event('purchase', {
+      transaction_id: payment.paymentId, currency: 'BRL', value, payment_type: 'pix', checkout_type: 'billing_balance',
+      items: [{ item_id: 'acainfe_invoice_fees', item_name: 'Emissão de NFS-e', price: value, quantity: 1 }],
+    })) return false;
+    emitted.add(key);
+    try { win.sessionStorage.setItem(key, '1'); } catch { /* In-memory fallback, GA also receives the stable ID. */ }
+    return true;
+  }
+  return { consent, init, setConsent, pageView, onboarding, pixGenerated, pixPaid };
 }
 
 let browser: Window | undefined;
@@ -129,4 +148,7 @@ export const trackOnboarding = (event: OnboardingEvent, step?: OnboardingStep, d
 };
 export const trackPixGenerated = (amountCents: number, payload: string) => {
   void getAnalytics()?.pixGenerated(amountCents, payload);
+};
+export const trackPixPaid = (payment: { paymentId: string; status: string; currency: string; paidAmountCents?: number | null }) => {
+  return getAnalytics()?.pixPaid(payment) ?? false;
 };
