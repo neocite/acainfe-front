@@ -584,7 +584,7 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
   it('privacidade contém só os 12 tópicos aprovados e a versão e aviso no topo', async () => {
     const privacy = institutionalPage('/privacidade')!;
     assert.equal(privacy.sections.length, 12);
-    assert.equal(privacy.version, 'Versão de 21/10/2026');
+    assert.equal(privacy.version, 'Versão de 26/10/2026');
     assert.equal(privacy.notice, 'Esta política está em revisão.');
     const markdown = institutionalMarkdown(privacy);
     assert.ok(markdown.indexOf(privacy.version) < markdown.indexOf('## 1. Quem somos'));
@@ -592,7 +592,9 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     assert.ok(markdown.includes('só aceitamos e-CNPJ emitidos pela ICP-Brasil'));
     assert.ok(markdown.includes('o açaínfe atua como operador'));
     assert.ok(markdown.includes('Não vendemos dados.'));
-    assert.ok(markdown.includes('nenhum de publicidade'));
+    assert.ok(markdown.includes('Não habilitamos recursos de publicidade.'));
+    assert.ok(markdown.includes('Com sua autorização, usamos também o Google Analytics'));
+    assert.ok(markdown.includes('retirar a autorização pelo botão “Cookies”'));
     const response = await fetch(base + '/contato');
     assert.ok((await response.text()).includes('href="tel:+551134587367"'));
   });

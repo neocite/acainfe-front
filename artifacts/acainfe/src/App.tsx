@@ -13,6 +13,8 @@ import { queryClient } from './lib/queryClient';
 import { clerkAppearance } from './lib/clerk-appearance';
 import { INSTITUTIONAL_ROUTES, PUBLIC_PAGE_ALIASES, SITE_ROUTES } from './lib/site-routes';
 import Institutional from './pages/Institutional';
+import { AnalyticsNavigation } from './components/AnalyticsNavigation';
+import { AnalyticsConsent } from './components/AnalyticsConsent';
 
 const clerkPubKey = publishableKeyFromHost(
   window.location.hostname,
@@ -68,6 +70,8 @@ function ClerkProviderWithRoutes() {
     routerReplace={(to) => setLocation(stripBase(to), { replace: true })}
   >
     <QueryClientProvider client={queryClient}>
+      <AnalyticsNavigation />
+      <AnalyticsConsent />
       <ClerkQueryClientCacheInvalidator />
       <Switch>
         <Route path={SITE_ROUTES.home} component={HomeRedirect} />

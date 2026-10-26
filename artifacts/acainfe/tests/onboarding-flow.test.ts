@@ -5,6 +5,7 @@ import { JSDOM } from 'jsdom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { Root } from 'react-dom/client';
 import type { ViteDevServer } from 'vite';
+import { webcrypto } from 'node:crypto';
 
 describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   let dom: JSDOM, root: Root, container: HTMLElement;
@@ -12,6 +13,8 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   let createRoot: typeof import('react-dom/client').createRoot;
   let modules: ViteDevServer;
   let coverageClient: QueryClient;
+  let analytics: ReturnType<typeof import('../src/lib/analytics').createAnalytics>;
+  let billingDue: number;
   let company: any, details: any, patches: any[], profilesRequested: number, detailRequests: number, mcpRequests: number, fiscalRequests: number;
   let keys: any[], keyGets: number, keyDeletes: string[], generatedLabels: any[], generationError: boolean;
   let gatewayCalls: any[], gatewayFailure: boolean;
@@ -21,7 +24,8 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
   const descriptors = new Map<string, PropertyDescriptor | undefined>();
   const originalFetch = globalThis.fetch;
   before(async () => {
-    dom = new JSDOM('<html><body></body></html>', { url: 'https://example.test/app', pretendToBeVisual: true });
+    dom = new JSDOM('<html><body></body></html>', { url: 'https://acainfe.com/app', pretendToBeVisual: true });
+    Object.defineProperty(dom.window, 'crypto', { value: webcrypto });
     const exposed: Record<string, unknown> = {
       window: dom.window, document: dom.window.document, navigator: dom.window.navigator,
       location: dom.window.location, history: dom.window.history,
@@ -43,6 +47,7 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
       resolve: { alias: { '@': `${process.cwd()}/src`, '@clerk/react': `${process.cwd()}/tests/fixtures/clerk.ts` }, dedupe: ['react', 'react-dom'] },
       server: { middlewareMode: true, hmr: false, ws: false, watch: null }, optimizeDeps: { noDiscovery: true } });
     ({ default: Onboarding } = await modules.ssrLoadModule('/src/pages/Onboarding.tsx'));
+    analytics = (await modules.ssrLoadModule('/src/lib/analytics.ts')).getAnalytics();
   });
   after(async () => {
     if (modules) await modules.close();
@@ -53,6 +58,11 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     }
   });
   beforeEach(() => {
+    analytics.setConsent('denied');
+    dom.window.localStorage.clear();
+    dom.window.sessionStorage.clear();
+    (dom.window as any).dataLayer = [];
+    billingDue = 0;
     patches = []; profilesRequested = 0; details = undefined; detailRequests = 0; mcpRequests = 0; fiscalRequests = 0;
     keys = []; keyGets = 0; keyDeletes = []; generatedLabels = []; generationError = false;
     gatewayCalls = []; gatewayFailure = false;
@@ -104,7 +114,8 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
         { cityCode: '3550308', cityName: 'São Paulo', uf: 'SP', regimes: ['MEI', 'SIMPLES_NACIONAL'] },
         { cityCode: '3548708', cityName: 'São Bernardo do Campo', uf: 'SP', regimes: ['MEI', 'SIMPLES_NACIONAL'] },
       ] };
-      else if (path.endsWith('/billing')) data = { amountDueCents: 0 };
+      else if (path.endsWith('/billing')) data = { amountDueCents: billingDue };
+      else if (path.endsWith('/billing/payments')) data = { amountCents: billingDue, pixCopyPaste: 'fixture-pix-only', pixQrCodeImage: '', expiresAt: '2030-01-01T12:00:00Z' };
       else if (path.endsWith('/products?pendingTaxReview=true')) data = [];
       else if (path.endsWith('/mcp-connection')) data = {
         mcpUrl: 'https://example.test/mcp', keyPlaceholder: '<SUA_CHAVE>',
@@ -156,6 +167,35 @@ describe('Cadastro completo: escolha de atividade até AbacatePay', () => {
     };
   });
   afterEach(async () => { await act(async () => root.unmount()); container.remove(); globalThis.fetch = originalFetch; });
+  function gaEvents() {
+    return ((dom.window as any).dataLayer ?? []).map((args: ArrayLike<unknown>) => Array.from(args)).filter((args: unknown[]) => args[0] === 'event');
+  }
+  it('mede a etapa real depois de carregar o cadastro e não conta visita ao painel como onboarding', async () => {
+    analytics.setConsent('granted');
+    await mount();
+    assert.equal(gaEvents().filter((event: any[]) => event[1] === 'onboarding_start').length, 1);
+    const views = gaEvents().filter((event: any[]) => event[1] === 'onboarding_step_view');
+    assert.equal(views.length, 1);
+    assert.equal(views[0][2].step_name, 'company');
+    assert.equal(gaEvents().filter((event: any[]) => event[1] === 'onboarding_step_complete').length, 0);
+  });
+  it('registra Pix gerado na tela de saldo mas não inventa purchase quando o saldo zera', async () => {
+    readyPanel(); billingDue = 12345;
+    analytics.setConsent('granted');
+    await mount();
+    await click(button('Saldo'));
+    await click(button('Pagar com Pix'));
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 40)); });
+    assert.ok(container.textContent?.includes('fixture-pix-only'));
+    const events = gaEvents();
+    assert.equal(events.filter((event: any[]) => event[1] === 'onboarding_start').length, 0);
+    assert.equal(events.filter((event: any[]) => event[1] === 'pix_generated').length, 1);
+    assert.equal(events.find((event: any[]) => event[1] === 'begin_checkout')[2].value, 123.45);
+    billingDue = 0;
+    await click(button('Verificar pagamento'));
+    assert.equal(container.querySelector('.pix-section'), null);
+    assert.equal(gaEvents().some((event: any[]) => event[1] === 'purchase'), false);
+  });
   async function mount() {
     coverageClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
     await act(async () => root.render(createElement(QueryClientProvider, { client: coverageClient }, createElement(Onboarding))));

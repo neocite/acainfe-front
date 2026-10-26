@@ -11,6 +11,7 @@ describe('Landing inglesa: simulador, comparação e termos', () => {
   let dom: JSDOM, root: Root, container: HTMLElement, vite: ViteDevServer, client: QueryClient;
   let Page: typeof import('../src/pages/EnglishLanding').default;
   let PortuguesePage: typeof import('../src/pages/Landing').default;
+  let Consent: typeof import('../src/components/AnalyticsConsent').AnalyticsConsent;
   let createRoot: typeof import('react-dom/client').createRoot;
   const originals = new Map<string, PropertyDescriptor | undefined>();
   const originalFetch = globalThis.fetch;
@@ -37,6 +38,7 @@ describe('Landing inglesa: simulador, comparação e termos', () => {
       server: { middlewareMode: true, hmr: false, ws: false, watch: null }, optimizeDeps: { noDiscovery: true } });
     ({ default: Page } = await vite.ssrLoadModule('/src/pages/EnglishLanding.tsx'));
     ({ default: PortuguesePage } = await vite.ssrLoadModule('/src/pages/Landing.tsx'));
+    ({ AnalyticsConsent: Consent } = await vite.ssrLoadModule('/src/components/AnalyticsConsent.tsx'));
   });
   after(async () => {
     await vite?.close(); dom.window.close(); globalThis.fetch = originalFetch;
@@ -123,6 +125,22 @@ describe('Landing inglesa: simulador, comparação e termos', () => {
       await new Promise(resolve => setTimeout(resolve, 30));
     });
     assert.match(heroPrice(), /R\$ 0,90 por nota emitida\. Sem mensalidade\. Não vendeu, não pagou\./);
+  });
+
+  it('permite aceitar cookies e depois retirar a autorização pelo mesmo controle', async () => {
+    await act(async () => root.render(createElement(Consent)));
+    assert.ok(container.textContent?.includes('Analytics cookies'));
+    assert.ok(container.querySelector('button')?.textContent);
+    await click('Accept');
+    assert.equal(dom.window.localStorage.getItem('acainfe.analytics-consent.v1'), 'granted');
+    assert.equal(container.querySelector('.acx-banner'), null);
+    await click('Cookies');
+    assert.ok(container.textContent?.includes('Currently: accepted.'));
+    await click('Decline');
+    assert.equal(dom.window.localStorage.getItem('acainfe.analytics-consent.v1'), 'denied');
+    assert.equal(container.querySelector('.acx-banner'), null);
+    assert.ok(container.querySelector('.acx-reopen'));
+    dom.window.localStorage.clear();
   });
 
   it('usa preço e cobertura atualizados sem trocar idioma ou ampliar a disponibilidade', async () => {

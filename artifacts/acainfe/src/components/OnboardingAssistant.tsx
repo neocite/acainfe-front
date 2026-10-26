@@ -14,9 +14,10 @@ type Props = {
   onDone: () => void;
   onManage: () => void;
   onUnauthorized: (error: ApiError) => void;
+  onKeyCreated?: () => void;
 };
 
-export function OnboardingAssistant({ base, products, onDone, onManage, onUnauthorized }: Props) {
+export function OnboardingAssistant({ base, products, onDone, onManage, onUnauthorized, onKeyCreated }: Props) {
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [hasKeys, setHasKeys] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -51,6 +52,7 @@ export function OnboardingAssistant({ base, products, onDone, onManage, onUnauth
       const result = await createMcpKey(base, label);
       if (!mounted.current) return;
       setGenerated(result); setLabel('');
+      onKeyCreated?.();
     }
     catch (e) {
       if (!mounted.current) return;

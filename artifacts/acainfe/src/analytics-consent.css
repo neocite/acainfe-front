@@ -1,0 +1,15 @@
+.acx-banner, .acx-reopen { position: fixed; z-index: 60; font-family: 'DM Sans', sans-serif; color: #302530; box-sizing: border-box; }
+.acx-banner *, .acx-reopen { box-sizing: border-box; }
+.acx-banner { left: 8px; right: 8px; bottom: 8px; max-width: 420px; padding: 12px 14px; background: #fffdf8; border: 1px solid rgba(53,19,51,.18); border-top: 3px solid #f2a52d; box-shadow: 0 14px 40px rgba(53,19,51,.16); }
+.acx-title { margin: 0 0 4px; color: #351333; font: 700 14px/1.2 'Manrope', sans-serif; letter-spacing: -.03em; }
+.acx-body { margin: 0 0 10px; color: #5f535c; font-size: 12px; line-height: 1.5; }
+.acx-body a { color: #5a2a50; text-decoration: underline; text-underline-offset: 3px; }
+.acx-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.acx-btn { flex: 1 1 110px; min-height: 44px; padding: 0 14px; background: #fbf7ef; color: #351333; border: 1.5px solid #351333; font: 700 13px 'DM Sans', sans-serif; cursor: pointer; transition: background .18s; }
+.acx-btn:hover { background: #f3ece1; }
+.acx-close { flex-basis: 100%; min-height: 32px; background: transparent; border: 0; color: #746871; font: 12px 'DM Sans', sans-serif; text-decoration: underline; cursor: pointer; }
+.acx-reopen { left: 8px; bottom: 8px; min-height: 32px; padding: 0 10px; background: rgba(251,247,239,.94); border: 1px solid rgba(53,19,51,.25); color: #5a2a50; font-size: 11px; cursor: pointer; }
+.acx-reopen:hover { background: #f3ece1; }
+.acx-banner :focus-visible, .acx-reopen:focus-visible { outline: 2px solid #8c4b79; outline-offset: 2px; }
+@media (min-width: 640px) { .acx-banner { left: 16px; right: auto; bottom: 16px; } .acx-reopen { left: 16px; bottom: 16px; } }
+@media (prefers-reduced-motion: reduce) { .acx-btn { transition: none; } }
