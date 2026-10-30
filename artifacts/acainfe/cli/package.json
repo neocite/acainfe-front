@@ -3,9 +3,25 @@
   "version": "0.1.0",
   "description": "CLI do açaínfe para NFS-e, produtos e consultas pela API pública.",
   "private": true,
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/neocite/acainfe-front.git",
+    "directory": "artifacts/acainfe/cli"
+  },
+  "homepage": "https://acainfe.com/developers",
+  "bugs": {
+    "url": "https://github.com/neocite/acainfe-front/issues"
+  },
   "type": "module",
-  "bin": { "acainfe": "./acainfe.mjs" },
-  "files": ["acainfe.mjs", "README.md"],
-  "engines": { "node": ">=22" },
-  "homepage": "https://acainfe.com/developers"
+  "bin": {
+    "acainfe": "./acainfe.mjs"
+  },
+  "files": [
+    "acainfe.mjs",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  }
 }

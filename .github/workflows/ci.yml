@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # Valores fictícios: os testes não acessam a API nem o Clerk.
+      ACAINFE_API_URL: http://127.0.0.1:9
+      ACAINFE_APP_KEY: ci-dummy-app-key
+      CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
+      VITE_CLERK_PUBLISHABLE_KEY: pk_test_ZXhhbXBsZS5jbGVyay5hY2NvdW50cy5kZXYk
+      CLERK_SECRET_KEY: sk_test_ci_dummy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.22.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x  # sempre a última da linha 22; check-node barra versões sem a correção de 21/10/2026
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @workspace/acainfe run typecheck
+      - run: pnpm --filter @workspace/acainfe run build
+        env:
+          NODE_ENV: production
+      - run: pnpm --filter @workspace/acainfe test

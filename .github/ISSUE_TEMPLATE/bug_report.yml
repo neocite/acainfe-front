@@ -1,0 +1,36 @@
+name: Bug
+description: Algo não funciona como deveria no app ou na landing.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por reportar! **Não inclua** CPF, CNPJ, certificados, chaves de API nem dados de clientes reais.
+        Vulnerabilidades de segurança: use a [política de segurança](https://github.com/neocite/acainfe-front/security/policy).
+  - type: textarea
+    id: what
+    attributes:
+      label: O que aconteceu?
+      description: "Descreva o problema e o que você esperava que acontecesse."
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Como reproduzir
+      placeholder: |
+        1. Acesse '...'
+        2. Clique em '...'
+        3. Veja o erro
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Onde
+      description: "URL ou tela (ex.: /app, cadastro, Gateways de pagamento) e navegador."
+  - type: textarea
+    id: logs
+    attributes:
+      label: Prints ou logs
+      description: "Remova dados pessoais antes de colar."
