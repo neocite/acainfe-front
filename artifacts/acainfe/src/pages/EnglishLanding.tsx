@@ -52,6 +52,7 @@ export default function EnglishLanding() {
       <section className="csr-hero">
         <div className="csr-hero-copy">
           <div className="csr-eyebrow"><span className="csr-status-dot" /> INVOICES ON AUTOPILOT</div>
+            <a className="csr-oss-badge" href="https://github.com/extractify/acainfe-api" target="_blank" rel="noopener noreferrer">Open source · AGPL-3.0 <span aria-hidden="true">↗</span></a>
           <p className="csr-kicker">For digital businesses</p>
           <h1><span className="sr-only">açaínfe: automatic Brazilian service invoices (NFS-e). </span>Sold.<br /><em>Invoice sent.</em></h1>
           <p className="csr-lead">Each approved payment on AbacatePay becomes an NFS-e automatically, with no end-of-month spreadsheets.</p>
@@ -86,6 +87,13 @@ export default function EnglishLanding() {
         <p className="csr-independent">Independent product, not affiliated with AbacatePay.</p>
       </section>
       <section className="sr-only" aria-label="AI agents and MCP"><h2>AI agents and MCP</h2><p>açaínfe can be operated by AI agents via MCP (Model Context Protocol). Set up your company and connect your assistant to work with your service invoices.</p><a href="/llms.txt">Information for AI agents</a></section>
+      <section className="csr-open" id="open-source">
+        <div className="csr-open-copy"><span className="csr-label">AGPL-3.0 · BUILT ON OPEN SOURCE</span><h2>Open source.<br /><em>Ready to audit.</em></h2><p>açaínfe is built on Node.js, NestJS, Fastify, MongoDB and the MCP SDK. Opening the code is our way of giving back to the community and letting anyone audit how certificates and invoices are handled.</p>
+          <div className="csr-open-links"><a className="csr-open-primary" href="https://github.com/extractify/acainfe-api" target="_blank" rel="noopener noreferrer">View the API on GitHub <span aria-hidden="true">↗</span></a><a className="csr-text-link" href="https://github.com/neocite/acainfe-front" target="_blank" rel="noopener noreferrer">Front end <span aria-hidden="true">↗</span></a></div>
+          <p className="csr-open-invite">Contributions are welcome, including support for your own municipality.</p></div>
+        <div className="csr-open-side"><span className="csr-label">WHAT IS IN THE REPOSITORY</span><ul><li>National NFS-e issuer</li><li>Ginfes · São Bernardo do Campo</li><li>NFS-e Paulistana (São Paulo)</li><li>ICP-Brasil A1 certificate validation and XML signing</li><li>Full MCP server for AI agents</li><li>End-to-end tests</li></ul>
+          <div className="csr-open-hosted"><strong>Rather not run anything?</strong><p>The hosted service is the simplest path: no server setup, your certificate stored securely, and support when you need it.</p><Link href="/sign-up">Get started <span aria-hidden="true">↗</span></Link></div></div>
+      </section>
       <section className="csr-faq" id="duvidas">
         <span id="faq" className="csr-anchor" /><div className="csr-faq-intro"><span className="csr-label">BEFORE YOU START</span><h2>No fine print.<br /><em>Just answers.</em></h2><p>The essentials, explained clearly.</p></div>
         <div className="csr-faq-list">{englishFaq(price, coverage).map(({ q, a }) => <details key={q}><summary>{q}<span aria-hidden="true">+</span></summary><p>{a}</p></details>)}</div>

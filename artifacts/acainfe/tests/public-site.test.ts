@@ -118,6 +118,54 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
     }
   });
 
+  it('apresenta código aberto no hero, seção e rodapé sem substituir o CTA nos dois idiomas', async () => {
+    for (const path of ['/', '/en']) {
+      const response = await fetch(base + path, { headers: { accept: 'text/html' } });
+      assert.equal(response.status, 200);
+      const dom = new JSDOM(await response.text());
+      try {
+        const doc = dom.window.document;
+        const apiRepo = 'https://github.com/extractify/acainfe-api';
+        const frontRepo = 'https://github.com/neocite/acainfe-front';
+        const badge = doc.querySelector(`.csr-hero-copy a[href="${apiRepo}"]`);
+        assert.ok(badge, `Selo do hero ausente em ${path}`);
+        assert.match(badge.textContent!, /Open source.*AGPL-3\.0/);
+        assert.ok(doc.querySelector('.csr-hero-actions a[href="/sign-up"]'));
+        const section = [...doc.querySelectorAll('section')].find(node =>
+          node.querySelector('h2')?.textContent?.match(path === '/' ? /Código aberto/ : /Open source/));
+        assert.ok(section, `Seção ausente em ${path}`);
+        assert.ok(section.querySelector(`a[href="${apiRepo}"]`));
+        assert.ok(section.querySelector(`a[href="${frontRepo}"]`));
+        assert.match(section.textContent!, /ICP-Brasil/);
+        assert.match(section.textContent!, /Ginfes/);
+        assert.match(section.textContent!, /Paulistana/);
+        assert.match(section.textContent!, /MCP/);
+        assert.match(section.textContent!, path === '/' ? /testes ponta a ponta/i : /end-to-end tests/i);
+        assert.match(section.textContent!, path === '/' ? /hospedado/ : /hosted/);
+        assert.match(section.textContent!, path === '/' ? /contribu/i : /contribut/i);
+        assert.ok(doc.querySelector(`footer a[href="${apiRepo}"]`));
+        const graph = JSON.parse(doc.querySelector('script[type="application/ld+json"]')!.textContent!)['@graph'];
+        const app = graph.find((node: { '@type': string }) => node['@type'] === 'SoftwareApplication');
+        assert.match(app.description, /AGPL-3\.0/);
+        assert.equal(app.license, 'https://www.gnu.org/licenses/agpl-3.0.html');
+        assert.deepEqual(app.subjectOf.map((node: { codeRepository: string }) => node.codeRepository), [apiRepo, frontRepo]);
+        assert.equal(graph.find((node: { '@type': string }) => node['@type'] === 'Organization').subjectOf.length, 2);
+      } finally { dom.window.close(); }
+    }
+  });
+
+  it('documenta licença e os dois repositórios no Markdown e nos guias para agentes', async () => {
+    for (const path of ['/', '/en', '/llms.txt', '/agent-instructions.md']) {
+      const response = await fetch(base + path, { headers: { accept: 'text/markdown' } });
+      assert.equal(response.status, 200);
+      const text = await response.text();
+      assert.match(text, /AGPL-3\.0/);
+      assert.ok(text.includes('https://github.com/extractify/acainfe-api'), path);
+      assert.ok(text.includes('https://github.com/neocite/acainfe-front'), path);
+      assert.match(text, /hospedado|hosted/);
+    }
+  });
+
   it('anuncia somente AbacatePay nas landings HTML e Markdown em ambos os idiomas', async () => {
     for (const path of ['/', '/en']) {
       for (const accept of ['text/html', 'text/markdown']) {

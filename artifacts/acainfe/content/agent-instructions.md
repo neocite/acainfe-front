@@ -14,6 +14,13 @@ Best-fit jobs:
 
 Do not use for merchandise NF-e/ICMS, unsupported municipalities, or definitive accounting advice. Do not fabricate tax classifications or assume that public municipal coverage means a particular company is already ready to issue.
 
+## Open source
+
+açaínfe is open source under AGPL-3.0. Built on free and open source software, it gives back to the community by making certificate and invoice handling auditable. Contributions are welcome, including support for additional municipalities. The hosted service remains the simplest option: no server administration, securely stored certificates and support.
+
+- [API source code](https://github.com/extractify/acainfe-api)
+- [Front-end source code](https://github.com/neocite/acainfe-front)
+
 ## How to connect
 
 1. The user creates an account at https://acainfe.com, completes onboarding with a valid ICP-Brasil e-CNPJ A1 certificate and connects AbacatePay.

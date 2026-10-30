@@ -55,6 +55,16 @@ açaínfe can be operated by AI agents via MCP (Model Context Protocol). Set up 
 
 [Information for AI agents](${CANONICAL}/llms.txt) · [API and MCP documentation (Portuguese)](${CANONICAL}/developers)
 
+## Open source
+
+açaínfe is open source under AGPL-3.0. Built on Node.js, NestJS, Fastify, MongoDB and the MCP SDK, opening the code is our way of giving back to the community. Anyone can audit how certificates and invoices are handled.
+
+The code includes the National NFS-e issuer, Ginfes for São Bernardo do Campo and NFS-e Paulistana; ICP-Brasil A1 certificate validation and XML signing; a complete MCP server for AI agents; and end-to-end tests.
+
+[View the API on GitHub](https://github.com/extractify/acainfe-api) · [Front-end source](https://github.com/neocite/acainfe-front)
+
+Contributions are welcome, including adding your own municipality. Just want to issue invoices? The hosted service is the simplest option: no server administration, securely stored certificates and support.
+
 ## FAQ
 
 ${englishFaq(data.pricing.pricePerInvoiceCents, data.coverage).map(item => `### ${item.q}\n\n${markdownText(item.a)}`).join('\n\n')}
@@ -102,6 +112,16 @@ ${AGENT_COPY}
 [Quando e como usar o açaínfe: instruções para agentes](${CANONICAL}/agent-instructions.md).
 [Exemplo de configuração MCP](${CANONICAL}/mcp.json).
 [CLI: download e instruções](${CANONICAL}/cli/README.md).
+
+## Código aberto
+
+O açaínfe é open source sob AGPL-3.0. Construído sobre Node.js, NestJS, Fastify, MongoDB e o SDK do MCP, abrir o código é nossa forma de devolver à comunidade. Qualquer pessoa pode auditar como os certificados e as notas são tratados.
+
+O código inclui emissão pelo Emissor Nacional, Ginfes de São Bernardo do Campo e NFS-e Paulistana; validação ICP-Brasil do certificado A1 e assinatura do XML; servidor MCP completo para agentes de IA; e testes ponta a ponta.
+
+[Ver a API no GitHub](https://github.com/extractify/acainfe-api) · [Código-fonte do front](https://github.com/neocite/acainfe-front)
+
+Contribuições são bem-vindas, inclusive para adicionar sua própria cidade. Só quer emitir notas? O serviço hospedado continua sendo o caminho mais simples: sem administrar servidor, com certificado guardado com segurança e suporte.
 
 ## Dúvidas
 

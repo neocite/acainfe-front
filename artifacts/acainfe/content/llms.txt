@@ -2,6 +2,13 @@
 
 > Emissor de NFS-e (Nota Fiscal de Serviço eletrônica) brasileiro, automático e AI-first. Cada pagamento aprovado no AbacatePay vira nota fiscal, com a tributação de cada produto; toda a operação pode ser feita por agentes de IA via MCP. R$ 0,80 por nota emitida, sem mensalidade. Produto da EXTRACTIFY TECNOLOGIA LTDA (CNPJ 28.095.894/0001-60).
 
+## Código aberto
+
+O açaínfe é open source sob AGPL-3.0. Construído sobre software livre, abre o código como forma de devolver à comunidade e permitir a auditoria do tratamento de certificados e notas fiscais. Contribuições são bem-vindas, inclusive para adicionar a própria cidade. O serviço hospedado continua sendo o caminho mais simples: sem administrar servidor, com certificado guardado com segurança e suporte.
+
+- [Código-fonte da API](https://github.com/extractify/acainfe-api)
+- [Código-fonte do front](https://github.com/neocite/acainfe-front)
+
 ## Quando usar (When to use)
 
 Use o açaínfe quando o usuário (empresa brasileira, MEI ou Simples Nacional, em São Paulo/SP ou São Bernardo do Campo/SP) precisar:

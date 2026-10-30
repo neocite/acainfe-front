@@ -7,13 +7,19 @@ export function structuredData(data: PublicSiteData, locale: LandingLocale = 'pt
     {
       '@type': 'SoftwareApplication', '@id': `${CANONICAL}/#software`,
       name: 'açaínfe', url: CANONICAL, applicationCategory: 'BusinessApplication',
-      operatingSystem: 'Web', inLanguage: locale === 'en' ? 'en' : 'pt-BR', description: locale === 'en' ? englishDescription(data.pricing, data.coverage) : AGENT_DESCRIPTION,
+      operatingSystem: 'Web', inLanguage: locale === 'en' ? 'en' : 'pt-BR', description: locale === 'en' ? `${englishDescription(data.pricing, data.coverage)} Open source under AGPL-3.0.` : `${AGENT_DESCRIPTION} Código aberto sob AGPL-3.0.`,
+      license: 'https://www.gnu.org/licenses/agpl-3.0.html',
+      subjectOf: [
+        { '@type': 'SoftwareSourceCode', '@id': `${CANONICAL}/#api-source`, name: 'açaínfe API', codeRepository: 'https://github.com/extractify/acainfe-api', license: 'https://www.gnu.org/licenses/agpl-3.0.html' },
+        { '@type': 'SoftwareSourceCode', '@id': `${CANONICAL}/#front-source`, name: 'açaínfe Front', codeRepository: 'https://github.com/neocite/acainfe-front', license: 'https://www.gnu.org/licenses/agpl-3.0.html' },
+      ],
       offers: { '@type': 'Offer', price: (data.pricing.pricePerInvoiceCents / 100).toFixed(2), priceCurrency: 'BRL', description: locale === 'en' ? 'Per successfully issued service invoice, no monthly fee' : 'Por nota fiscal emitida com sucesso, sem mensalidade' },
       publisher: { '@id': `${CANONICAL}/#org` },
     },
     {
       '@type': 'Organization', '@id': `${CANONICAL}/#org`,
       name: 'EXTRACTIFY TECNOLOGIA LTDA', alternateName: 'açaínfe', url: CANONICAL,
+      subjectOf: [{ '@id': `${CANONICAL}/#api-source` }, { '@id': `${CANONICAL}/#front-source` }],
       taxID: '28.095.894/0001-60', email: 'contato@extractify.com.br', telephone: '+55-11-3458-7367',
       address: { '@type': 'PostalAddress', streetAddress: 'Av. Pereira Barreto, 1479, sala 2108, Baeta Neves', addressLocality: 'São Bernardo do Campo', addressRegion: 'SP', postalCode: '09751-000', addressCountry: 'BR' },
       contactPoint: { '@type': 'ContactPoint', contactType: 'customer support', email: 'contato@extractify.com.br', telephone: '+55-11-3458-7367', availableLanguage: 'pt-BR' },
