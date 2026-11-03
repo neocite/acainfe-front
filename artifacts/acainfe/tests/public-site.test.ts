@@ -125,7 +125,7 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
       const dom = new JSDOM(await response.text());
       try {
         const doc = dom.window.document;
-        const apiRepo = 'https://github.com/extractify/acainfe-api';
+        const apiRepo = 'https://github.com/neocite/acainfe-api';
         const frontRepo = 'https://github.com/neocite/acainfe-front';
         const badge = doc.querySelector(`.csr-hero-copy a[href="${apiRepo}"]`);
         assert.ok(badge, `Selo do hero ausente em ${path}`);
@@ -160,7 +160,7 @@ describe('Site público para navegadores e agentes — sem API externa', () => {
       assert.equal(response.status, 200);
       const text = await response.text();
       assert.match(text, /AGPL-3\.0/);
-      assert.ok(text.includes('https://github.com/extractify/acainfe-api'), path);
+      assert.ok(text.includes('https://github.com/neocite/acainfe-api'), path);
       assert.ok(text.includes('https://github.com/neocite/acainfe-front'), path);
       assert.match(text, /hospedado|hosted/);
     }

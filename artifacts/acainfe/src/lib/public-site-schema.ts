@@ -10,7 +10,7 @@ export function structuredData(data: PublicSiteData, locale: LandingLocale = 'pt
       operatingSystem: 'Web', inLanguage: locale === 'en' ? 'en' : 'pt-BR', description: locale === 'en' ? `${englishDescription(data.pricing, data.coverage)} Open source under AGPL-3.0.` : `${AGENT_DESCRIPTION} Código aberto sob AGPL-3.0.`,
       license: 'https://www.gnu.org/licenses/agpl-3.0.html',
       subjectOf: [
-        { '@type': 'SoftwareSourceCode', '@id': `${CANONICAL}/#api-source`, name: 'açaínfe API', codeRepository: 'https://github.com/extractify/acainfe-api', license: 'https://www.gnu.org/licenses/agpl-3.0.html' },
+        { '@type': 'SoftwareSourceCode', '@id': `${CANONICAL}/#api-source`, name: 'açaínfe API', codeRepository: 'https://github.com/neocite/acainfe-api', license: 'https://www.gnu.org/licenses/agpl-3.0.html' },
         { '@type': 'SoftwareSourceCode', '@id': `${CANONICAL}/#front-source`, name: 'açaínfe Front', codeRepository: 'https://github.com/neocite/acainfe-front', license: 'https://www.gnu.org/licenses/agpl-3.0.html' },
       ],
       offers: { '@type': 'Offer', price: (data.pricing.pricePerInvoiceCents / 100).toFixed(2), priceCurrency: 'BRL', description: locale === 'en' ? 'Per successfully issued service invoice, no monthly fee' : 'Por nota fiscal emitida com sucesso, sem mensalidade' },

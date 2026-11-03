@@ -18,7 +18,7 @@ export function SiteFooter({ onTerms, home = false, locale = 'pt' }: { onTerms: 
       <button type="button" onClick={onTerms}>{t('Termos de uso', 'Terms of use')}</button>
       <Link href="/privacidade">{t('Política de privacidade', 'Privacy policy (Portuguese)')}</Link>
       <Link href="/contato">{t('Contato', 'Contact (Portuguese)')}</Link>
-      <a href="https://github.com/extractify/acainfe-api" target="_blank" rel="noopener noreferrer">{t('Código-fonte no GitHub', 'Source on GitHub')}</a>
+      <a href="https://github.com/neocite/acainfe-api" target="_blank" rel="noopener noreferrer">{t('Código-fonte no GitHub', 'Source on GitHub')}</a>
       <Link href={locale === 'en' ? '/' : '/en'} hrefLang={locale === 'en' ? 'pt-BR' : 'en'}>{locale === 'en' ? 'Português' : 'English'}</Link>
     </div>
     <small>{t('O açaínfe não é afiliado ao AbacatePay.', 'açaínfe is not affiliated with AbacatePay.')}</small>

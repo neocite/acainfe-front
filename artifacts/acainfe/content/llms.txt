@@ -6,7 +6,7 @@
 
 O açaínfe é open source sob AGPL-3.0. Construído sobre software livre, abre o código como forma de devolver à comunidade e permitir a auditoria do tratamento de certificados e notas fiscais. Contribuições são bem-vindas, inclusive para adicionar a própria cidade. O serviço hospedado continua sendo o caminho mais simples: sem administrar servidor, com certificado guardado com segurança e suporte.
 
-- [Código-fonte da API](https://github.com/extractify/acainfe-api)
+- [Código-fonte da API](https://github.com/neocite/acainfe-api)
 - [Código-fonte do front](https://github.com/neocite/acainfe-front)
 
 ## Quando usar (When to use)

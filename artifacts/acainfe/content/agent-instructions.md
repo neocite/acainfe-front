@@ -18,7 +18,7 @@ Do not use for merchandise NF-e/ICMS, unsupported municipalities, or definitive 
 
 açaínfe is open source under AGPL-3.0. Built on free and open source software, it gives back to the community by making certificate and invoice handling auditable. Contributions are welcome, including support for additional municipalities. The hosted service remains the simplest option: no server administration, securely stored certificates and support.
 
-- [API source code](https://github.com/extractify/acainfe-api)
+- [API source code](https://github.com/neocite/acainfe-api)
 - [Front-end source code](https://github.com/neocite/acainfe-front)
 
 ## How to connect

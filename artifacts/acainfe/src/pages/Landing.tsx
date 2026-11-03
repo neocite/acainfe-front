@@ -72,7 +72,7 @@ export default function Landing() {
         <section className="csr-hero">
           <div className="csr-hero-copy">
             <div className="csr-eyebrow"><span className="csr-status-dot" /> NOTA FISCAL NO AUTOMÁTICO</div>
-            <a className="csr-oss-badge" href="https://github.com/extractify/acainfe-api" target="_blank" rel="noopener noreferrer">Open source · AGPL-3.0 <span aria-hidden="true">↗</span></a>
+            <a className="csr-oss-badge" href="https://github.com/neocite/acainfe-api" target="_blank" rel="noopener noreferrer">Open source · AGPL-3.0 <span aria-hidden="true">↗</span></a>
             <p className="csr-kicker">Para quem vende no digital</p>
             <h1><span className="sr-only">açaínfe: nota fiscal de serviço (NFS-e) automática. </span>Vendeu.<br /><em>A nota foi.</em></h1>
             <p className="csr-lead">Cada pagamento aprovado no AbacatePay vira uma NFS-e automaticamente, sem planilha no fim do mês.</p>
@@ -122,7 +122,7 @@ export default function Landing() {
         </section>
       <section className="csr-open" id="codigo-aberto">
         <div className="csr-open-copy"><span className="csr-label">AGPL-3.0 · FEITO COM SOFTWARE LIVRE</span><h2>Código aberto.<br /><em>Pode auditar.</em></h2><p>Construímos o açaínfe sobre Node.js, NestJS, Fastify, MongoDB e o SDK do MCP. Abrir o código é nossa forma de devolver para a comunidade e permitir que qualquer pessoa audite como os certificados e as notas são tratados.</p>
-          <div className="csr-open-links"><a className="csr-open-primary" href="https://github.com/extractify/acainfe-api" target="_blank" rel="noopener noreferrer">Ver a API no GitHub <span aria-hidden="true">↗</span></a><a className="csr-text-link" href="https://github.com/neocite/acainfe-front" target="_blank" rel="noopener noreferrer">Front-end <span aria-hidden="true">↗</span></a></div>
+          <div className="csr-open-links"><a className="csr-open-primary" href="https://github.com/neocite/acainfe-api" target="_blank" rel="noopener noreferrer">Ver a API no GitHub <span aria-hidden="true">↗</span></a><a className="csr-text-link" href="https://github.com/neocite/acainfe-front" target="_blank" rel="noopener noreferrer">Front-end <span aria-hidden="true">↗</span></a></div>
           <p className="csr-open-invite">Contribuições são bem-vindas, inclusive a integração do seu município.</p></div>
         <div className="csr-open-side"><span className="csr-label">O QUE ESTÁ NO REPOSITÓRIO</span><ul><li>Emissão pelo Emissor Nacional da NFS-e</li><li>Ginfes · São Bernardo do Campo</li><li>NFS-e Paulistana</li><li>Validação de certificado ICP-Brasil A1 e assinatura de XML</li><li>Servidor MCP completo para agentes de IA</li><li>Testes ponta a ponta</li></ul>
           <div className="csr-open-hosted"><strong>Prefere não manter nada?</strong><p>O serviço hospedado é o caminho mais simples: sem servidor para configurar, certificado armazenado com segurança e suporte quando precisar.</p><Link href="/sign-up">Começar agora <span aria-hidden="true">↗</span></Link></div></div>
