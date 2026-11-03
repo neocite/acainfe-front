@@ -33,7 +33,7 @@ Avisamos você quando a correção for publicada e, se quiser, damos o crédito 
 - o app em https://acainfe.com: landing, cadastro e conta;
 - o proxy `/api/*`.
 
-Problemas na API, como emissão, certificados ou MCP, também podem ser reportados aqui. Se preferir, use [extractify/acainfe-api](https://github.com/extractify/acainfe-api/security).
+Problemas na API, como emissão, certificados ou MCP, também podem ser reportados aqui. Se preferir, use [neocite/acainfe-api](https://github.com/neocite/acainfe-api/security).
 
 **Fora do escopo:**
 - testes contra dados, certificados ou contas de empresas reais, inclusive tentar assumir uma empresa já cadastrada. Use uma conta sua e o CNPJ de teste `99000001000101`;

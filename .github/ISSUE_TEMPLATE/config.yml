@@ -4,5 +4,5 @@ contact_links:
     url: https://github.com/neocite/acainfe-front/security/advisories/new
     about: Reporte vulnerabilidades em privado. Nunca em issue pública.
   - name: Problemas na emissão de notas ou na API
-    url: https://github.com/extractify/acainfe-api/issues
+    url: https://github.com/neocite/acainfe-api/issues
     about: Emissão, certificados, MCP e regras fiscais ficam na API.

@@ -7,7 +7,7 @@
 
 O [açaínfe](https://acainfe.com) emite NFS-e (Nota Fiscal de Serviço eletrônica) automaticamente a cada venda paga no AbacatePay e pode ser operado inteiro por agentes de IA via MCP.
 
-Este repositório é o **front**: a landing page, o cadastro (onboarding) e a área da conta. As notas, empresas, certificados e cobranças ficam na **API**, em [extractify/acainfe-api](https://github.com/extractify/acainfe-api). O front não emite notas e não guarda dados fiscais: ele autentica o usuário e repassa as chamadas à API.
+Este repositório é o **front**: a landing page, o cadastro (onboarding) e a área da conta. As notas, empresas, certificados e cobranças ficam na **API**, em [neocite/acainfe-api](https://github.com/neocite/acainfe-api). O front não emite notas e não guarda dados fiscais: ele autentica o usuário e repassa as chamadas à API.
 
 ## Stack
 
@@ -38,7 +38,7 @@ threat_model.md         # modelo de ameaças
 Pré-requisitos:
 - **Node.js 22.23.4+, 24.22.1+ ou 26.12.1+.** Versões anteriores são bloqueadas por causa de uma correção de segurança.
 - **pnpm 10.**
-- **Uma instância da [API](https://github.com/extractify/acainfe-api).**
+- **Uma instância da [API](https://github.com/neocite/acainfe-api).**
 - **Uma aplicação no [Clerk](https://clerk.com).**
 
 ```bash

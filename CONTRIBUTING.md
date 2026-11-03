@@ -7,7 +7,7 @@ Obrigado pelo interesse! Este guia explica como preparar o ambiente, as regras d
 - **Bugs e sugestões:** abra uma [issue](https://github.com/neocite/acainfe-front/issues/new/choose).
 - **Mudanças grandes** (nova tela, mudança de fluxo ou de arquitetura): abra uma issue antes, para discutirmos a ideia.
 - **Vulnerabilidades:** **nunca** em issue pública. Siga a [política de segurança](SECURITY.md).
-- **Mudanças de regra fiscal, emissão ou dados da empresa** costumam ser da API: veja [extractify/acainfe-api](https://github.com/extractify/acainfe-api).
+- **Mudanças de regra fiscal, emissão ou dados da empresa** costumam ser da API: veja [neocite/acainfe-api](https://github.com/neocite/acainfe-api).
 
 ## Ambiente
 
